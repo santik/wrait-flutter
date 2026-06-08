@@ -3,32 +3,50 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
+import 'package:wrait/core/router/app_router.dart';
+import 'package:wrait/presentation/theme/design_tokens.dart';
 
 void main() {
-  testWidgets('renders the placeholder shell', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appConfigProvider.overrideWithValue(
-            const AppConfig(
-              backendUrl: 'https://wrait-backend.vercel.app',
-              proxySecret: '',
-              recordingHardCapMs: 120000,
-            ),
-          ),
-        ],
-        child: const WraitApp(),
-      ),
-    );
+  testWidgets('renders the root placeholder shell', (tester) async {
+    await tester.pumpWidget(_buildTestApp());
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Foundation ready'), findsOneWidget);
-    expect(find.byKey(const ValueKey('backendHostValue')), findsOneWidget);
-    expect(find.text('wrait-backend.vercel.app'), findsOneWidget);
-    expect(find.byKey(const ValueKey('recordingHardCapValue')), findsOneWidget);
-    expect(find.text('120 seconds'), findsOneWidget);
-    expect(find.byKey(const ValueKey('proxySecretStateValue')), findsOneWidget);
-    expect(find.text('Not configured'), findsOneWidget);
+    expect(find.text('Capture'), findsOneWidget);
+    expect(find.byKey(const ValueKey('shellTitle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('adaptiveButtonPreview')), findsOneWidget);
   });
+
+  testWidgets('preserves reserved status and quota space', (tester) async {
+    await tester.pumpWidget(_buildTestApp());
+
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('statusLineSlot'))).height,
+      WraitStatusLineTokens.reservedHeight,
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('quotaLineSlot'))).height,
+      WraitQuotaLineTokens.reservedHeight,
+    );
+  });
+}
+
+Widget _buildTestApp({String initialLocation = '/'}) {
+  return ProviderScope(
+    overrides: [
+      appConfigProvider.overrideWithValue(
+        const AppConfig(
+          backendUrl: 'https://wrait-backend.vercel.app',
+          proxySecret: '',
+          recordingHardCapMs: 120000,
+        ),
+      ),
+      appRouterProvider.overrideWithValue(
+        buildAppRouter(initialLocation: initialLocation),
+      ),
+    ],
+    child: const WraitApp(),
+  );
 }

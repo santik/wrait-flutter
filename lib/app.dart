@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
+import 'presentation/theme/wrait_theme.dart';
 
 final appConfigProvider = Provider<AppConfig>(
   (ref) =>
@@ -21,10 +22,10 @@ class WraitApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'Wrait',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E6A5A)),
-        useMaterial3: true,
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: wraitLightTheme,
+      darkTheme: wraitDarkTheme,
+      themeMode: ThemeMode.system,
       routerConfig: router,
     );
   }
