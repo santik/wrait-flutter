@@ -38,13 +38,20 @@ upcoming feature work:
 - shared preferences bootstrap
 - persisted recording-state preference
 - persisted stable app device identifier with native lookup and fallback
+- centralized backend API client for device registration, audio transcription,
+  and transcript cleanup
+- OpenAPI-driven backend contract consumption from `api/wrait-backend.yaml`
+- backend request wiring through runtime config plus persisted device identity
+- explicit backend failure categories for timeout, no internet,
+  request-too-large, quota-exceeded, proxy-auth failure,
+  backend-unavailable, and generic API error
 - placeholder shell routes for `/`, `/entries`, and `/entry/:id`
 - platform setup for Android and iOS
 - placeholder screens used to validate launch, theming, and route coverage
 
-Feature behavior such as real recording, transcription, preferences
-persistence beyond the current basic flags and identifiers, and entry-management
-UI still belongs to later user stories.
+Feature behavior such as real recording UI, full transcription/cleanup
+orchestration, preferences persistence beyond the current basic flags and
+identifiers, and entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -59,11 +66,21 @@ UI still belongs to later user stories.
 Planned future stories cover:
 
 - expanded preferences and settings
-- backend API integration
 - audio recording services
 - transcription and cleanup flows
 - entry browsing and detail screens
 - privacy mode and offline behavior
+
+## Backend integration note
+
+The backend client is generated at build time from the checked-in OpenAPI
+contract.
+
+- Source of truth: `api/wrait-backend.yaml`
+- Build/bootstrap command: `npm run build`
+- Generated package output: `tool/openapi-generator/output/backend_api/`
+- App-facing compatibility bridge:
+  `lib/data/api/generated/backend_api_generated.dart`
 
 ## Reference
 

@@ -1,0 +1,380 @@
+openapi: 3.0.3
+info:
+  title: Wrait Backend API
+  version: 0.1.0
+  license:
+    name: Proprietary
+    url: https://wrait.app
+  description: |
+    Consumer-facing API contract for device registration, transcription proxying,
+    and transcript cleanup.
+servers:
+  - url: /
+    description: Relative server URL for deployed or local environments
+paths:
+  /api/register:
+    post:
+      operationId: registerDevice
+      summary: Register a device
+      description: Registers or upserts a device using the hashed device identifier.
+      security:
+        - ProxySecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdHeader'
+      responses:
+        '201':
+          description: Device registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/transcribe:
+    post:
+      operationId: transcribeAudio
+      summary: Proxy audio transcription
+      description: |
+        Accepts an audio upload as multipart form data, applies backend defaults
+        for the upstream Deepgram request, and returns the normalized backend
+        JSON payload.
+      security:
+        - ProxySecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio recording file to transcribe.
+            encoding:
+              audio:
+                contentType: audio/mp4, audio/m4a, audio/wav, audio/webm
+      responses:
+        '200':
+          description: Transcription completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/DailyRecordLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          description: Upstream service error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamErrorResponse'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+  /api/cleanup:
+    post:
+      operationId: cleanupTranscript
+      summary: Clean up a transcript
+      description: |
+        Accepts a raw transcript plus the speaker language and returns cleaned
+        diary-ready text.
+      security:
+        - ProxySecretHeader: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupRequest'
+      responses:
+        '200':
+          description: Cleanup completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/DailyRecordLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          description: Upstream service error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+components:
+  securitySchemes:
+    ProxySecretHeader:
+      type: apiKey
+      in: header
+      name: X-Proxy-Secret
+  parameters:
+    DeviceIdHeader:
+      name: X-Device-Id
+      in: header
+      required: true
+      description: 64-character hex-encoded device identifier.
+      schema:
+        type: string
+        pattern: '^[a-fA-F0-9]{64}$'
+  responses:
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid proxy secret
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    MethodNotAllowed:
+      description: Unsupported HTTP method
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RequestTooLarge:
+      description: Request body exceeded the supported size limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    DailyRecordLimitExceeded:
+      description: Device has reached its daily completed-record limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DailyRecordLimitExceededResponse'
+    InternalServerError:
+      description: Internal backend error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UpstreamTimeout:
+      description: Upstream provider request timed out
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    DailyRecordLimitExceededResponse:
+      type: object
+      required:
+        - error
+        - quota
+      properties:
+        error:
+          type: string
+          enum:
+            - Daily record limit exceeded
+        quota:
+          $ref: '#/components/schemas/RecordQuota'
+    RecordQuota:
+      type: object
+      required:
+        - limit
+        - count
+        - remaining
+        - resetAt
+      properties:
+        limit:
+          type: integer
+          minimum: 0
+          description: Effective completed-record limit for the current UTC day.
+        count:
+          type: integer
+          minimum: 0
+          description: Completed records already counted for the current UTC day.
+        remaining:
+          type: integer
+          minimum: 0
+          description: Remaining completed records available before the next UTC reset.
+        resetAt:
+          type: string
+          format: date-time
+          description: Next UTC midnight when the daily record quota resets.
+    RegisterResponse:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        quota:
+          allOf:
+            - $ref: '#/components/schemas/RecordQuota'
+          description: Current cleanup quota for the device on the active UTC day. Omitted if quota lookup fails after registration succeeds.
+    CleanupRequest:
+      type: object
+      required:
+        - transcript
+        - language
+      properties:
+        transcript:
+          type: string
+          minLength: 10
+          description: Raw transcript text to clean up.
+        language:
+          type: string
+          enum:
+            - en
+            - en-US
+            - en-GB
+            - en-AU
+            - en-NZ
+            - en-IN
+            - nl
+            - nl-NL
+            - nl-BE
+            - de
+            - de-DE
+            - de-AT
+            - de-CH
+            - fr
+            - fr-FR
+            - fr-BE
+            - fr-CA
+            - fr-CH
+            - es
+            - es-ES
+            - es-MX
+            - es-AR
+            - es-US
+            - es-419
+            - it
+            - it-IT
+            - pt
+            - pt-PT
+            - pt-BR
+            - ja
+            - ja-JP
+            - zh
+            - zh-CN
+            - zh-TW
+            - zh-HK
+            - ko
+            - ko-KR
+            - ru
+            - ru-RU
+            - pl
+            - pl-PL
+            - tr
+            - tr-TR
+            - sv
+            - sv-SE
+            - da
+            - da-DK
+            - fi
+            - fi-FI
+            - nb
+            - nb-NO
+            - 'no'
+            - ar
+            - ar-SA
+            - ar-AE
+            - hi
+            - hi-IN
+            - id
+            - id-ID
+            - ms
+            - ms-MY
+            - th
+            - th-TH
+            - uk
+            - uk-UA
+            - cs
+            - cs-CZ
+            - sk
+            - sk-SK
+            - ro
+            - ro-RO
+            - hu
+            - hu-HU
+            - bg
+            - bg-BG
+            - hr
+            - hr-HR
+            - el
+            - el-GR
+            - he
+            - he-IL
+            - vi
+            - vi-VN
+            - ca
+            - ca-ES
+    CleanupResponse:
+      type: object
+      required:
+        - cleanedText
+        - wasTruncated
+      properties:
+        cleanedText:
+          type: string
+        wasTruncated:
+          type: boolean
+        quota:
+          allOf:
+            - $ref: '#/components/schemas/RecordQuota'
+          description: Updated cleanup quota after the successful cleanup is counted. Omitted if quota persistence fails after cleanup succeeds.
+    TranscribeResponse:
+      type: object
+      required:
+        - transcript
+        - detected_language
+      properties:
+        transcript:
+          type: string
+        detected_language:
+          type: string
+        quota:
+          allOf:
+            - $ref: '#/components/schemas/RecordQuota'
+          description: Current cleanup quota for the device on the active UTC day. Omitted if quota lookup fails after transcription succeeds.
+    UpstreamErrorResponse:
+      type: object
+      additionalProperties: true

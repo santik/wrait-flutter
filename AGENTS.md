@@ -56,3 +56,18 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 
 - Application description: [`docs/application-description.md`](docs/application-description.md)
 - Agent-relevant implementation findings: [`docs/agent-findings.md`](docs/agent-findings.md)
+
+## Backend API generation guidance
+
+US-005 introduced a build-time OpenAPI generation prerequisite for the Flutter
+backend client.
+
+- The backend contract source of truth in this repo is `api/wrait-backend.yaml`.
+- If that file changes, run `npm run build` before `flutter pub get`,
+  `flutter analyze`, or `flutter test`.
+- The generated package under `tool/openapi-generator/output/backend_api/` is
+  local build output and is not committed to git.
+- App code should depend on
+  `lib/data/api/generated/backend_api_generated.dart`, which acts as the stable
+  compatibility bridge over the generated package, rather than importing the
+  generated package surface directly in feature code.

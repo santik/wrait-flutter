@@ -226,6 +226,9 @@ Core recording flow with cloud transcription and AI cleanup. All UI screens,
 navigation, permissions, security, draft retry, device registration. This
 delivers the primary user experience.
 
+Detailed implementation order is tracked in `plan/README.md`. The current plan
+intentionally schedules US-016 before US-006.
+
 **Phase 2 — Offline Mode (US-024, US-025):**
 On-device speech recognition and language selection. Lower priority because it
 requires platform-specific speech APIs with more complexity and less
@@ -261,4 +264,3 @@ Analytics, accessibility refinements, and comprehensive testing.
 
 ### Permissions
 - `permission_handler` package.
-
