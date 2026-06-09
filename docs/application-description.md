@@ -35,12 +35,16 @@ upcoming feature work:
 - centralized light/dark theme and design tokens
 - encrypted local entry database bootstrap
 - encrypted local entry persistence and stale-draft cleanup
+- shared preferences bootstrap
+- persisted recording-state preference
+- persisted stable app device identifier with native lookup and fallback
 - placeholder shell routes for `/`, `/entries`, and `/entry/:id`
 - platform setup for Android and iOS
 - placeholder screens used to validate launch, theming, and route coverage
 
 Feature behavior such as real recording, transcription, preferences
-persistence, and entry-management UI still belongs to later user stories.
+persistence beyond the current basic flags and identifiers, and entry-management
+UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -54,8 +58,7 @@ persistence, and entry-management UI still belongs to later user stories.
 
 Planned future stories cover:
 
-- encrypted local database storage
-- persisted user preferences
+- expanded preferences and settings
 - backend API integration
 - audio recording services
 - transcription and cleanup flows

@@ -16,41 +16,41 @@ Reference the spec's acceptance criteria and explain how this plan satisfies the
 
 _Document key technical choices and their rationale._
 
-| Decision                       | Choice         | Rationale                          |
-| ------------------------------ | -------------- | ---------------------------------- |
-| [e.g., Validation approach]    | [e.g., Zod]   | [e.g., Runtime + static typing]    |
-| [e.g., Storage migration]      | [e.g., None]  | [e.g., JSON store sufficient]      |
+| Decision | Choice | Rationale |
+| --- | --- | --- |
+| [e.g., Validation approach] | [e.g., Riverpod state + repository] | [Why this is the simplest correct choice] |
+| [e.g., Storage migration] | [e.g., None] | [Why no migration is required] |
 
 ## File changes
 
 _List every file that will be created or modified._
 
-| File                                | Action   | Description                        |
-| ----------------------------------- | -------- | ---------------------------------- |
-| `src/routes/example.ts`             | Create   | New route handler                  |
-| `src/controllers/example.ts`        | Create   | Business logic and validation      |
-| `src/types/example.ts`              | Modify   | Add new fields or types            |
+| File | Action | Description |
+| --- | --- | --- |
+| `lib/example.dart` | Create | New feature logic |
+| `test/example_test.dart` | Modify | Coverage for the new behavior |
 
 ## API contract details
 
-_Expand on the spec's API contract with implementation specifics:
-middleware, validation rules, response headers, pagination strategy._
+_Expand on the spec's contract with implementation specifics:
+validation rules, failure behavior, response structure, or internal contract
+details as appropriate for the feature._
 
 ## Data model changes
 
 _Show the before/after for any type changes.
-Include migration steps for `features.json` if data shape changes._
+Include migration steps when existing data is affected._
 
 ### Before
 
-```typescript
-// existing type
+```text
+// existing shape
 ```
 
 ### After
 
-```typescript
-// modified type
+```text
+// modified shape
 ```
 
 ### Migration
@@ -63,21 +63,49 @@ _Define how this feature will be validated._
 
 ### Automated tests
 
-_List the test cases that will be written.
-Indicate test type: unit, integration, or contract._
+_List the planned test cases.
+Every in-scope user flow should have `integration_test` coverage unless the
+user explicitly approves an exception during planning._
 
-| Test case                                | Type        | File                        |
-| ---------------------------------------- | ----------- | --------------------------- |
-| [e.g., Returns 400 for missing key]      | Integration | `tests/features.test.ts`    |
-| [e.g., Backstage YAML includes new field]| Unit        | `tests/backstageMapper.test.ts` |
+| Test case | Type | File |
+| --- | --- | --- |
+| [e.g., Happy-path user flow] | Integration | `integration_test/example_flow_test.dart` |
+| [e.g., Repository fallback behavior] | Unit | `test/data/example_repository_test.dart` |
 
-### Manual verification
+### Android emulator verification
 
-_Steps for manual validation if automated tests don't fully cover the feature._
+_Describe the Android emulator checks required before final approval._
 
-1. Start the development server.
-2. [Step 2]
-3. [Step 3]
+1. [Launch or runtime step]
+2. [User-flow verification step]
+3. [Expected evidence]
+
+### iOS simulator verification
+
+_Describe the iOS simulator checks required before final approval._
+
+1. [Launch or runtime step]
+2. [User-flow verification step]
+3. [Expected evidence]
+
+### Validation exception request
+
+_Leave this section empty if no exception is needed.
+If this feature cannot reasonably satisfy the default `integration_test` or
+dual-platform runtime-verification requirements, request the exception here
+with a concrete rationale for explicit user approval._
+
+## Review and finalization
+
+_Describe any feature-specific expectations for the post-implementation review
+loop and the final knowledge-capture decision._
+
+- `review.md` will be externally authored if review occurs.
+- After reading `review.md`, no files may be changed until the remediation plan
+  is explicitly approved.
+- Note whether the feature is likely to require durable updates to
+  `AGENTS.md`, `docs/application-description.md`, or `docs/agent-findings.md`
+  after final approval.
 
 ## Integration notes
 
@@ -92,9 +120,9 @@ Feature flags needed?_
 
 ## Risks & mitigations
 
-| Risk                                   | Likelihood | Impact | Mitigation                    |
-| -------------------------------------- | ---------- | ------ | ----------------------------- |
-| [e.g., Breaking existing consumers]    | Medium     | High   | [e.g., Version the endpoint]  |
+| Risk | Likelihood | Impact | Mitigation |
+| --- | --- | --- | --- |
+| [e.g., Regression in an existing flow] | Medium | High | [How it will be contained or detected] |
 
 ## Open items from spec
 

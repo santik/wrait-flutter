@@ -258,6 +258,84 @@ US-002 was validated successfully with both automated and manual checks:
   - Android debug build: `flutter build apk --debug`
   - iOS simulator debug build: `flutter build ios --simulator --debug --no-codesign`
 
+## US-004: Preferences Storage
+
+### Established preferences foundation
+
+- The app now has a shared preferences layer under:
+  - `lib/data/preferences/`
+  - `lib/domain/repository/preferences_repository.dart`
+- App startup now injects `SharedPreferences` once in:
+  - `lib/main.dart`
+- Riverpod access already exists and should be reused:
+  - `sharedPreferencesProvider`
+  - `platformDeviceIdProvider`
+  - `preferencesRepositoryProvider`
+
+### Preferences contract worth preserving
+
+- `PreferencesRepository` currently owns two persisted concerns:
+  - `hasEverRecorded`
+  - `deviceId`
+- `hasEverRecorded` defaults to `false` when unset.
+- Failed writes are treated as hard failures inside the repository:
+  - `setHasEverRecorded()` throws when persistence reports `false`
+  - `getDeviceId()` throws when persisting the resolved ID reports `false`
+
+### Device ID behavior worth preserving
+
+- The rest of the app should treat `getDeviceId()` as returning one opaque
+  stable app identifier.
+- Feature code should not know or care whether that value came from the
+  platform or from generated fallback.
+- Current resolution order is:
+  - in-memory cached value
+  - stored `app_device_id` from shared preferences
+  - platform-provided device ID
+  - generated fallback ID
+- The first non-empty resolved value is persisted and then reused on later
+  launches.
+
+### Platform bridge guidance
+
+- Android currently supplies the platform value from
+  `Settings.Secure.ANDROID_ID` in
+  `android/app/src/main/kotlin/com/wrait/app/MainActivity.kt`.
+- iOS currently supplies the platform value from
+  `UIDevice.current.identifierForVendor?.uuidString` in
+  `ios/Runner/AppDelegate.swift`.
+- The Flutter-side bridge is intentionally best-effort:
+  - `PlatformException` returns `null`
+  - `MissingPluginException` returns `null`
+- Non-recoverable platform lookup failures should degrade to fallback
+  generation instead of interrupting the user.
+
+### Testing guidance
+
+- `PreferencesStore` exists as a seam for deterministic repository tests and
+  write-failure coverage.
+- Future preference work should preserve test coverage for:
+  - unset defaults
+  - persistence across repository recreation
+  - write-failure behavior
+  - stored-value precedence over platform lookup
+  - generated fallback reuse after persistence
+  - source opacity of `getDeviceId()`
+
+### Validation and caveats
+
+- Validation that has already succeeded:
+  - `flutter analyze`
+  - `flutter test`
+  - `flutter build apk --debug`
+  - `flutter build ios --simulator --debug --no-codesign`
+- Native builds verified the bridge compiles on both platforms, but live
+  device/simulator retrieval of the actual platform IDs was not exercised in
+  this environment.
+- `SharedPreferences.getInstance()` is still part of app bootstrap in
+  `lib/main.dart`; if that call starts failing in the future, the app will fail
+  before `runApp`.
+
 ### Guidance for future stories
 
 - Reuse the existing `EntryRepository` contract instead of adding parallel local
@@ -271,7 +349,7 @@ US-002 was validated successfully with both automated and manual checks:
 - If a future story changes the SQLite runtime or iOS dependency surface,
   revalidate both encrypted-store startup and the iOS SPM-only build path.
 
-## US-004: iOS Swift Package Manager Cleanup
+## Cross-cutting: iOS Swift Package Manager Cleanup
 
 ### Current iOS dependency state
 
