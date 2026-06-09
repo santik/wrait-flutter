@@ -25,16 +25,22 @@ and transcription flow first, then offline capabilities, and then polish work.
 
 ## Current implementation scope
 
-At the moment, the Flutter app includes only the shared project foundation:
+At the moment, the Flutter app includes the shared project foundation, the core
+visual shell, and the first encrypted local persistence layer needed for
+upcoming feature work:
 
 - app bootstrap
 - routing shell
 - runtime configuration loading
+- centralized light/dark theme and design tokens
+- encrypted local entry database bootstrap
+- encrypted local entry persistence and stale-draft cleanup
+- placeholder shell routes for `/`, `/entries`, and `/entry/:id`
 - platform setup for Android and iOS
-- a placeholder screen used to validate launch and config visibility
+- placeholder screens used to validate launch, theming, and route coverage
 
-Feature behavior such as real recording, transcription, local database storage,
-preferences persistence, and entry management belongs to later user stories.
+Feature behavior such as real recording, transcription, preferences
+persistence, and entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -48,7 +54,6 @@ preferences persistence, and entry management belongs to later user stories.
 
 Planned future stories cover:
 
-- theme and design tokens
 - encrypted local database storage
 - persisted user preferences
 - backend API integration

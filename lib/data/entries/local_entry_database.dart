@@ -1,0 +1,131 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import 'database_key_store.dart';
+
+part 'entry_dao.dart';
+part 'local_entry_database.g.dart';
+
+typedef CipherSupportVerifier = void Function(sqlite.Database rawDb);
+
+class EntryRecords extends Table {
+  @override
+  String get tableName => 'entries';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get rawTranscript => text().named('raw_transcript')();
+  TextColumn get cleanedText => text().named('cleaned_text').nullable()();
+  BoolColumn get isDraft => boolean().named('is_draft')();
+  TextColumn get language => text()();
+  IntColumn get createdAt => integer().named('created_at')();
+  IntColumn get wordCount =>
+      integer().named('word_count').withDefault(const Constant(0))();
+  TextColumn get audioPath => text().named('audio_path').nullable()();
+}
+
+@DriftDatabase(tables: [EntryRecords], daos: [EntryDao])
+class LocalEntryDatabase extends _$LocalEntryDatabase {
+  LocalEntryDatabase(super.e);
+
+  static const databaseFileName = 'wrait_entries.sqlite';
+
+  @override
+  int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (migrator) async {
+      await migrator.createAll();
+    },
+  );
+
+  static Future<LocalEntryDatabase> open({
+    required DatabaseKeyStore keyStore,
+    File? databaseFile,
+    bool logStatements = false,
+    CipherSupportVerifier verifyCipherSupport = _ensureCipherSupport,
+  }) async {
+    final dbFile = databaseFile ?? await defaultDatabaseFile();
+    final key = await keyStore.readOrCreateKey();
+    final existedBefore = await dbFile.exists();
+
+    try {
+      return await _openVerified(
+        dbFile,
+        key,
+        logStatements: logStatements,
+        verifyCipherSupport: verifyCipherSupport,
+      );
+    } catch (_) {
+      if (!existedBefore) rethrow;
+
+      await deleteDatabaseArtifacts(dbFile);
+      return _openVerified(
+        dbFile,
+        key,
+        logStatements: logStatements,
+        verifyCipherSupport: verifyCipherSupport,
+      );
+    }
+  }
+
+  static Future<File> defaultDatabaseFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File(path.join(directory.path, databaseFileName));
+  }
+
+  static Future<void> deleteDatabaseArtifacts(File databaseFile) async {
+    final candidates = <String>[
+      databaseFile.path,
+      '${databaseFile.path}-wal',
+      '${databaseFile.path}-shm',
+      '${databaseFile.path}-journal',
+    ];
+
+    for (final candidate in candidates) {
+      final file = File(candidate);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+  }
+
+  static Future<LocalEntryDatabase> _openVerified(
+    File databaseFile,
+    String key, {
+    required bool logStatements,
+    required CipherSupportVerifier verifyCipherSupport,
+  }) async {
+    final database = LocalEntryDatabase(
+      NativeDatabase.createInBackground(
+        databaseFile,
+        logStatements: logStatements,
+        setup: (rawDb) {
+          verifyCipherSupport(rawDb);
+          rawDb.execute("PRAGMA key = '${_escapePragmaValue(key)}';");
+        },
+      ),
+    );
+
+    await database
+        .customSelect('SELECT COUNT(*) AS count FROM sqlite_master;')
+        .getSingle();
+    return database;
+  }
+}
+
+void _ensureCipherSupport(sqlite.Database database) {
+  final result = database.select('PRAGMA cipher;');
+  if (result.isEmpty) {
+    throw StateError(
+      'Encrypted SQLite runtime unavailable. Expected the sqlite3mc build with cipher support.',
+    );
+  }
+}
+
+String _escapePragmaValue(String value) => value.replaceAll("'", "''");
