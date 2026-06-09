@@ -258,6 +258,85 @@ US-002 was validated successfully with both automated and manual checks:
   - Android debug build: `flutter build apk --debug`
   - iOS simulator debug build: `flutter build ios --simulator --debug --no-codesign`
 
+## US-005: Backend API Client
+
+### Established backend API foundation
+
+- The Flutter app now has a centralized backend API layer under:
+  - `lib/data/api/backend_client.dart`
+  - `lib/data/api/backend_results.dart`
+  - `lib/data/api/backend_providers.dart`
+  - `lib/data/api/record_quota_state.dart`
+  - `lib/data/api/generated/backend_api_generated.dart`
+
+### OpenAPI contract and generation guidance
+
+- The backend contract source of truth in this repo is:
+  - `api/wrait-backend.yaml`
+- Backend client generation now uses the official OpenAPI Generator CLI with
+  the `dart-dio` generator.
+- The checked-in generation entrypoints are:
+  - `package.json`
+  - `openapitools.json`
+  - `tool/openapi-generator/backend-api-config.yaml`
+- The generated package output lives at:
+  - `tool/openapi-generator/output/backend_api/`
+
+Important workflow implication:
+
+- The generated package output is not tracked in git.
+- On a fresh clone, run `npm run build` before `flutter pub get`,
+  `flutter analyze`, or `flutter test`.
+- App code should continue to depend on the compatibility bridge in
+  `lib/data/api/generated/backend_api_generated.dart` rather than importing the
+  generated package surface directly in feature code.
+
+### Request wiring contract
+
+- Backend base URL comes from `AppConfig.backendUrl`.
+- Proxy authentication comes from `AppConfig.proxySecret` via the
+  `X-Proxy-Secret` header.
+- Device identity comes from `PreferencesRepository.getDeviceId()` via the
+  `X-Device-Id` header.
+- Shared Dio timeout configuration currently uses:
+  - connect timeout: `15s`
+  - send timeout: `60s`
+  - receive timeout: `60s`
+
+### Current behavior conventions
+
+- Registration retries with bounded exponential backoff.
+- Retry is intentionally scoped to registration only.
+- Quota payloads are validated before being surfaced to callers.
+- Current backend failure mapping is:
+  - `401` -> proxy auth failed
+  - `413` -> request too large
+  - `429` -> quota exceeded, while still surfacing valid quota data when
+    present
+  - `502`, `504`, and other `5xx` -> backend unavailable
+  - connection errors -> no internet
+  - timeout errors -> timeout
+
+### Validation knowledge
+
+- Shared backend validation now includes:
+  - `flutter analyze --no-pub`
+  - `flutter test`
+  - targeted API tests under `test/data/api/`
+  - Android emulator integration pass for
+    `integration_test/backend_api_client_flow_test.dart`
+  - iOS simulator integration pass for
+    `integration_test/backend_api_client_flow_test.dart`
+
+### Guidance for future stories
+
+- If the backend contract changes, update `api/wrait-backend.yaml` first and
+  regenerate with `npm run build`.
+- Keep app-specific policy in the handwritten adapter layer and avoid leaking
+  generated package types into unrelated feature code.
+- Extend backend failure reasons cautiously; the app-facing surface is
+  intentionally narrower than the full transport/OpenAPI error space.
+
 ## US-004: Preferences Storage
 
 ### Established preferences foundation
