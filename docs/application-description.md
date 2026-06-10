@@ -37,11 +37,14 @@ upcoming feature work:
 - encrypted local entry persistence and stale-draft cleanup
 - shared preferences bootstrap
 - persisted recording-state preference
-- persisted stable app device identifier with native lookup and fallback
+- persisted stable app device identifier with native lookup/fallback
+  resolution and backend-compatible anonymous hashing for newly resolved IDs
 - centralized backend API client for device registration, audio transcription,
   and transcript cleanup
 - OpenAPI-driven backend contract consumption from `api/wrait-backend.yaml`
 - backend request wiring through runtime config plus persisted device identity
+- non-blocking launch-time backend device registration
+- session-only quota state populated from successful backend registration
 - explicit backend failure categories for timeout, no internet,
   request-too-large, quota-exceeded, proxy-auth failure,
   backend-unavailable, and generic API error
@@ -50,8 +53,9 @@ upcoming feature work:
 - placeholder screens used to validate launch, theming, and route coverage
 
 Feature behavior such as real recording UI, full transcription/cleanup
-orchestration, preferences persistence beyond the current basic flags and
-identifiers, and entry-management UI still belongs to later user stories.
+orchestration, quota presentation beyond the current session state,
+preferences persistence beyond the current basic flags and identifiers, and
+entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -81,6 +85,13 @@ contract.
 - Generated package output: `tool/openapi-generator/output/backend_api/`
 - App-facing compatibility bridge:
   `lib/data/api/generated/backend_api_generated.dart`
+
+Current runtime behavior on top of that generated client:
+
+- app launch triggers backend device registration without blocking initial UI
+  rendering
+- successful registration can seed the current in-memory quota state for later
+  quota-aware flows in the same app session
 
 ## Reference
 
