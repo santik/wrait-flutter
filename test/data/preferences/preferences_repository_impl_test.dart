@@ -5,6 +5,8 @@ import 'package:wrait/data/preferences/platform_device_id_provider.dart';
 import 'package:wrait/data/preferences/preferences_repository_impl.dart';
 
 void main() {
+  final hashedDeviceIdPattern = RegExp(r'^[0-9a-f]{64}$');
+
   late _FakePreferencesStore preferencesStore;
   late PreferencesRepositoryImpl repository;
   late _FakePlatformDeviceIdProvider deviceIdProvider;
@@ -79,7 +81,7 @@ void main() {
   );
 
   test(
-    'getDeviceId stores and reuses the platform value when available first',
+    'getDeviceId stores and reuses a hashed platform value when available first',
     () async {
       final first = await repository.getDeviceId();
       final recreated = PreferencesRepositoryImpl(
@@ -88,18 +90,19 @@ void main() {
       );
       final second = await recreated.getDeviceId();
 
-      expect(first, 'device-id-001');
-      expect(second, 'device-id-001');
+      expect(first, matches(hashedDeviceIdPattern));
+      expect(first, isNot('device-id-001'));
+      expect(second, first);
       expect(
         preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey],
-        'device-id-001',
+        first,
       );
       expect(deviceIdProvider.callCount, 1);
     },
   );
 
   test(
-    'getDeviceId generates, stores, and reuses a fallback when platform is unavailable',
+    'getDeviceId generates, hashes, stores, and reuses a fallback when platform is unavailable',
     () async {
       final fallbackRepository = PreferencesRepositoryImpl(
         preferencesStore: preferencesStore,
@@ -115,7 +118,8 @@ void main() {
       );
       final second = await recreated.getDeviceId();
 
-      expect(first, '00112233445566778899aabbccddeeff');
+      expect(first, matches(hashedDeviceIdPattern));
+      expect(first, isNot('00112233445566778899aabbccddeeff'));
       expect(second, first);
       expect(
         preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey],
@@ -129,8 +133,8 @@ void main() {
     deviceIdProvider.value = 'device-id-002';
     final second = await repository.getDeviceId();
 
-    expect(first, 'device-id-001');
-    expect(second, 'device-id-001');
+    expect(first, matches(hashedDeviceIdPattern));
+    expect(second, first);
     expect(deviceIdProvider.callCount, 1);
   });
 
@@ -150,6 +154,21 @@ void main() {
       expect(fallbackResolved, isA<String>());
       expect(platformResolved, isNotEmpty);
       expect(fallbackResolved, isNotEmpty);
+      expect(platformResolved, matches(hashedDeviceIdPattern));
+      expect(fallbackResolved, matches(hashedDeviceIdPattern));
+    },
+  );
+
+  test(
+    'getDeviceId preserves a preexisting stored value unchanged even if it is not backend-compatible',
+    () async {
+      preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey] =
+          'legacy-device-id';
+
+      final resolved = await repository.getDeviceId();
+
+      expect(resolved, 'legacy-device-id');
+      expect(deviceIdProvider.callCount, 0);
     },
   );
 }

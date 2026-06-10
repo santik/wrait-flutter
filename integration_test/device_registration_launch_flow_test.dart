@@ -1,0 +1,312 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wrait/app.dart';
+import 'package:wrait/core/config/app_config.dart';
+import 'package:wrait/data/api/backend_providers.dart';
+import 'package:wrait/data/api/record_quota_state.dart';
+import 'package:wrait/data/preferences/platform_device_id_provider.dart';
+import 'package:wrait/data/preferences/preferences_providers.dart';
+import 'package:wrait/data/preferences/preferences_repository_impl.dart';
+import 'package:wrait/main.dart';
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'launch registration is non-blocking and updates session quota on success',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+
+      final requests = <_ObservedRequest>[];
+      final requestSeen = Completer<void>();
+      final releaseResponse = Completer<void>();
+      final serverFuture = _serveBackend(
+        server,
+        requests,
+        onRegister: (request) async {
+          requestSeen.complete();
+          await releaseResponse.future;
+          return _StubResponse.created(
+            '{"ok":true,"quota":{"limit":5,"count":1,"remaining":4,"resetAt":"2026-06-10T00:00:00Z"}}',
+          );
+        },
+      );
+
+      final container = createAppContainer(
+        appConfig: AppConfig.fromValues(
+          backendUrl: 'http://${server.address.host}:${server.port}',
+          proxySecret: 'proxy-secret',
+        ),
+        sharedPreferences: sharedPreferences,
+        overrides: [
+          platformDeviceIdProvider.overrideWithValue(
+            const _FakePlatformDeviceIdProvider('platform-device-id'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      startAppLaunchWork(container);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Capture'), findsOneWidget);
+      await requestSeen.future.timeout(const Duration(seconds: 5));
+      expect(container.read(registrationQuotaStateProvider), isNull);
+
+      releaseResponse.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+
+      final quota = container.read(registrationQuotaStateProvider);
+      final storedDeviceId = sharedPreferences.getString(
+        PreferencesRepositoryImpl.deviceIdKey,
+      );
+
+      expect(quota?.remaining, 4);
+      expect(storedDeviceId, matches(RegExp(r'^[0-9a-f]{64}$')));
+      expect(requests.single.deviceId, storedDeviceId);
+
+      await server.close(force: true);
+      await serverFuture;
+    },
+  );
+
+  testWidgets(
+    'a new launch reuses the stored device id but starts with fresh in-memory quota state',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+
+      final requests = <_ObservedRequest>[];
+      var registerCount = 0;
+      final serverFuture = _serveBackend(
+        server,
+        requests,
+        onRegister: (request) async {
+          registerCount += 1;
+          final remaining = registerCount == 1 ? 4 : 3;
+          return _StubResponse.created(
+            '{"ok":true,"quota":{"limit":5,"count":$registerCount,"remaining":$remaining,"resetAt":"2026-06-10T00:00:00Z"}}',
+          );
+        },
+      );
+
+      final firstContainer = createAppContainer(
+        appConfig: AppConfig.fromValues(
+          backendUrl: 'http://${server.address.host}:${server.port}',
+          proxySecret: 'proxy-secret',
+        ),
+        sharedPreferences: sharedPreferences,
+        overrides: [
+          platformDeviceIdProvider.overrideWithValue(
+            const _FakePlatformDeviceIdProvider('first-platform-device'),
+          ),
+        ],
+      );
+
+      startAppLaunchWork(firstContainer);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: firstContainer,
+          child: const WraitApp(),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+
+      final firstLaunchDeviceId = requests.single.deviceId;
+      expect(firstContainer.read(registrationQuotaStateProvider)?.remaining, 4);
+
+      firstContainer.dispose();
+
+      final secondContainer = createAppContainer(
+        appConfig: AppConfig.fromValues(
+          backendUrl: 'http://${server.address.host}:${server.port}',
+          proxySecret: 'proxy-secret',
+        ),
+        sharedPreferences: sharedPreferences,
+        overrides: [
+          platformDeviceIdProvider.overrideWithValue(
+            const _FakePlatformDeviceIdProvider('second-platform-device'),
+          ),
+        ],
+      );
+      addTearDown(secondContainer.dispose);
+
+      expect(secondContainer.read(registrationQuotaStateProvider), isNull);
+
+      startAppLaunchWork(secondContainer);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: secondContainer,
+          child: const WraitApp(),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+
+      expect(requests, hasLength(2));
+      expect(requests[1].deviceId, firstLaunchDeviceId);
+      expect(
+        secondContainer.read(registrationQuotaStateProvider)?.remaining,
+        3,
+      );
+
+      await server.close(force: true);
+      await serverFuture;
+    },
+  );
+
+  testWidgets(
+    'transient launch registration failure is non-blocking and preserves quota',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+
+      final requests = <_ObservedRequest>[];
+      final serverFuture = _serveBackend(
+        server,
+        requests,
+        onRegister: (request) async =>
+            _StubResponse.json(500, '{"error":"temporary backend failure"}'),
+      );
+
+      final container = createAppContainer(
+        appConfig: AppConfig.fromValues(
+          backendUrl: 'http://${server.address.host}:${server.port}',
+          proxySecret: 'proxy-secret',
+        ),
+        sharedPreferences: sharedPreferences,
+        overrides: [
+          platformDeviceIdProvider.overrideWithValue(
+            const _FakePlatformDeviceIdProvider('platform-device-id'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container
+          .read(registrationQuotaStateProvider.notifier)
+          .setQuota(_TestQuotaState());
+
+      startAppLaunchWork(container);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Capture'), findsOneWidget);
+      await Future<void>.delayed(const Duration(seconds: 4));
+      await tester.pump();
+
+      expect(requests, hasLength(3));
+      expect(container.read(registrationQuotaStateProvider)?.remaining, 4);
+
+      await server.close(force: true);
+      await serverFuture;
+    },
+  );
+}
+
+Future<void> _serveBackend(
+  HttpServer server,
+  List<_ObservedRequest> requests, {
+  required Future<_StubResponse> Function(_ObservedRequest request) onRegister,
+}) async {
+  await for (final request in server) {
+    final bodyBytes = await request.fold<List<int>>(
+      <int>[],
+      (buffer, chunk) => buffer..addAll(chunk),
+    );
+    final observed = _ObservedRequest(
+      path: request.uri.path,
+      deviceId: request.headers.value('X-Device-Id'),
+      proxySecret: request.headers.value('X-Proxy-Secret'),
+      jsonBody:
+          request.headers.contentType?.mimeType == ContentType.json.mimeType
+          ? jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>
+          : null,
+    );
+    requests.add(observed);
+
+    final response = switch (request.uri.path) {
+      '/api/register' => await onRegister(observed),
+      _ => _StubResponse.json(404, '{"error":"not found"}'),
+    };
+
+    request.response.statusCode = response.statusCode;
+    request.response.headers.contentType = ContentType.json;
+    request.response.write(response.body);
+    await request.response.close();
+  }
+}
+
+class _ObservedRequest {
+  const _ObservedRequest({
+    required this.path,
+    required this.deviceId,
+    required this.proxySecret,
+    required this.jsonBody,
+  });
+
+  final String path;
+  final String? deviceId;
+  final String? proxySecret;
+  final Map<String, dynamic>? jsonBody;
+}
+
+class _StubResponse {
+  const _StubResponse._({required this.statusCode, required this.body});
+
+  final int statusCode;
+  final String body;
+
+  factory _StubResponse.created(String body) =>
+      _StubResponse._(statusCode: 201, body: body);
+
+  factory _StubResponse.json(int statusCode, String body) =>
+      _StubResponse._(statusCode: statusCode, body: body);
+}
+
+class _FakePlatformDeviceIdProvider implements PlatformDeviceIdProvider {
+  const _FakePlatformDeviceIdProvider(this.value);
+
+  final String value;
+
+  @override
+  Future<String?> getPlatformDeviceId() async => value;
+}
+
+class _TestQuotaState extends RecordQuotaState {
+  _TestQuotaState()
+    : super(
+        limit: 5,
+        count: 1,
+        remaining: 4,
+        resetAt: DateTime.utc(2026, 6, 10),
+      );
+}

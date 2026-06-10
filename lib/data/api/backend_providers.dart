@@ -1,10 +1,14 @@
+import 'dart:developer' as developer;
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app.dart';
+import '../../domain/usecase/register_device_on_launch_use_case.dart';
 import '../preferences/preferences_providers.dart';
 import 'backend_client.dart';
 import 'generated/backend_api_generated.dart';
+import 'record_quota_state.dart';
 
 const backendConnectTimeout = Duration(seconds: 15);
 const backendSendTimeout = Duration(seconds: 60);
@@ -36,3 +40,41 @@ final wraitBackendClientProvider = Provider<WraitBackendClient>((ref) {
     preferencesRepository: ref.watch(preferencesRepositoryProvider),
   );
 });
+
+class RegistrationQuotaStateNotifier extends Notifier<RecordQuotaState?> {
+  @override
+  RecordQuotaState? build() => null;
+
+  void setQuota(RecordQuotaState quota) {
+    state = quota;
+  }
+}
+
+final registrationQuotaStateProvider =
+    NotifierProvider<RegistrationQuotaStateNotifier, RecordQuotaState?>(
+      RegistrationQuotaStateNotifier.new,
+    );
+
+final registrationWarningLoggerProvider = Provider<RegistrationWarningLogger>((
+  ref,
+) {
+  return (message, {error, stackTrace}) {
+    developer.log(
+      message,
+      name: 'DeviceRegistration',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  };
+});
+
+final registerDeviceOnLaunchUseCaseProvider =
+    Provider<RegisterDeviceOnLaunchUseCase>((ref) {
+      return RegisterDeviceOnLaunchUseCase(
+        registerDevice: ref.watch(wraitBackendClientProvider).register,
+        setRecordQuota: (quota) {
+          ref.read(registrationQuotaStateProvider.notifier).setQuota(quota);
+        },
+        logWarning: ref.watch(registrationWarningLoggerProvider),
+      );
+    });

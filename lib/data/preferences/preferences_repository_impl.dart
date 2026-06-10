@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/repository/preferences_repository.dart';
@@ -50,6 +52,7 @@ class PreferencesRepositoryImpl implements PreferencesRepository {
 
   static const hasEverRecordedKey = 'has_ever_recorded';
   static const deviceIdKey = 'app_device_id';
+  static const deviceIdSalt = 'wrait-v1';
 
   final PlatformDeviceIdProvider deviceIdProvider;
   final PreferencesStore _preferencesStore;
@@ -86,7 +89,8 @@ class PreferencesRepositoryImpl implements PreferencesRepository {
     }
 
     final platformDeviceId = await deviceIdProvider.getPlatformDeviceId();
-    final resolvedDeviceId = platformDeviceId ?? _generateFallbackDeviceId();
+    final rawDeviceId = platformDeviceId ?? _generateFallbackDeviceId();
+    final resolvedDeviceId = _hashDeviceId(rawDeviceId);
     final persisted = await _preferencesStore.setString(
       deviceIdKey,
       resolvedDeviceId,
@@ -97,6 +101,11 @@ class PreferencesRepositoryImpl implements PreferencesRepository {
 
     _cachedDeviceId = resolvedDeviceId;
     return resolvedDeviceId;
+  }
+
+  String _hashDeviceId(String rawDeviceId) {
+    final digest = sha256.convert(utf8.encode('$rawDeviceId|$deviceIdSalt'));
+    return digest.toString();
   }
 
   String _generateFallbackDeviceId() {

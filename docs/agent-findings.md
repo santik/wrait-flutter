@@ -372,6 +372,12 @@ Important workflow implication:
   - stored `app_device_id` from shared preferences
   - platform-provided device ID
   - generated fallback ID
+- Newly resolved values from either the platform path or generated fallback are
+  normalized into a backend-compatible 64-character lowercase SHA-256 hex
+  string with the app-scoped salt `wrait-v1` before first persistence.
+- Preexisting stored values are intentionally returned unchanged, even if they
+  predate the backend-compatible format; US-016 explicitly chose not to
+  migrate legacy stored IDs.
 - The first non-empty resolved value is persisted and then reused on later
   launches.
 
@@ -418,6 +424,71 @@ Important workflow implication:
 ### Guidance for future stories
 
 - Reuse the existing `EntryRepository` contract instead of adding parallel local
+  persistence entry paths.
+- Do not assume `getDeviceId()` returns a raw platform identifier; treat it as
+  an opaque app-scoped identifier that may already be hashed.
+
+## US-016: Device Registration
+
+### Established launch registration foundation
+
+- App launch now triggers device registration from the bootstrapped
+  `ProviderContainer` in:
+  - `lib/main.dart`
+- The launch orchestration now lives in:
+  - `lib/domain/usecase/register_device_on_launch_use_case.dart`
+- Shared backend/session registration state now lives in:
+  - `lib/data/api/backend_providers.dart`
+  - `registrationQuotaStateProvider`
+  - `registerDeviceOnLaunchUseCaseProvider`
+
+### Launch behavior worth preserving
+
+- Registration is intentionally non-blocking:
+  - startup triggers the work once per app launch
+  - initial UI rendering does not wait for the backend response
+- Registration continues to use `WraitBackendClient.register()` as the only
+  network path, so retry policy stays centralized in the backend client.
+- Successful registration updates session quota only when valid quota data is
+  present.
+- Successful registration without quota is silent and preserves the current
+  in-memory quota value.
+- Registration failure is logging-only in this story and does not surface a
+  user-visible error.
+
+### Quota-state guidance
+
+- Registration quota is session-scoped only:
+  - it is stored in memory
+  - it does not persist across app relaunches
+- Later quota-aware stories should read the shared backend-provider quota state
+  instead of caching launch results independently or adding a second quota
+  owner.
+
+### Validation knowledge
+
+- Shared launch-registration validation now includes:
+  - `flutter analyze --no-pub`
+  - targeted unit tests in `test/data/api/register_device_on_launch_use_case_test.dart`
+  - updated preferences tests in
+    `test/data/preferences/preferences_repository_impl_test.dart`
+  - integration coverage in
+    `integration_test/device_registration_launch_flow_test.dart`
+  - Android emulator pass for the launch-registration integration test
+  - iOS simulator pass for the launch-registration integration test
+
+### Guidance for future stories
+
+- Start app-wide launch side effects from the bootstrapped
+  `ProviderContainer` in `main.dart` rather than from route builders or
+  placeholder widgets.
+- Reuse the existing launch registration use case/provider path instead of
+  adding a second registration trigger in UI code.
+- If a future story needs legacy stored device-ID migration, treat that as
+  explicit new scope; US-016 intentionally left legacy values untouched.
+- Keep user-visible registration messaging separate from launch orchestration
+  unless a future story explicitly expands the scope beyond logging-only
+  failure handling.
   storage paths.
 - Reuse `resolveSupportedLanguageCode()` from
   `lib/domain/model/supported_language.dart` anywhere a persisted or
