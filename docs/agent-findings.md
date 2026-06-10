@@ -337,6 +337,74 @@ Important workflow implication:
 - Extend backend failure reasons cautiously; the app-facing surface is
   intentionally narrower than the full transport/OpenAPI error space.
 
+## US-006: Audio Recording Service
+
+### Established recording foundation
+
+- The Flutter app now has a shared recording layer under:
+  - `lib/data/audio/audio_recording_service.dart`
+  - `lib/data/audio/record_audio_recording_service.dart`
+  - `lib/data/audio/audio_recording_providers.dart`
+  - `lib/core/time/monotonic_clock.dart`
+
+### Recording contract guidance
+
+- The current recording service contract intentionally stays narrow:
+  - `startRecording(outputPath)`
+  - `stopRecording()`
+  - `isRecording`
+  - `hardCapDeadlineElapsedRealtime`
+- The service is file-based and currently targets:
+  - AAC Low Complexity in an M4A container
+  - 16 kHz sample rate
+  - mono capture
+- The 5-second minimum recording rule is enforced in the service itself:
+  - shorter captures throw `RecordingTooShortFailure`
+  - too-short output files are deleted before control returns to callers
+- Successful recordings return only when the produced file exists and is
+  non-empty:
+  - unusable or missing output now throws
+    `RecordingOutputUnavailableFailure`
+
+### Ownership boundaries worth preserving
+
+- The service owns recorder lifecycle and active-session bookkeeping.
+- The service does not own the hard-cap timer:
+  - later orchestration should observe
+    `hardCapDeadlineElapsedRealtime`
+  - the orchestrator should call `stopRecording()` on user stop or cap expiry
+- The service does not own successful file cleanup policy:
+  - later transcription/draft flows decide whether to delete or retain the
+    valid returned file
+- The service does own cleanup for invalid or aborted partial output:
+  - too-short recordings are deleted
+  - dispose during active recording cancels the recorder and deletes the
+    partial file
+
+### Failure-handling guidance
+
+- `startRecording()` now validates the caller-supplied output path:
+  - blank paths are rejected
+  - parent directories are created when needed
+  - non-directory parents or unwritable targets fail fast
+- Recorder start/stop failures now clean up consistently before rethrowing.
+- Temporary-file cleanup remains best-effort, but cleanup failures are now
+  logged through `dart:developer` instead of being swallowed silently.
+
+### Testing and validation knowledge
+
+- Deterministic tests should prefer the shared fake monotonic clock:
+  - `test/test_doubles/fake_monotonic_clock.dart`
+- Current automated coverage for the recording layer lives in:
+  - `test/data/audio/audio_recording_service_test.dart`
+  - `integration_test/audio_recording_service_flow_test.dart`
+- Real recorder validation succeeded on both:
+  - Android emulator `emulator-5554`
+  - iOS simulator `iPhone 17`
+- In this environment, `flutter test --no-pub` was more reliable than a plain
+  `flutter test` because the latter tried to refresh generated iOS ephemeral
+  package state.
+
 ## US-004: Preferences Storage
 
 ### Established preferences foundation
