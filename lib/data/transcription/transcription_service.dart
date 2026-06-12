@@ -46,6 +46,9 @@ final class Uploading extends TranscriptionStatus {
 
 /// Narrowed failure reasons exposed by the cloud transcription flow.
 enum TranscriptionFailureReason {
+  tooShort,
+  nothingCaught,
+  micBlocked,
   network,
   timeout,
   backendUnavailable,
@@ -104,4 +107,10 @@ final class NoActiveLiveTranscriptionFailure
     extends TranscriptionServiceFailure {
   const NoActiveLiveTranscriptionFailure()
     : super('No live cloud transcription recording is active.');
+}
+
+final class MicBlockedTranscriptionServiceFailure
+    extends TranscriptionServiceFailure {
+  const MicBlockedTranscriptionServiceFailure()
+    : super('The microphone is blocked or unavailable for recording.');
 }

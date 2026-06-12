@@ -67,15 +67,25 @@ upcoming feature work:
   sequential live record-stop-upload orchestration, optional detected-language
   normalization, retryable failed-live audio retention, and immediate cleanup
   of successful live temporary audio files
+- app-facing main recording controller for the Best-mode flow under
+  `lib/presentation/main/`, including `Idle`, `Listening`, `Uploading`,
+  `Processing`, `Saved`, `Error`, and `Deleted` states plus derived
+  active-state behavior
+- single-button Best-mode orchestration from live recording start/stop through
+  cloud transcription, transcript cleanup, Saved-state publication, retryable
+  audio-draft persistence, and `hasEverRecorded` updates
+- controller-owned three-second auto-clear behavior for Error and Deleted
+  feedback, with Saved feedback intentionally left UI-owned
 - placeholder shell routes for `/`, `/entries`, and `/entry/:id`
 - platform setup for Android and iOS
 - placeholder screens used to validate launch, theming, and route coverage
 
 Feature behavior such as real recording UI, higher-level recording and
-transcription orchestration on top of the shared services, cleanup-triggering
-controller logic and retry UX, quota presentation beyond the current session
-state, preferences persistence beyond the current basic flags and identifiers,
-and entry-management UI still belongs to later user stories.
+transcription presentation on top of the shared services, network-preflight
+handling for Best mode, offline-mode routing, retry UX, quota presentation
+beyond the current session state, preferences persistence beyond the current
+basic flags and identifiers, and entry-management UI still belongs to later
+user stories.
 
 ## Important product themes
 
@@ -90,10 +100,10 @@ and entry-management UI still belongs to later user stories.
 Planned future stories cover:
 
 - expanded preferences and settings
-- recording UI and higher-level state-machine orchestration on top of the
-  shared audio recording and cloud transcription services
-- cleanup-triggering controller flows and retry UX on top of the existing
-  transcription and cleanup use cases
+- recording UI on top of the existing app-facing recording controller
+- Best-mode network preflight and offline-mode routing on top of the existing
+  recording/transcription controller surface
+- retry UX on top of the existing transcription and cleanup use cases
 - entry browsing and detail screens
 - privacy mode and offline behavior
 

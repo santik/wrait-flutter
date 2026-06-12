@@ -703,7 +703,69 @@ Important workflow implication:
 - Keep user-visible registration messaging separate from launch orchestration
   unless a future story explicitly expands the scope beyond logging-only
   failure handling.
-  storage paths.
+
+## US-009: Recording State Machine and Controller
+
+### Established recording-controller foundation
+
+- The app-facing recording state boundary now lives under:
+  - `lib/presentation/main/recording_state.dart`
+  - `lib/presentation/main/main_recording_controller.dart`
+- The main controller is exposed through:
+  - `mainRecordingControllerProvider`
+  - `RecordingControllerState`
+  - `RecordingState`
+  - `RecordingError`
+
+### Controller behavior worth preserving
+
+- `RecordingControllerState.isActive` is intentionally true only for:
+  - `Listening`
+  - `Uploading`
+  - `Processing`
+- `RecordingSaved` requires a positive `entryId`.
+- Cleanup results with a missing or non-positive `entryId` must degrade to
+  `RecordingError.apiFailed`; they must not publish `Saved` and must not set
+  `hasEverRecorded`.
+- Error and Deleted auto-clear timers belong to the controller.
+- Saved clearing is intentionally UI-owned through `clearSaved()` or a new
+  recording start; the controller does not run a Saved timer.
+- `_buttonActionInFlight` is an important guard against rapid repeated taps
+  while start/stop work is still in flight.
+- Timer cancellation on new transitions is required so stale Error/Deleted
+  timers cannot reset a newer state.
+
+### Retryable draft guidance
+
+- Retryable audio-draft persistence now validates that the trimmed
+  `audioDraftPath` points to an existing file before saving a draft record.
+- Invalid or missing retryable audio paths should be logged and ignored
+  without masking the original transcription failure.
+- Integration or controller tests that validate audio-draft persistence should
+  create a real temp audio file; nonexistent paths are intentionally ignored by
+  the controller.
+
+### Validation knowledge
+
+- Shared controller validation now includes:
+  - `flutter analyze`
+  - `flutter test`
+  - unit coverage in
+    `test/presentation/main/main_recording_controller_test.dart`
+  - integration coverage in
+    `integration_test/main_recording_controller_flow_test.dart`
+  - Android emulator pass for the main-recording-controller integration flow
+  - iOS simulator pass for the main-recording-controller integration flow
+
+### Guidance for future stories
+
+- Build main-screen recording UI on top of
+  `mainRecordingControllerProvider` rather than recreating recording state in
+  widgets.
+- Reuse the existing controller failure mapping unless a future story
+  explicitly changes the product contract.
+- Keep retryable draft preservation and `hasEverRecorded` updates inside the
+  controller/orchestration layer instead of scattering them across UI code.
 - Reuse `resolveSupportedLanguageCode()` from
   `lib/domain/model/supported_language.dart` anywhere a persisted or
   user-selected language must be canonicalized.
