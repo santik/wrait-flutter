@@ -41,7 +41,7 @@ final wraitBackendClientProvider = Provider<WraitBackendClient>((ref) {
   );
 });
 
-class RegistrationQuotaStateNotifier extends Notifier<RecordQuotaState?> {
+class SessionRecordQuotaStateNotifier extends Notifier<RecordQuotaState?> {
   @override
   RecordQuotaState? build() => null;
 
@@ -50,10 +50,13 @@ class RegistrationQuotaStateNotifier extends Notifier<RecordQuotaState?> {
   }
 }
 
-final registrationQuotaStateProvider =
-    NotifierProvider<RegistrationQuotaStateNotifier, RecordQuotaState?>(
-      RegistrationQuotaStateNotifier.new,
+final sessionRecordQuotaStateProvider =
+    NotifierProvider<SessionRecordQuotaStateNotifier, RecordQuotaState?>(
+      SessionRecordQuotaStateNotifier.new,
     );
+
+@Deprecated('Use sessionRecordQuotaStateProvider instead.')
+final registrationQuotaStateProvider = sessionRecordQuotaStateProvider;
 
 final registrationWarningLoggerProvider = Provider<RegistrationWarningLogger>((
   ref,
@@ -73,7 +76,7 @@ final registerDeviceOnLaunchUseCaseProvider =
       return RegisterDeviceOnLaunchUseCase(
         registerDevice: ref.watch(wraitBackendClientProvider).register,
         setRecordQuota: (quota) {
-          ref.read(registrationQuotaStateProvider.notifier).setQuota(quota);
+          ref.read(sessionRecordQuotaStateProvider.notifier).setQuota(quota);
         },
         logWarning: ref.watch(registrationWarningLoggerProvider),
       );

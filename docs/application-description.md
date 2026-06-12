@@ -44,22 +44,27 @@ upcoming feature work:
 - OpenAPI-driven backend contract consumption from `api/wrait-backend.yaml`
 - backend request wiring through runtime config plus persisted device identity
 - non-blocking launch-time backend device registration
-- session-only quota state populated from successful backend registration
+- session-only quota state populated from successful backend registration and
+  refreshed by valid transcription responses in the same app session
 - explicit backend failure categories for timeout, no internet,
   request-too-large, quota-exceeded, proxy-auth failure,
   backend-unavailable, and generic API error
 - cross-platform file-based audio recording service with mono 16 kHz AAC/M4A
   capture, monotonic hard-cap deadline exposure, too-short invalidation, and
   caller-owned post-recording file lifecycle
+- app-facing cloud transcription service for the Best-mode flow, including
+  sequential live record-stop-upload orchestration, optional detected-language
+  normalization, retryable failed-live audio retention, and immediate cleanup
+  of successful live temporary audio files
 - placeholder shell routes for `/`, `/entries`, and `/entry/:id`
 - platform setup for Android and iOS
 - placeholder screens used to validate launch, theming, and route coverage
 
 Feature behavior such as real recording UI, full transcription/cleanup
-orchestration on top of the new recording service, quota presentation beyond
-the current session state, preferences persistence beyond the current basic
-flags and identifiers, and entry-management UI still belongs to later user
-stories.
+orchestration on top of the new transcription and recording services,
+quota presentation beyond the current session state, preferences persistence
+beyond the current basic flags and identifiers, and entry-management UI still
+belongs to later user stories.
 
 ## Important product themes
 
@@ -74,9 +79,9 @@ stories.
 Planned future stories cover:
 
 - expanded preferences and settings
-- recording orchestration and recording UI on top of the shared audio
-  recording service
-- transcription and cleanup flows
+- recording UI and higher-level state-machine orchestration on top of the
+  shared audio recording and cloud transcription services
+- transcript cleanup and retry UX flows
 - entry browsing and detail screens
 - privacy mode and offline behavior
 

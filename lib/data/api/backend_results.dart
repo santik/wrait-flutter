@@ -40,7 +40,7 @@ final class TranscriptionSuccess extends TranscriptionResult {
   });
 
   final String transcript;
-  final String detectedLanguage;
+  final String? detectedLanguage;
   final RecordQuotaState? quota;
 }
 

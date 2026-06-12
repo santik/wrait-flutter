@@ -446,6 +446,37 @@ void main() {
       );
     });
 
+    test('blank detected language is allowed as nullable success', () async {
+      generatedClient.transcribeResponses.add(
+        const GeneratedApiSuccess<TranscribeResponse>(
+          statusCode: 200,
+          data: TranscribeResponse(
+            transcript: 'usable transcript',
+            detectedLanguage: '   ',
+          ),
+        ),
+      );
+
+      final result = await backendClient.transcribeAudio(
+        await _createTempAudioFile('blank-language'),
+      );
+
+      expect(
+        result,
+        isA<TranscriptionSuccess>()
+            .having(
+              (value) => value.transcript,
+              'transcript',
+              'usable transcript',
+            )
+            .having(
+              (value) => value.detectedLanguage,
+              'detectedLanguage',
+              isNull,
+            ),
+      );
+    });
+
     test('blank cleaned text is treated as api error failure', () async {
       generatedClient.cleanupResponses.add(
         const GeneratedApiSuccess<CleanupResponse>(

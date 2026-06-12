@@ -67,13 +67,13 @@ void main() {
 
       expect(find.text('Capture'), findsOneWidget);
       await requestSeen.future.timeout(const Duration(seconds: 5));
-      expect(container.read(registrationQuotaStateProvider), isNull);
+      expect(container.read(sessionRecordQuotaStateProvider), isNull);
 
       releaseResponse.complete();
       await Future<void>.delayed(const Duration(milliseconds: 100));
       await tester.pump();
 
-      final quota = container.read(registrationQuotaStateProvider);
+      final quota = container.read(sessionRecordQuotaStateProvider);
       final storedDeviceId = sharedPreferences.getString(
         PreferencesRepositoryImpl.deviceIdKey,
       );
@@ -133,7 +133,10 @@ void main() {
       await tester.pump();
 
       final firstLaunchDeviceId = requests.single.deviceId;
-      expect(firstContainer.read(registrationQuotaStateProvider)?.remaining, 4);
+      expect(
+        firstContainer.read(sessionRecordQuotaStateProvider)?.remaining,
+        4,
+      );
 
       firstContainer.dispose();
 
@@ -151,7 +154,7 @@ void main() {
       );
       addTearDown(secondContainer.dispose);
 
-      expect(secondContainer.read(registrationQuotaStateProvider), isNull);
+      expect(secondContainer.read(sessionRecordQuotaStateProvider), isNull);
 
       startAppLaunchWork(secondContainer);
       await tester.pumpWidget(
@@ -166,7 +169,7 @@ void main() {
       expect(requests, hasLength(2));
       expect(requests[1].deviceId, firstLaunchDeviceId);
       expect(
-        secondContainer.read(registrationQuotaStateProvider)?.remaining,
+        secondContainer.read(sessionRecordQuotaStateProvider)?.remaining,
         3,
       );
 
@@ -206,7 +209,7 @@ void main() {
       addTearDown(container.dispose);
 
       container
-          .read(registrationQuotaStateProvider.notifier)
+          .read(sessionRecordQuotaStateProvider.notifier)
           .setQuota(_TestQuotaState());
 
       startAppLaunchWork(container);
@@ -224,7 +227,7 @@ void main() {
       await tester.pump();
 
       expect(requests, hasLength(3));
-      expect(container.read(registrationQuotaStateProvider)?.remaining, 4);
+      expect(container.read(sessionRecordQuotaStateProvider)?.remaining, 4);
 
       await server.close(force: true);
       await serverFuture;

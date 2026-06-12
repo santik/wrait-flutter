@@ -94,15 +94,9 @@ class WraitBackendClient {
         }
 
         final detectedLanguage = response.data.detectedLanguage.trim();
-        if (detectedLanguage.isEmpty) {
-          return const TranscriptionFailure(
-            reason: BackendFailureReason.apiError,
-          );
-        }
-
         return TranscriptionSuccess(
           transcript: transcript,
-          detectedLanguage: detectedLanguage,
+          detectedLanguage: detectedLanguage.isEmpty ? null : detectedLanguage,
           quota: response.data.quota?.toValidatedStateOrNull(),
         );
       }
