@@ -3,9 +3,9 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import '../../domain/model/supported_language.dart';
+import '../audio/audio_recording_service.dart';
 import '../api/backend_results.dart' as backend;
 import '../api/record_quota_state.dart';
-import '../audio/audio_recording_service.dart';
 import 'transcription_service.dart';
 
 typedef TranscribeAudioCallback =
@@ -81,6 +81,11 @@ class CloudTranscriptionService implements TranscriptionService {
     late final String audioPath;
     try {
       audioPath = await audioRecordingService.stopRecording();
+    } on RecordingTooShortFailure {
+      _state = _CloudTranscriptionState.idle;
+      return const TranscriptionFailure(
+        reason: TranscriptionFailureReason.tooShort,
+      );
     } catch (_) {
       _state = _CloudTranscriptionState.idle;
       rethrow;
@@ -211,7 +216,7 @@ class CloudTranscriptionService implements TranscriptionService {
         'Cloud transcription returned a blank transcript in a success payload.',
       );
       return TranscriptionFailure(
-        reason: TranscriptionFailureReason.apiError,
+        reason: TranscriptionFailureReason.nothingCaught,
         audioDraftPath: deleteAudioOnSuccess ? audioPath : null,
         quota: result.quota,
       );

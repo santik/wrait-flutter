@@ -243,6 +243,57 @@ void main() {
     },
   );
 
+  test(
+    'too-short live stop returns a typed failure without uploading',
+    () async {
+      await service.startLiveTranscription(onStatus: (_) {});
+      audioRecordingService.stopFailure = const RecordingTooShortFailure();
+
+      final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+      expect(
+        result,
+        isA<TranscriptionFailure>().having(
+          (value) => value.reason,
+          'reason',
+          TranscriptionFailureReason.tooShort,
+        ),
+      );
+      expect(transcribeCallCount, 0);
+      expect(service.isRecording, isFalse);
+      expect(service.isTranscribing, isFalse);
+    },
+  );
+
+  test(
+    'blank live transcript success becomes nothingCaught and keeps retryable audio',
+    () async {
+      transcribe = (_) async => const backend.TranscriptionSuccess(
+        transcript: '   ',
+        detectedLanguage: 'en-US',
+      );
+
+      await service.startLiveTranscription(onStatus: (_) {});
+      final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+      expect(
+        result,
+        isA<TranscriptionFailure>()
+            .having(
+              (value) => value.reason,
+              'reason',
+              TranscriptionFailureReason.nothingCaught,
+            )
+            .having(
+              (value) => value.audioDraftPath,
+              'audioDraftPath',
+              livePath,
+            ),
+      );
+      expect(await File(livePath).exists(), isTrue);
+    },
+  );
+
   test('rejects new work while another transcription is in progress', () async {
     final startedCompleter = Completer<void>();
     final resultCompleter = Completer<backend.TranscriptionResult>();
@@ -366,7 +417,7 @@ void main() {
   );
 
   test(
-    'blank transcript success payload becomes apiError without updating quota',
+    'blank transcript success payload becomes nothingCaught without updating quota',
     () async {
       final draftPath = '${tempDirectory.path}/draft.m4a';
       await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
@@ -390,7 +441,7 @@ void main() {
             .having(
               (value) => value.reason,
               'reason',
-              TranscriptionFailureReason.apiError,
+              TranscriptionFailureReason.nothingCaught,
             )
             .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
       );
@@ -452,6 +503,7 @@ class _FakeAudioRecordingService implements AudioRecordingService {
 
   final List<String> startedPaths = <String>[];
   String? _currentPath;
+  AudioRecordingFailure? stopFailure;
 
   @override
   Future<void> startRecording(String outputPath) async {
@@ -466,6 +518,14 @@ class _FakeAudioRecordingService implements AudioRecordingService {
     final path = _currentPath;
     if (path == null) {
       throw const NoActiveRecordingFailure();
+    }
+
+    if (stopFailure case final failure?) {
+      stopFailure = null;
+      _currentPath = null;
+      isRecording = false;
+      hardCapDeadlineElapsedRealtime = null;
+      throw failure;
     }
 
     final file = File(path);
