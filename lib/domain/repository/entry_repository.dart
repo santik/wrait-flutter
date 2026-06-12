@@ -13,6 +13,12 @@ abstract interface class EntryRepository {
     String rawTranscript,
     int wordCount,
   );
+  Future<void> updateDraftTranscriptAndLanguage(
+    int id,
+    String rawTranscript,
+    int wordCount,
+    String language,
+  );
   Future<void> finalizeDraftWithCleanedText(
     int id,
     String rawTranscript,

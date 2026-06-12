@@ -478,10 +478,20 @@ void main() {
     });
 
     test('blank cleaned text is treated as api error failure', () async {
+      final quota = RecordQuota(
+        limit: 5,
+        count: 4,
+        remaining: 1,
+        resetAt: DateTime.utc(2026, 6, 10),
+      );
       generatedClient.cleanupResponses.add(
-        const GeneratedApiSuccess<CleanupResponse>(
+        GeneratedApiSuccess<CleanupResponse>(
           statusCode: 200,
-          data: CleanupResponse(cleanedText: '   ', wasTruncated: false),
+          data: CleanupResponse(
+            cleanedText: '   ',
+            wasTruncated: false,
+            quota: quota,
+          ),
         ),
       );
 
@@ -498,6 +508,7 @@ void main() {
           BackendFailureReason.apiError,
         ),
       );
+      expect((result as CleanupFailure).quota?.remaining, 1);
     });
 
     test(

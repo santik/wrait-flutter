@@ -489,6 +489,68 @@ Important workflow implication:
 - Treat cancellation, retry policy, telemetry, and user-visible quota/cleanup
   UX as separate scope unless a future story explicitly absorbs them.
 
+## US-008: Transcript Cleanup Use Case
+
+### Established cleanup foundation
+
+- The Flutter app now has an app-facing cleanup boundary under:
+  - `lib/domain/usecase/cleanup_transcript_use_case.dart`
+- Provider wiring for that boundary already exists under:
+  - `lib/data/api/backend_providers.dart`
+
+### Cleanup contract and persistence guidance
+
+- `CleanupTranscriptUseCase` should remain the app-facing boundary for
+  Best-mode transcript cleanup flows instead of coordinating repository and
+  backend cleanup calls directly in UI/controller code.
+- Fresh cleanup persists a text draft before the backend request and finalizes
+  that same entry only after usable cleaned text is returned.
+- Retry cleanup should target an existing draft entry and must fail safely when
+  the supplied `entryId` is missing or already finalized.
+- The broader Best-mode flow now assumes incremental draft persistence across:
+  - recording
+  - transcription
+  - cleanup
+- An entry should remain `isDraft == true` until the full happy path succeeds.
+
+### Backend and repository behavior worth preserving
+
+- Malformed nominal cleanup success with blank `cleanedText` is intentionally
+  downgraded in `WraitBackendClient` instead of the use case:
+  - valid quota from that malformed response must still survive the downgrade
+- Retry-path draft rewrites should use
+  `updateDraftTranscriptAndLanguage()`:
+  - transcript
+  - canonical language
+  - word count
+  - `audioPath` cleanup
+  should update atomically before the backend cleanup call
+- Cleanup request truncation is request-only:
+  - the submitted transcript is capped at `10000` characters
+  - the stored `rawTranscript` remains full-length
+- Cleanup uses transcript-associated language when usable and falls back to
+  `en-US` only when a supported non-null language is required.
+- Repository load, draft-persistence, and finalization problems should surface
+  as typed cleanup failures instead of leaking exceptions into higher layers.
+
+### Testing and validation knowledge
+
+- Cleanup use-case coverage now lives in:
+  - `test/domain/usecase/cleanup_transcript_use_case_test.dart`
+  - `integration_test/cleanup_transcript_use_case_flow_test.dart`
+- Repository regression coverage for atomic retry-path updates lives in:
+  - `test/data/entries/entry_repository_impl_test.dart`
+- Full emulator validation that has already succeeded for this story includes:
+  - Android emulator `emulator-5554`:
+    - `flutter test --no-pub -d emulator-5554`
+    - `flutter test --no-pub -d emulator-5554 integration_test`
+  - iOS simulator `491CD949-D3C0-4C4C-A6B9-15BAB1859156`:
+    - `flutter test --no-pub -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156`
+    - `flutter test --no-pub -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156 integration_test`
+- Integration tests that rely on the real local entry database are more stable
+  when each test harness uses an isolated temporary database path instead of
+  the default persistent app database location.
+
 ## US-004: Preferences Storage
 
 ### Established preferences foundation
