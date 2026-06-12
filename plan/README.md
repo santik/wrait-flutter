@@ -10,7 +10,7 @@ Story IDs stay stable, but implementation order follows the sequence below.
 4. US-004 - done
 5. US-005 - done
 6. US-016 - done
-7. US-006 - in progress
+7. US-006 - done
 8. US-007
 9. US-008
 10. US-009

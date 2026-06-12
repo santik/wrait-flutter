@@ -23,7 +23,7 @@ final supportedLanguageCodes = supportedLanguages
     .map((language) => language.code)
     .toSet();
 
-String? resolveSupportedLanguageCode(String? code) {
+String? sanitizeLanguageCode(String? code) {
   if (code == null) {
     return null;
   }
@@ -33,13 +33,50 @@ String? resolveSupportedLanguageCode(String? code) {
     return null;
   }
 
+  return sanitized;
+}
+
+String? normalizeLocaleLikeLanguageCode(String? code) {
+  final sanitized = sanitizeLanguageCode(code);
+  if (sanitized == null) {
+    return null;
+  }
+
+  final parts = sanitized.split('-');
+  if (parts.length > 2) {
+    return null;
+  }
+
+  final languageCode = parts.first;
+  if (!_languageCodePattern.hasMatch(languageCode)) {
+    return null;
+  }
+
+  if (parts.length == 1) {
+    return languageCode.toLowerCase();
+  }
+
+  final countryCode = parts[1];
+  if (!_countryCodePattern.hasMatch(countryCode)) {
+    return null;
+  }
+
+  return '${languageCode.toLowerCase()}-${countryCode.toUpperCase()}';
+}
+
+String? resolveSupportedLanguageCode(String? code) {
+  final normalized = normalizeLocaleLikeLanguageCode(code);
+  if (normalized == null) {
+    return null;
+  }
+
   for (final supportedLanguage in supportedLanguages) {
-    if (supportedLanguage.code.toLowerCase() == sanitized.toLowerCase()) {
+    if (supportedLanguage.code.toLowerCase() == normalized.toLowerCase()) {
       return supportedLanguage.code;
     }
   }
 
-  final baseLanguage = sanitized.split('-').first.toLowerCase();
+  final baseLanguage = normalized.split('-').first.toLowerCase();
   for (final supportedLanguage in supportedLanguages) {
     if (supportedLanguage.code.split('-').first.toLowerCase() == baseLanguage) {
       return supportedLanguage.code;
@@ -48,3 +85,6 @@ String? resolveSupportedLanguageCode(String? code) {
 
   return null;
 }
+
+final _languageCodePattern = RegExp(r'^[A-Za-z]{2,3}$');
+final _countryCodePattern = RegExp(r'^[A-Za-z]{2}$');

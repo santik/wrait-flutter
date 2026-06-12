@@ -405,6 +405,90 @@ Important workflow implication:
   `flutter test` because the latter tried to refresh generated iOS ephemeral
   package state.
 
+## US-007: Cloud Transcription Service
+
+### Established transcription foundation
+
+- The Flutter app now has an app-facing cloud transcription layer under:
+  - `lib/data/transcription/transcription_service.dart`
+  - `lib/data/transcription/cloud_transcription_service.dart`
+  - `lib/data/transcription/transcription_providers.dart`
+
+### Service contract and flow guidance
+
+- The current cloud transcription contract intentionally stays sequential:
+  - `startLiveTranscription(onStatus)`
+  - `stopLiveTranscription(onStatus)`
+  - `transcribeAudioDraft(audioPath)`
+- Live Best-mode transcription currently follows one linear flow:
+  - start recording
+  - stop a valid recording
+  - emit `Uploading`
+  - upload the captured file
+  - return a narrowed app-facing success or failure result
+- The service rejects overlapping live or draft transcription operations.
+- `detectedLanguage` is optional at the app-facing boundary:
+  - usable transcript text still succeeds when backend language detection is
+    blank, unsupported, or otherwise unresolvable
+  - future language-aware features should treat `null` as a valid outcome
+
+### Shared-language and quota guidance
+
+- Transcription language normalization should reuse
+  `resolveSupportedLanguageCode()` from
+  `lib/domain/model/supported_language.dart`.
+- If future stories need locale-shape preprocessing, keep it in the same
+  supported-language module instead of creating a second normalization path in
+  feature code.
+- Shared session quota now has one generalized owner:
+  - `sessionRecordQuotaStateProvider`
+- Later quota-aware stories should update or read that provider rather than
+  introducing a second in-memory quota cache for transcription-specific state.
+- Valid quota from transcription is surfaced on both success and supported
+  failure results, but malformed success payloads rejected by the app should
+  not mutate shared quota state.
+
+### Audio-file ownership boundaries
+
+- Live transcription owns its temporary recording file lifecycle:
+  - successful live transcription deletes the temp audio immediately after a
+    usable transcription result is available
+  - failed live transcription preserves the audio path as retryable draft input
+- Draft transcription does not own caller-supplied file cleanup:
+  - successful draft transcription leaves the original file untouched
+  - failed draft transcription also leaves the original file untouched
+- Invalid draft files are rejected locally before upload:
+  - blank, missing, unreadable, or zero-byte files fail fast with warning logs
+
+### Validation knowledge
+
+- Shared transcription validation now includes:
+  - `flutter analyze`
+  - `flutter test --no-pub`
+  - unit coverage in `test/data/transcription/cloud_transcription_service_test.dart`
+  - provider-graph coverage in
+    `integration_test/cloud_transcription_service_flow_test.dart`
+  - Android emulator pass for
+    `integration_test/cloud_transcription_service_flow_test.dart`
+  - iOS simulator pass for
+    `integration_test/cloud_transcription_service_flow_test.dart`
+- Real recorder runtime verification on the Android emulator may require
+  explicitly granting microphone permission to the installed app:
+  - `adb -s emulator-5554 shell pm grant com.wrait.app android.permission.RECORD_AUDIO`
+- In this environment, post-review reruns were more reliable with
+  `flutter test --no-pub` because plain `flutter test` attempted iOS ephemeral
+  package cleanup before executing the Dart tests.
+
+### Guidance for future stories
+
+- Reuse `TranscriptionService` as the app-facing boundary for Best-mode
+  transcription instead of coordinating recorder and backend client calls
+  separately in UI code.
+- Keep the narrowed app-facing failure surface intentional unless a future
+  story explicitly expands it.
+- Treat cancellation, retry policy, telemetry, and user-visible quota/cleanup
+  UX as separate scope unless a future story explicitly absorbs them.
+
 ## US-004: Preferences Storage
 
 ### Established preferences foundation
@@ -507,7 +591,7 @@ Important workflow implication:
   - `lib/domain/usecase/register_device_on_launch_use_case.dart`
 - Shared backend/session registration state now lives in:
   - `lib/data/api/backend_providers.dart`
-  - `registrationQuotaStateProvider`
+  - `sessionRecordQuotaStateProvider`
   - `registerDeviceOnLaunchUseCaseProvider`
 
 ### Launch behavior worth preserving
