@@ -46,6 +46,17 @@ upcoming feature work:
 - non-blocking launch-time backend device registration
 - session-only quota state populated from successful backend registration and
   refreshed by valid transcription responses in the same app session
+- app-facing transcript cleanup use case for Best-mode flows, including fresh
+  draft creation before cleanup, retry against existing text drafts, typed
+  cleanup failures for invalid retry targets, and draft finalization only on
+  usable cleanup success
+- incremental Best-mode draft persistence across recording, transcription, and
+  cleanup so partially completed work remains retryable until the full happy
+  path succeeds
+- cleanup request truncation to 10,000 characters while preserving the full
+  stored raw transcript, transcript-language reuse with `en-US` fallback only
+  when required, and session quota refresh from valid cleanup responses on
+  success or supported failure
 - explicit backend failure categories for timeout, no internet,
   request-too-large, quota-exceeded, proxy-auth failure,
   backend-unavailable, and generic API error
@@ -60,11 +71,11 @@ upcoming feature work:
 - platform setup for Android and iOS
 - placeholder screens used to validate launch, theming, and route coverage
 
-Feature behavior such as real recording UI, full transcription/cleanup
-orchestration on top of the new transcription and recording services,
-quota presentation beyond the current session state, preferences persistence
-beyond the current basic flags and identifiers, and entry-management UI still
-belongs to later user stories.
+Feature behavior such as real recording UI, higher-level recording and
+transcription orchestration on top of the shared services, cleanup-triggering
+controller logic and retry UX, quota presentation beyond the current session
+state, preferences persistence beyond the current basic flags and identifiers,
+and entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -81,7 +92,8 @@ Planned future stories cover:
 - expanded preferences and settings
 - recording UI and higher-level state-machine orchestration on top of the
   shared audio recording and cloud transcription services
-- transcript cleanup and retry UX flows
+- cleanup-triggering controller flows and retry UX on top of the existing
+  transcription and cleanup use cases
 - entry browsing and detail screens
 - privacy mode and offline behavior
 

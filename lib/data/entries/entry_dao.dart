@@ -68,6 +68,22 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
     );
   }
 
+  Future<int> updateDraftTranscriptAndLanguage(
+    int id,
+    String rawTranscript,
+    int wordCount,
+    String language,
+  ) {
+    return (update(entryRecords)..where((table) => table.id.equals(id))).write(
+      EntryRecordsCompanion(
+        rawTranscript: Value(rawTranscript),
+        wordCount: Value(wordCount),
+        language: Value(language),
+        audioPath: const Value(null),
+      ),
+    );
+  }
+
   Future<int> finalizeDraftWithCleanedText(
     int id,
     String rawTranscript,

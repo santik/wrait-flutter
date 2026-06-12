@@ -75,6 +75,28 @@ void main() {
     expect(draft.audioPath, isNull);
   });
 
+  test('updates draft transcript and language atomically', () async {
+    final audioFile = File('${tempDirectory.path}/atomic-audio.m4a');
+    await audioFile.writeAsString('audio');
+    final id = await repository!.saveAudioDraft(audioFile.path, 'en-US');
+
+    await repository!.updateDraftTranscriptAndLanguage(
+      id,
+      'bonjour monde',
+      2,
+      'fr',
+    );
+
+    final entry = await repository!.getEntryById(id);
+
+    expect(entry, isNotNull);
+    expect(entry!.rawTranscript, 'bonjour monde');
+    expect(entry.wordCount, 2);
+    expect(entry.language, 'fr-FR');
+    expect(entry.audioPath, isNull);
+    expect(entry.isDraft, isTrue);
+  });
+
   test('canonicalizes supported language values before persistence', () async {
     final id = await repository!.saveEntry('bonjour monde', 'FR_fr');
 

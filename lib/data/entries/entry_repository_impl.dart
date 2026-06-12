@@ -109,6 +109,23 @@ class EntryRepositoryImpl implements EntryRepository {
   }
 
   @override
+  Future<void> updateDraftTranscriptAndLanguage(
+    int id,
+    String rawTranscript,
+    int wordCount,
+    String language,
+  ) async {
+    final canonicalLanguage = _requireSupportedLanguage(language);
+    final affectedRows = await entryDao.updateDraftTranscriptAndLanguage(
+      id,
+      rawTranscript,
+      wordCount,
+      canonicalLanguage,
+    );
+    _throwIfMissing(id, affectedRows);
+  }
+
+  @override
   Future<void> finalizeDraftWithCleanedText(
     int id,
     String rawTranscript,

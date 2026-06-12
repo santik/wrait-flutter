@@ -11,8 +11,8 @@ Story IDs stay stable, but implementation order follows the sequence below.
 5. US-005 - done
 6. US-016 - done
 7. US-006 - done
-8. US-007
-9. US-008
+8. US-007 - done
+9. US-008 - done
 10. US-009
 11. US-010
 12. US-011

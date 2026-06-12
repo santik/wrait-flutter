@@ -130,7 +130,10 @@ class WraitBackendClient {
       if (response is GeneratedApiSuccess<CleanupResponse>) {
         final cleanedText = response.data.cleanedText.trim();
         if (cleanedText.isEmpty) {
-          return const CleanupFailure(reason: BackendFailureReason.apiError);
+          return CleanupFailure(
+            reason: BackendFailureReason.apiError,
+            quota: response.data.quota?.toValidatedStateOrNull(),
+          );
         }
 
         return CleanupSuccess(

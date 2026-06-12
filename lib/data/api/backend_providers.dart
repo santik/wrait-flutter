@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app.dart';
+import '../../domain/usecase/cleanup_transcript_use_case.dart';
 import '../../domain/usecase/register_device_on_launch_use_case.dart';
+import '../entries/entry_providers.dart';
 import '../preferences/preferences_providers.dart';
 import 'backend_client.dart';
 import 'generated/backend_api_generated.dart';
@@ -41,6 +43,16 @@ final wraitBackendClientProvider = Provider<WraitBackendClient>((ref) {
   );
 });
 
+final cleanupTranscriptCallbackProvider = Provider<CleanupTranscriptCallback>((
+  ref,
+) {
+  return ({required String transcript, required String language}) {
+    return ref
+        .watch(wraitBackendClientProvider)
+        .cleanupTranscript(transcript: transcript, language: language);
+  };
+});
+
 class SessionRecordQuotaStateNotifier extends Notifier<RecordQuotaState?> {
   @override
   RecordQuotaState? build() => null;
@@ -71,6 +83,17 @@ final registrationWarningLoggerProvider = Provider<RegistrationWarningLogger>((
   };
 });
 
+final cleanupWarningLoggerProvider = Provider<CleanupWarningLogger>((ref) {
+  return (message, {error, stackTrace}) {
+    developer.log(
+      message,
+      name: 'CleanupTranscriptUseCase',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  };
+});
+
 final registerDeviceOnLaunchUseCaseProvider =
     Provider<RegisterDeviceOnLaunchUseCase>((ref) {
       return RegisterDeviceOnLaunchUseCase(
@@ -81,3 +104,16 @@ final registerDeviceOnLaunchUseCaseProvider =
         logWarning: ref.watch(registrationWarningLoggerProvider),
       );
     });
+
+final cleanupTranscriptUseCaseProvider = Provider<CleanupTranscriptUseCase>((
+  ref,
+) {
+  return CleanupTranscriptUseCase(
+    cleanupTranscript: ref.watch(cleanupTranscriptCallbackProvider),
+    entryRepository: ref.watch(entryRepositoryProvider),
+    setRecordQuota: (quota) {
+      ref.read(sessionRecordQuotaStateProvider.notifier).setQuota(quota);
+    },
+    logWarning: ref.watch(cleanupWarningLoggerProvider),
+  );
+});
