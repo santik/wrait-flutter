@@ -4,6 +4,8 @@ abstract final class WraitAnimationTokens {
   static const Duration fade = Duration(milliseconds: 300);
   static const Duration pulse = Duration(milliseconds: 1800);
   static const Duration buttonAlpha = Duration(milliseconds: 200);
+  static const Duration buttonShake = Duration(milliseconds: 420);
+  static const Duration countdownRefresh = Duration(milliseconds: 250);
   static const Duration deleteFade = Duration(milliseconds: 200);
   static const Duration swipeDeleteFling = Duration(milliseconds: 250);
 }
@@ -37,6 +39,9 @@ abstract final class WraitButtonTokens {
   static const double alphaReduced = 0.5;
   static const double alphaFull = 1.0;
   static const double countdownStrokeWidth = 3;
+  static const double countdownSizeOffset = 18;
+  static const double shakeAmplitude = 10;
+  static const double shakeOscillations = 5;
 }
 
 abstract final class WraitAppLockTokens {

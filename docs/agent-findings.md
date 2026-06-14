@@ -258,6 +258,90 @@ US-002 was validated successfully with both automated and manual checks:
   - Android debug build: `flutter build apk --debug`
   - iOS simulator debug build: `flutter build ios --simulator --debug --no-codesign`
 
+## US-011: Main Screen UI
+
+### Established main-screen presentation surface
+
+- The app root route `/` now renders the real recording-focused main screen:
+  - `lib/presentation/main/main_screen.dart`
+- The reusable main-screen presentation pieces now live under:
+  - `lib/presentation/main/button_area.dart`
+  - `lib/presentation/main/pulse_ring.dart`
+  - `lib/presentation/main/countdown_ring.dart`
+  - `lib/presentation/main/main_screen_status.dart`
+  - `lib/presentation/main/main_screen_stats.dart`
+
+### Main-screen behavior worth preserving
+
+- The root experience is now a voice-first single-button flow:
+  - first-time idle status: `tap button to write`
+  - returning idle button/status text: `wrait`
+  - listening button text: `stop`
+  - status text lives under the button, not inside it
+- Saved feedback is intentionally UI-owned and auto-clears from the screen
+  after the configured saved display window.
+- Error and Deleted feedback remain controller-owned auto-clear behavior.
+- Main-screen stats use fixed wording:
+  - `{count} entries - {days} days`
+- Stats count all stored entries, including drafts.
+- Day counts use unique local calendar dates derived from entry timestamps.
+- The saved status line navigates to `/entry/:id`.
+- The stats line navigates to `/entries`.
+
+### State-contract guidance
+
+- `RecordingListening` now carries:
+  - `hardCapDeadlineElapsedRealtime`
+- `RecordingErrorState` now carries:
+  - `preservedDraft`
+
+Future stories should reuse these fields rather than reaching back into
+transcription services or inferring draft preservation from generic error
+categories in the UI.
+
+### Presentation-logic guidance
+
+- Status copy and status tap behavior are intentionally centralized in:
+  - `lib/presentation/main/main_screen_status.dart`
+- Entry-stat derivation is intentionally centralized in:
+  - `lib/presentation/main/main_screen_stats.dart`
+
+Future UI work on the main screen should extend those helpers instead of
+duplicating status text or entry-stat formatting in widgets.
+
+### Countdown and repaint guidance
+
+- Countdown progress is intentionally updated through a local
+  `ValueNotifier<double?>` in `MainScreen`.
+- The button/countdown region is rebuilt through `ValueListenableBuilder`
+  rather than whole-screen `setState()` ticks.
+
+Future work should preserve that localized repaint pattern unless a story
+explicitly introduces a different timing architecture.
+
+### Token and test guidance
+
+- Button shake and countdown sizing/timing values now belong in:
+  - `lib/presentation/theme/design_tokens.dart`
+- Do not reintroduce feature-local magic values for button/countdown tuning.
+- When testing listening-state UI, be careful with `pumpAndSettle()` because
+  active countdown refreshes keep scheduling frames.
+
+### Validation knowledge
+
+- Main-screen integration coverage now runs on both:
+  - Android emulator
+  - iOS simulator
+- `integration_test/main_screen_flow_test.dart` is the primary end-to-end
+  coverage surface for:
+  - first-time idle
+  - listening
+  - saved feedback
+  - entry-detail navigation
+  - stats display/navigation
+  - quota visibility
+  - microphone-blocked feedback
+
 ## US-005: Backend API Client
 
 ### Established backend API foundation

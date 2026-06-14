@@ -76,16 +76,28 @@ upcoming feature work:
   audio-draft persistence, and `hasEverRecorded` updates
 - controller-owned three-second auto-clear behavior for Error and Deleted
   feedback, with Saved feedback intentionally left UI-owned
-- placeholder shell routes for `/`, `/entries`, and `/entry/:id`
+- real root main screen at `/` with a voice-first circular recording button,
+  under-button status line, entry stats line, and session quota line when
+  quota data exists
+- approved main-screen status behavior including first-time
+  `tap button to write`, idle `wrait`, listening `stop`, uploading,
+  processing, saved, draft-preserved, and microphone-blocked feedback states
+- listening-state pulse/countdown presentation driven by the configured
+  recording hard cap
+- main-screen navigation from saved feedback to `/entry/:id` and from entry
+  stats to `/entries`
+- active entry stats using fixed `{count} entries - {days} days` wording,
+  counting every stored entry including drafts and unique local calendar days
+- placeholder shell routes still backing `/entries` and `/entry/:id` until
+  later stories replace those route bodies
 - platform setup for Android and iOS
-- placeholder screens used to validate launch, theming, and route coverage
+- placeholder screens still used behind `/entries` and `/entry/:id` to
+  validate route coverage until later entry-management stories land
 
-Feature behavior such as real recording UI, higher-level recording and
-transcription presentation on top of the shared services, network-preflight
-handling for Best mode, offline-mode routing, retry UX, quota presentation
-beyond the current session state, preferences persistence beyond the current
-basic flags and identifiers, and entry-management UI still belongs to later
-user stories.
+Feature behavior such as network-preflight handling for Best mode, offline-mode
+routing, retry UX, quota presentation beyond the current session state,
+preferences persistence beyond the current basic flags and identifiers,
+settings UI, and full entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
