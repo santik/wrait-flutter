@@ -51,13 +51,34 @@ final class RecordingIdle extends RecordingState {
 }
 
 final class RecordingListening extends RecordingState {
-  const RecordingListening();
+  RecordingListening({required int hardCapDeadlineElapsedRealtime})
+    : hardCapDeadlineElapsedRealtime = _validateDeadline(
+        hardCapDeadlineElapsedRealtime,
+      );
+
+  final int hardCapDeadlineElapsedRealtime;
+
+  static int _validateDeadline(int value) {
+    if (value <= 0) {
+      throw ArgumentError.value(
+        value,
+        'hardCapDeadlineElapsedRealtime',
+        'must be positive',
+      );
+    }
+    return value;
+  }
 
   @override
-  bool operator ==(Object other) => other is RecordingListening;
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RecordingListening &&
+            other.hardCapDeadlineElapsedRealtime ==
+                hardCapDeadlineElapsedRealtime;
+  }
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => hardCapDeadlineElapsedRealtime.hashCode;
 }
 
 final class RecordingUploading extends RecordingState {
@@ -107,18 +128,21 @@ final class RecordingSaved extends RecordingState {
 }
 
 final class RecordingErrorState extends RecordingState {
-  const RecordingErrorState(this.error);
+  const RecordingErrorState(this.error, {this.preservedDraft = false});
 
   final RecordingError error;
+  final bool preservedDraft;
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is RecordingErrorState && other.error == error;
+        other is RecordingErrorState &&
+            other.error == error &&
+            other.preservedDraft == preservedDraft;
   }
 
   @override
-  int get hashCode => error.hashCode;
+  int get hashCode => Object.hash(error, preservedDraft);
 }
 
 final class RecordingDeleted extends RecordingState {

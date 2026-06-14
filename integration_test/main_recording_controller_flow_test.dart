@@ -104,7 +104,10 @@ void main() {
 
       expect(
         harness.container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.noInternet),
+        const RecordingErrorState(
+          RecordingError.noInternet,
+          preservedDraft: true,
+        ),
       );
 
       final drafts = await harness.container
@@ -143,7 +146,10 @@ void main() {
 
       expect(
         harness.container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.backendUnavailable),
+        const RecordingErrorState(
+          RecordingError.backendUnavailable,
+          preservedDraft: true,
+        ),
       );
 
       final entry = await harness.container

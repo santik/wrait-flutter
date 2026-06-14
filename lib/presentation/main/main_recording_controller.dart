@@ -194,7 +194,12 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     switch (status) {
       case RecordingStarted():
         _listeningStartedAtElapsedRealtime = _monotonicClock.now();
-        state = state.copyWith(recordingState: const RecordingListening());
+        state = state.copyWith(
+          recordingState: RecordingListening(
+            hardCapDeadlineElapsedRealtime:
+                status.hardCapDeadlineElapsedRealtime,
+          ),
+        );
         return;
       case Uploading():
         state = state.copyWith(recordingState: const RecordingUploading());
@@ -226,8 +231,13 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         await _handleCleanup(result);
         return;
       case TranscriptionFailure():
-        await _persistAudioDraftIfNeeded(result.audioDraftPath);
-        _emitError(_mapTranscriptionFailure(result.reason));
+        final preservedDraft = await _persistAudioDraftIfNeeded(
+          result.audioDraftPath,
+        );
+        _emitError(
+          _mapTranscriptionFailure(result.reason),
+          preservedDraft: preservedDraft,
+        );
         return;
     }
   }
@@ -258,19 +268,22 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         );
         return;
       case CleanupTranscriptFailure():
-        _emitError(_mapCleanupFailure(cleanupResult.reason));
+        _emitError(
+          _mapCleanupFailure(cleanupResult.reason),
+          preservedDraft: cleanupResult.entryId != null,
+        );
         return;
     }
   }
 
-  Future<void> _persistAudioDraftIfNeeded(String? audioDraftPath) async {
+  Future<bool> _persistAudioDraftIfNeeded(String? audioDraftPath) async {
     if (audioDraftPath == null) {
-      return;
+      return false;
     }
 
     final normalizedAudioDraftPath = audioDraftPath.trim();
     if (normalizedAudioDraftPath.isEmpty) {
-      return;
+      return false;
     }
 
     try {
@@ -284,7 +297,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
             'must point to an existing file',
           ),
         );
-        return;
+        return false;
       }
     } catch (error, stackTrace) {
       _logWarning(
@@ -292,7 +305,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         error: error,
         stackTrace: stackTrace,
       );
-      return;
+      return false;
     }
 
     try {
@@ -300,12 +313,14 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         normalizedAudioDraftPath,
         cleanupTranscriptFallbackLanguage,
       );
+      return true;
     } catch (error, stackTrace) {
       _logWarning(
         'Failed to persist retryable audio draft after transcription failure.',
         error: error,
         stackTrace: stackTrace,
       );
+      return false;
     }
   }
 
@@ -355,6 +370,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     RecordingError nextError, {
     Object? cause,
     StackTrace? stackTrace,
+    bool preservedDraft = false,
   }) {
     if (cause != null) {
       _logWarning(
@@ -369,7 +385,10 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
       RecordingError.noMatch => state.shakeErrorKey + 1,
       _ => state.shakeErrorKey,
     };
-    final errorState = RecordingErrorState(nextError);
+    final errorState = RecordingErrorState(
+      nextError,
+      preservedDraft: preservedDraft,
+    );
     state = state.copyWith(
       recordingState: errorState,
       shakeErrorKey: nextShakeKey,

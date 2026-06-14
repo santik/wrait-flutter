@@ -1,0 +1,144 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../theme/adaptive_button_size.dart';
+import '../theme/design_tokens.dart';
+import 'countdown_ring.dart';
+import 'pulse_ring.dart';
+import 'recording_state.dart';
+
+class ButtonArea extends StatefulWidget {
+  const ButtonArea({
+    required this.recordingState,
+    required this.shakeErrorKey,
+    required this.buttonLabel,
+    required this.onPressed,
+    this.countdownProgress,
+    super.key,
+  });
+
+  final RecordingState recordingState;
+  final int shakeErrorKey;
+  final String buttonLabel;
+  final VoidCallback onPressed;
+  final double? countdownProgress;
+
+  @override
+  State<ButtonArea> createState() => _ButtonAreaState();
+}
+
+class _ButtonAreaState extends State<ButtonArea>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shakeController = AnimationController(
+    vsync: this,
+    duration: WraitAnimationTokens.buttonShake,
+  );
+
+  @override
+  void didUpdateWidget(covariant ButtonArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.shakeErrorKey != widget.shakeErrorKey) {
+      _shakeController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isListening = widget.recordingState is RecordingListening;
+    final isDisabled =
+        widget.recordingState is RecordingUploading ||
+        widget.recordingState is RecordingProcessing;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final buttonSize = AdaptiveButtonSize.forWidth(constraints.maxWidth);
+        final pulseSize = buttonSize * WraitButtonTokens.pulseScaleMax;
+
+        return AnimatedBuilder(
+          animation: _shakeController,
+          builder: (context, child) {
+            final value = _shakeController.value;
+            final offset =
+                math.sin(
+                  value * math.pi * WraitButtonTokens.shakeOscillations,
+                ) *
+                WraitButtonTokens.shakeAmplitude *
+                (1 - value);
+            return Transform.translate(offset: Offset(offset, 0), child: child);
+          },
+          child: SizedBox(
+            width: pulseSize,
+            height: pulseSize,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (isListening)
+                  PulseRing(
+                    key: const ValueKey('pulseRing'),
+                    size: buttonSize,
+                    color: colorScheme.primary.withValues(alpha: 0.4),
+                  ),
+                if (isListening && widget.countdownProgress != null)
+                  CountdownRing(
+                    key: const ValueKey('countdownRing'),
+                    size: buttonSize + WraitButtonTokens.countdownSizeOffset,
+                    progress: widget.countdownProgress!,
+                    color: colorScheme.primary,
+                    strokeWidth: WraitButtonTokens.countdownStrokeWidth,
+                  ),
+                AnimatedOpacity(
+                  duration: WraitAnimationTokens.buttonAlpha,
+                  opacity: isDisabled
+                      ? WraitButtonTokens.alphaDisabled
+                      : WraitButtonTokens.alphaFull,
+                  child: Semantics(
+                    button: true,
+                    label: isListening
+                        ? 'Recording action button. Listening with countdown indicator.'
+                        : 'Recording action button',
+                    hint: isListening
+                        ? 'Double tap to stop recording.'
+                        : 'Double tap to start recording.',
+                    value: widget.buttonLabel,
+                    child: Material(
+                      color: colorScheme.primary,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        key: const ValueKey('actionButton'),
+                        customBorder: const CircleBorder(),
+                        onTap: widget.onPressed,
+                        child: SizedBox(
+                          width: buttonSize,
+                          height: buttonSize,
+                          child: Center(
+                            child: Text(
+                              widget.buttonLabel,
+                              key: const ValueKey('actionButtonLabel'),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: colorScheme.onPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

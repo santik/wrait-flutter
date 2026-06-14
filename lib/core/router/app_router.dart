@@ -1,17 +1,14 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../presentation/home/home_placeholder_screen.dart';
+import '../../presentation/main/main_screen.dart';
 import '../../presentation/shell/shell_placeholder_screen.dart';
 
 GoRouter buildAppRouter({String? initialLocation}) {
   return GoRouter(
     initialLocation: _resolveInitialLocation(initialLocation),
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const HomePlaceholderScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const MainScreen()),
       GoRoute(
         path: '/entries',
         builder: (context, state) => const ShellPlaceholderScreen(

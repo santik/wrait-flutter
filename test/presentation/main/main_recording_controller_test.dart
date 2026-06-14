@@ -106,7 +106,11 @@ void main() {
       expect(transcriptionService.startCallCount, 1);
       expect(
         container.read(mainRecordingControllerProvider),
-        const RecordingControllerState(recordingState: RecordingListening()),
+        RecordingControllerState(
+          recordingState: RecordingListening(
+            hardCapDeadlineElapsedRealtime: 120000,
+          ),
+        ),
       );
       expect(container.read(mainRecordingControllerProvider).isActive, isTrue);
     },
@@ -218,7 +222,7 @@ void main() {
     expect(transcriptionService.startCallCount, 2);
     expect(
       container.read(mainRecordingControllerProvider).recordingState,
-      const RecordingListening(),
+      RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
     );
   });
 
@@ -234,7 +238,7 @@ void main() {
     expect(transcriptionService.startCallCount, 1);
     expect(
       container.read(mainRecordingControllerProvider).recordingState,
-      const RecordingListening(),
+      RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
     );
   });
 
@@ -259,7 +263,7 @@ void main() {
       expect(transcriptionService.startCallCount, 2);
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingListening(),
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
       );
     },
   );
@@ -350,7 +354,10 @@ void main() {
       ]);
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.noInternet),
+        const RecordingErrorState(
+          RecordingError.noInternet,
+          preservedDraft: true,
+        ),
       );
     },
   );
@@ -411,7 +418,10 @@ void main() {
       expect(preferencesRepository.hasEverRecorded, isFalse);
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.backendUnavailable),
+        const RecordingErrorState(
+          RecordingError.backendUnavailable,
+          preservedDraft: true,
+        ),
       );
     },
   );
@@ -558,7 +568,7 @@ void main() {
       expect(transcriptionService.startCallCount, 1);
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingListening(),
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
       );
     },
   );
@@ -593,13 +603,13 @@ void main() {
           .onMainButtonTapped();
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingListening(),
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
       );
 
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingListening(),
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
       );
     },
   );
@@ -627,13 +637,13 @@ void main() {
           .onMainButtonTapped();
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingListening(),
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
       );
 
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingListening(),
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
       );
     },
   );
