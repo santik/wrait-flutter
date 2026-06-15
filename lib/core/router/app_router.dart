@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/entries/entry_list_screen.dart';
 import '../../presentation/main/main_screen.dart';
 import '../../presentation/shell/shell_placeholder_screen.dart';
 
@@ -11,11 +12,7 @@ GoRouter buildAppRouter({String? initialLocation}) {
       GoRoute(path: '/', builder: (context, state) => const MainScreen()),
       GoRoute(
         path: '/entries',
-        builder: (context, state) => const ShellPlaceholderScreen(
-          title: 'Entries',
-          description:
-              'The entries route is ready to host browsing and summary views once entry data arrives.',
-        ),
+        builder: (context, state) => const EntryListScreen(),
       ),
       GoRoute(
         path: '/entry/:id',

@@ -144,7 +144,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('statsLineButton')));
       await tester.pumpAndSettle();
       await binding.takeScreenshot('main-screen-entry-list');
-      expect(find.text('Entries'), findsOneWidget);
+      expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
     },
   );
 

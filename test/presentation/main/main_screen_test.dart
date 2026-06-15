@@ -118,7 +118,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('statsLineButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Entries'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
   });
 
   testWidgets('saved feedback auto-clears after the saved display window', (
@@ -435,17 +435,22 @@ class _TestQuotaNotifier extends SessionRecordQuotaStateNotifier {
 class _TestEntryRepository implements EntryRepository {
   final StreamController<List<Entry>> _controller =
       StreamController<List<Entry>>.broadcast();
+  List<Entry> _entries = const <Entry>[];
 
   _TestEntryRepository() {
-    _controller.add(const <Entry>[]);
+    _controller.add(_entries);
   }
 
   void emitEntries(List<Entry> entries) {
-    _controller.add(entries);
+    _entries = List<Entry>.from(entries);
+    _controller.add(_entries);
   }
 
   @override
-  Stream<List<Entry>> watchAllEntries() => _controller.stream;
+  Stream<List<Entry>> watchAllEntries() async* {
+    yield _entries;
+    yield* _controller.stream;
+  }
 
   @override
   Stream<Entry?> watchEntryById(int id) => const Stream<Entry?>.empty();
