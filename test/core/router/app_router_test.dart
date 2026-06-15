@@ -20,7 +20,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Entries'), findsOneWidget);
+    expect(find.text('no entries yet'), findsOneWidget);
   });
 
   testWidgets('renders the entry-detail route for a non-empty id', (
@@ -41,7 +41,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Entries'), findsOneWidget);
+    expect(find.text('no entries yet'), findsOneWidget);
     expect(find.text('Entry preview'), findsNothing);
   });
 
@@ -55,7 +55,7 @@ void main() {
 
     router.go('/entries');
     await tester.pumpAndSettle();
-    expect(find.text('Entries'), findsOneWidget);
+    expect(find.text('no entries yet'), findsOneWidget);
 
     router.go('/entry/today');
     await tester.pumpAndSettle();

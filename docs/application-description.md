@@ -88,16 +88,25 @@ upcoming feature work:
   stats to `/entries`
 - active entry stats using fixed `{count} entries - {days} days` wording,
   counting every stored entry including drafts and unique local calendar days
-- placeholder shell routes still backing `/entries` and `/entry/:id` until
-  later stories replace those route bodies
+- real entry-list screen at `/entries` backed by the local entry repository
+- entry-list newest-first ordering with draft rows included and visibly marked
+- always-visible language labels and localized weekday/date/time metadata for
+  each entry row
+- entry-list previews derived from cleaned text first, then raw transcript,
+  with audio-only drafts shown as `pending · will retry`
+- right-swipe row deletion on `/entries` with immediate confirmation, cancel
+  reset, and stay-on-list behavior after confirmed deletion
+- placeholder route body still backing `/entry/:id` until a later story
+  replaces that screen
 - platform setup for Android and iOS
-- placeholder screens still used behind `/entries` and `/entry/:id` to
-  validate route coverage until later entry-management stories land
+- placeholder screen still used behind `/entry/:id` to validate route coverage
+  until later entry-detail stories land
 
 Feature behavior such as network-preflight handling for Best mode, offline-mode
 routing, retry UX, quota presentation beyond the current session state,
 preferences persistence beyond the current basic flags and identifiers,
-settings UI, and full entry-management UI still belongs to later user stories.
+settings UI, full entry detail, entry editing, entry sharing, and richer
+entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -116,7 +125,7 @@ Planned future stories cover:
 - Best-mode network preflight and offline-mode routing on top of the existing
   recording/transcription controller surface
 - retry UX on top of the existing transcription and cleanup use cases
-- entry browsing and detail screens
+- entry detail and broader entry-management screens
 - privacy mode and offline behavior
 
 ## Backend integration note

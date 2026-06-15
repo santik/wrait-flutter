@@ -859,6 +859,83 @@ Important workflow implication:
 - If a future story changes the SQLite runtime or iOS dependency surface,
   revalidate both encrypted-store startup and the iOS SPM-only build path.
 
+## US-013: Entry List Screen
+
+### Established entry-list surface
+
+- The `/entries` route now renders the real entry-list screen through:
+  - `lib/presentation/entries/entry_list_screen.dart`
+- Reusable entry-list presentation pieces now live under:
+  - `lib/presentation/entries/entry_list_row.dart`
+  - `lib/presentation/entries/entry_list_controller.dart`
+  - `lib/presentation/entries/entry_list_formatters.dart`
+
+### Entry-list behavior worth preserving
+
+- The `/entries` screen is repository-backed and includes both finalized and
+  draft entries.
+- Entry-list ordering is newest first by `createdAt`.
+- Draft rows are visibly marked with `draft`.
+- Language labels are intentionally always visible on every row.
+- Row previews prefer cleaned text, then fall back to raw transcript.
+- Audio-only drafts remain visible on the list as `pending · will retry`.
+- Audio-only draft rows do not navigate to `/entry/:id` on tap.
+- Row swipe-to-delete is intentionally scoped to a right-swipe reveal with an
+  80dp red affordance, followed immediately by the confirmation dialog.
+- Cancel and Delete both close the revealed row state.
+- Confirmed deletion removes the row reactively while keeping the user on
+  `/entries`.
+
+### Architecture guidance
+
+- Keep entry ordering in the presentation/controller layer instead of moving
+  newest-first sorting into the repository contract.
+- Keep row preview, localized timestamp, and language-label derivation in
+  `entry_list_formatters.dart` so display rules stay unit-testable.
+- Delete failures should remain non-destructive in the UI: log them from the
+  controller and leave the row visible rather than showing a false optimistic
+  removal state.
+- Guard each row reveal/delete flow against duplicate in-flight triggers so
+  repeated gestures or semantics actions cannot start multiple delete flows.
+
+### Accessibility and localization guidance
+
+- Preserve the row-level custom semantics delete action so assistive
+  technologies can invoke deletion without performing the swipe gesture.
+- Preserve explicit semantics labels and hints on the delete-confirmation
+  dialog actions so destructive and cancel actions stay clearly distinguishable.
+- Flutter localization delegates plus the direct `intl` dependency are now
+  part of the app surface for entry-list weekday/date/time formatting.
+- Timestamp formatting should keep its locale fallback path so unsupported
+  locale inputs still render usable labels.
+
+### Validation knowledge
+
+- Shared US-013 validation includes:
+  - `flutter analyze`
+  - `flutter test`
+  - widget coverage in:
+    - `test/presentation/entries/entry_list_row_test.dart`
+    - `test/presentation/entries/entry_list_screen_test.dart`
+  - unit/provider coverage in:
+    - `test/presentation/entries/entry_list_controller_test.dart`
+    - `test/presentation/entries/entry_list_formatters_test.dart`
+  - integration coverage in:
+    - `integration_test/entry_list_flow_test.dart`
+    - `integration_test/main_screen_flow_test.dart`
+  - Android emulator pass for the entry-list integration flows
+  - iOS simulator pass for the entry-list integration flows
+
+### Guidance for future stories
+
+- Prefer row-level widget coverage for swipe/reveal behavior instead of trying
+  to prove every gesture detail only through the parent `ListView`.
+- Keep integration coverage on both Android and iOS for real `/entries`
+  navigation and delete flows.
+- If a future story expands entry detail, editing, or bulk management, treat
+  audio-only drafts as a distinct state instead of assuming every listed entry
+  is immediately readable.
+
 ## Cross-cutting: iOS Swift Package Manager Cleanup
 
 ### Current iOS dependency state
