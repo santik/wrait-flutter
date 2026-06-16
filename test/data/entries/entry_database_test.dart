@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/core/time/system_clock.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
@@ -168,6 +169,58 @@ void main() {
       expect(remainingDrafts.single.rawTranscript, 'keep me');
       expect(await staleAudioFile.exists(), isFalse);
       await bootstrappedDatabase.close();
+    },
+  );
+
+  test(
+    'reopens a seeded database with 1000 entries within a host-side startup budget',
+    () async {
+      final storage = FakeSecureKeyValueStore();
+      final keyStore = DatabaseKeyStore(storage, random: Random(6));
+      final file = _databaseFile(tempDirectory);
+      final seedDatabase = await LocalEntryDatabase.open(
+        keyStore: keyStore,
+        databaseFile: file,
+      );
+      final createdAt = _ts(2026, 6, 8);
+
+      await seedDatabase.batch((batch) {
+        batch.insertAll(
+          seedDatabase.entryRecords,
+          List<EntryRecordsCompanion>.generate(
+            1000,
+            (index) => EntryRecordsCompanion.insert(
+              rawTranscript: 'seeded entry $index',
+              isDraft: false,
+              language: 'en-US',
+              createdAt: createdAt,
+              cleanedText: const Value.absent(),
+              wordCount: const Value(3),
+              audioPath: const Value.absent(),
+            ),
+          ),
+        );
+      });
+      await seedDatabase.close();
+
+      final reopenStopwatch = Stopwatch()..start();
+      final reopenedDatabase = await LocalEntryDatabase.open(
+        keyStore: keyStore,
+        databaseFile: file,
+      );
+      reopenStopwatch.stop();
+
+      final countRow = await reopenedDatabase
+          .customSelect('SELECT COUNT(*) AS count FROM entries;')
+          .getSingle();
+      final entryCount = countRow.data['count'] as int;
+      debugPrint(
+        'LocalEntryDatabase reopen with 1000 entries took ${reopenStopwatch.elapsedMilliseconds}ms.',
+      );
+
+      expect(entryCount, 1000);
+      expect(reopenStopwatch.elapsed, lessThan(const Duration(seconds: 3)));
+      await reopenedDatabase.close();
     },
   );
 }

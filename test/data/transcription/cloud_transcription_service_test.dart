@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
 import 'package:wrait/data/api/record_quota_state.dart';
+import 'package:wrait/data/audio/microphone_permission_service.dart';
 import 'package:wrait/data/audio/audio_recording_service.dart';
 import 'package:wrait/data/transcription/cloud_transcription_service.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
@@ -70,6 +71,20 @@ void main() {
       ),
     );
     expect(audioRecordingService.startedPaths.single, livePath);
+  });
+
+  test('denied microphone access surfaces a typed start failure', () async {
+    audioRecordingService.startFailure = const RecordingPermissionDeniedFailure(
+      MicrophoneAccessState.denied,
+    );
+
+    await expectLater(
+      service.startLiveTranscription(onStatus: (_) {}),
+      throwsA(isA<MicBlockedTranscriptionServiceFailure>()),
+    );
+
+    expect(service.isRecording, isFalse);
+    expect(service.isTranscribing, isFalse);
   });
 
   test(
@@ -503,10 +518,15 @@ class _FakeAudioRecordingService implements AudioRecordingService {
 
   final List<String> startedPaths = <String>[];
   String? _currentPath;
+  AudioRecordingFailure? startFailure;
   AudioRecordingFailure? stopFailure;
 
   @override
   Future<void> startRecording(String outputPath) async {
+    if (startFailure case final failure?) {
+      startFailure = null;
+      throw failure;
+    }
     startedPaths.add(outputPath);
     _currentPath = outputPath;
     isRecording = true;

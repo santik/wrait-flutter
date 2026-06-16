@@ -63,6 +63,46 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - Application description: [`docs/application-description.md`](docs/application-description.md)
 - Agent-relevant implementation findings: [`docs/agent-findings.md`](docs/agent-findings.md)
 
+## Current implementation guidance
+
+### Startup and bootstrap behavior
+
+- Keep startup non-blocking. `runApp()` should happen before heavier app
+  initialization, and the first-frame loading/retry shell should stay owned by
+  the bootstrap UI in `lib/main.dart`.
+- Preserve the current single-flight bootstrap/retry behavior. Retrying failed
+  launch work must not create duplicate concurrent startup requests.
+- Do not move encrypted database opening back into a fully blocking pre-UI
+  bootstrap path unless a future approved story explicitly changes that
+  startup tradeoff.
+
+### Android debug deployment guidance
+
+- Prefer `./deploy_debug.sh` for real-device Android debug deployment when the
+  story depends on backend registration, transcription, or proxy-authenticated
+  traffic.
+- Set `PROXY_SECRET` before running `./deploy_debug.sh`. The deployed app must
+  send the backend `X-Proxy-Secret` header from that runtime config value.
+- Keep the current deploy-script safety checks intact:
+  - require a connected target device
+  - reject missing or empty APK artifacts
+  - avoid silently reinstalling stale build output
+
+### Testing guidance
+
+- For main-screen integration and widget tests, prefer stable selectors from
+  `lib/presentation/main/main_screen_test_keys.dart` instead of visible-text
+  lookups wherever practical.
+- Reuse existing bootstrap and recording-controller tests before adding new
+  startup-specific harnesses.
+
+### Android identity note
+
+- The current Flutter Android application/package ID is `com.wrait.flutter`.
+- Older notes or external materials may still mention `com.wrait.app`; verify
+  the actual installed target before debugging, uninstalling, or scraping
+  device logs.
+
 ## Backend API generation guidance
 
 US-005 introduced a build-time OpenAPI generation prerequisite for the Flutter

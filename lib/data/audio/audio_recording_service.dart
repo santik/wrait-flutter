@@ -1,3 +1,5 @@
+import 'microphone_permission_service.dart';
+
 const minimumRecordingDuration = Duration(seconds: 5);
 
 abstract interface class AudioRecordingService {
@@ -34,4 +36,11 @@ final class RecordingTooShortFailure extends AudioRecordingFailure {
 final class RecordingOutputUnavailableFailure extends AudioRecordingFailure {
   const RecordingOutputUnavailableFailure()
     : super('Recorder stopped without producing a usable output file.');
+}
+
+final class RecordingPermissionDeniedFailure extends AudioRecordingFailure {
+  const RecordingPermissionDeniedFailure(this.accessState)
+    : super('Microphone permission was denied for recording.');
+
+  final MicrophoneAccessState accessState;
 }

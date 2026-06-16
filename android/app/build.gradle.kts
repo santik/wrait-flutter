@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.wrait.app"
+    namespace = "com.wrait.flutter"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.wrait.app"
+        applicationId = "com.wrait.flutter"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

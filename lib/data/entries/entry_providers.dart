@@ -42,7 +42,9 @@ class LocalEntryStartupBootstrap {
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
 
 Future<LocalEntryDatabase> bootstrapLocalEntryDatabase({
-  FlutterSecureStorage secureStorage = const FlutterSecureStorage(),
+  FlutterSecureStorage secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+  ),
   Clock clock = const SystemClock(),
   File? databaseFile,
 }) {

@@ -116,6 +116,20 @@ void main() {
     },
   );
 
+  test('start failure from blocked microphone publishes mic error', () async {
+    transcriptionService.startError =
+        const MicBlockedTranscriptionServiceFailure();
+
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.insufficientPermissions),
+    );
+  });
+
   test(
     'Listening stop before five seconds publishes TooShort, increments shake once, and auto-clears',
     () async {
@@ -664,6 +678,7 @@ class _CleanupCall {
 class _FakeTranscriptionService implements TranscriptionService {
   int startCallCount = 0;
   int stopCallCount = 0;
+  Object? startError;
   TranscriptionResult nextStopResult = const TranscriptionFailure(
     reason: TranscriptionFailureReason.apiError,
   );
@@ -689,6 +704,10 @@ class _FakeTranscriptionService implements TranscriptionService {
     required TranscriptionStatusCallback onStatus,
   }) async {
     startCallCount += 1;
+    if (startError case final error?) {
+      startError = null;
+      throw error;
+    }
     _isRecording = true;
     _hardCapDeadlineElapsedRealtime = 120000;
     final pendingStart = startFutureFactory?.call(onStatus);

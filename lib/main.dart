@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,23 +11,281 @@ import 'data/api/backend_providers.dart';
 import 'data/entries/entry_providers.dart';
 import 'data/entries/local_entry_database.dart';
 import 'data/preferences/preferences_providers.dart';
+import 'presentation/theme/wrait_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final appConfig = AppConfig.fromEnvironment();
+  runApp(
+    BootstrapApp(
+      appConfig: AppConfig.fromEnvironment(),
+      bootstrapRuntime: bootstrapAppRuntime,
+    ),
+  );
+}
+
+class AppBootstrapRuntime {
+  AppBootstrapRuntime({required this.container, required this.dispose});
+
+  final ProviderContainer container;
+  final Future<void> Function() dispose;
+}
+
+Future<AppBootstrapRuntime> bootstrapAppRuntime(AppConfig appConfig) async {
+  developer.log('Starting app bootstrap.', name: 'AppBootstrap');
+
+  developer.log('Opening local entry database.', name: 'AppBootstrap');
   final entryDatabase = await bootstrapLocalEntryDatabase();
+  developer.log('Local entry database ready.', name: 'AppBootstrap');
+
+  developer.log('Loading shared preferences.', name: 'AppBootstrap');
   final sharedPreferences = await SharedPreferences.getInstance();
+  developer.log('Shared preferences ready.', name: 'AppBootstrap');
+
   final appContainer = createAppContainer(
     appConfig: appConfig,
     entryDatabase: entryDatabase,
     sharedPreferences: sharedPreferences,
   );
+  developer.log('Provider container ready.', name: 'AppBootstrap');
   startAppLaunchWork(appContainer);
+  developer.log('Launch registration started.', name: 'AppBootstrap');
 
-  runApp(
-    UncontrolledProviderScope(container: appContainer, child: const WraitApp()),
+  return AppBootstrapRuntime(
+    container: appContainer,
+    dispose: () async {
+      appContainer.dispose();
+      await entryDatabase.close();
+    },
   );
+}
+
+class BootstrapApp extends StatefulWidget {
+  const BootstrapApp({
+    required this.appConfig,
+    required this.bootstrapRuntime,
+    this.startupTimeout = const Duration(seconds: 15),
+    super.key,
+  });
+
+  final AppConfig appConfig;
+  final Future<AppBootstrapRuntime> Function(AppConfig appConfig)
+  bootstrapRuntime;
+  final Duration startupTimeout;
+
+  @override
+  State<BootstrapApp> createState() => _BootstrapAppState();
+}
+
+class _BootstrapAppState extends State<BootstrapApp> {
+  Future<AppBootstrapRuntime>? _runtimeFuture;
+  AppBootstrapRuntime? _activeRuntime;
+  int _bootstrapRequestId = 0;
+  bool _bootstrapInFlight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      unawaited(_startBootstrap());
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_disposeRuntimeSafely(_activeRuntime));
+    super.dispose();
+  }
+
+  Future<AppBootstrapRuntime> _createRuntime(int requestId) async {
+    try {
+      final runtime = await widget
+          .bootstrapRuntime(widget.appConfig)
+          .timeout(widget.startupTimeout);
+      if (!mounted || requestId != _bootstrapRequestId) {
+        await runtime.dispose();
+      } else {
+        _activeRuntime = runtime;
+      }
+      return runtime;
+    } catch (error, stackTrace) {
+      developer.log(
+        'App bootstrap failed.',
+        name: 'AppBootstrap',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _startBootstrap({bool disposeActiveRuntime = false}) async {
+    if (_bootstrapInFlight) {
+      return;
+    }
+
+    _bootstrapInFlight = true;
+    final requestId = ++_bootstrapRequestId;
+    final previousRuntime = disposeActiveRuntime ? _activeRuntime : null;
+    _activeRuntime = null;
+
+    if (previousRuntime != null) {
+      await _disposeRuntimeSafely(previousRuntime);
+    }
+
+    final runtimeFuture = Future<AppBootstrapRuntime>.sync(
+      () => _createRuntime(requestId),
+    );
+    unawaited(runtimeFuture.then<void>((_) {}, onError: (_, _) {}));
+    if (mounted) {
+      setState(() {
+        _runtimeFuture = runtimeFuture;
+      });
+    }
+
+    try {
+      await runtimeFuture;
+    } catch (_) {
+      // FutureBuilder owns the user-visible error state.
+    } finally {
+      if (_bootstrapRequestId == requestId) {
+        if (mounted) {
+          setState(() {
+            _bootstrapInFlight = false;
+          });
+        } else {
+          _bootstrapInFlight = false;
+        }
+      }
+    }
+  }
+
+  Future<void> _disposeRuntimeSafely(AppBootstrapRuntime? runtime) async {
+    if (runtime == null) {
+      return;
+    }
+
+    try {
+      await runtime.dispose();
+    } catch (error, stackTrace) {
+      developer.log(
+        'App bootstrap runtime disposal failed.',
+        name: 'AppBootstrap',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  void _retryBootstrap() {
+    unawaited(_startBootstrap(disposeActiveRuntime: true));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final runtimeFuture = _runtimeFuture;
+    if (runtimeFuture == null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: wraitLightTheme,
+        darkTheme: wraitDarkTheme,
+        themeMode: ThemeMode.system,
+        home: const _BootstrapStatusScreen(
+          title: 'opening wrait',
+          subtitle: 'loading your local journal',
+          child: CircularProgressIndicator.adaptive(),
+        ),
+      );
+    }
+
+    return FutureBuilder<AppBootstrapRuntime>(
+      future: runtimeFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return UncontrolledProviderScope(
+            container: snapshot.data!.container,
+            child: const WraitApp(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: wraitLightTheme,
+            darkTheme: wraitDarkTheme,
+            themeMode: ThemeMode.system,
+            home: _BootstrapStatusScreen(
+              title: 'could not open wrait',
+              subtitle: 'try again',
+              child: FilledButton(
+                onPressed: _bootstrapInFlight ? null : _retryBootstrap,
+                child: const Text('retry'),
+              ),
+            ),
+          );
+        }
+
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: wraitLightTheme,
+          darkTheme: wraitDarkTheme,
+          themeMode: ThemeMode.system,
+          home: const _BootstrapStatusScreen(
+            title: 'opening wrait',
+            subtitle: 'loading your local journal',
+            child: CircularProgressIndicator.adaptive(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BootstrapStatusScreen extends StatelessWidget {
+  const _BootstrapStatusScreen({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              child,
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 ProviderContainer createAppContainer({

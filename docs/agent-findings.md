@@ -42,9 +42,13 @@ Current implementation details:
 
 Android baseline:
 
-- Package/application ID: `com.wrait.app`
+- Package/application ID: `com.wrait.flutter`
 - `minSdk = 26`
 - `RECORD_AUDIO` permission is already declared
+
+Older notes or external materials may still mention `com.wrait.app`. Treat
+that as historical context and verify the installed package name before
+debugging device state or uninstalling builds.
 
 iOS baseline:
 
@@ -200,7 +204,8 @@ US-002 was validated successfully with both automated and manual checks:
   - `lib/domain/model/entry.dart`
   - `lib/domain/model/supported_language.dart`
   - `lib/domain/repository/entry_repository.dart`
-- App startup now bootstraps the local database before `runApp` in:
+- App startup now renders first and completes launch/bootstrap work behind a
+  first-frame loading shell in:
   - `lib/main.dart`
   - `lib/data/entries/entry_providers.dart`
 
@@ -247,6 +252,14 @@ US-002 was validated successfully with both automated and manual checks:
 - Stale draft cleanup runs during startup before normal app use continues.
 - Audio-file cleanup is best-effort and intentionally does not block database
   correctness.
+- Preserve the non-blocking launch pattern: bootstrap failures should surface
+  through the startup retry UI instead of preventing the Flutter app from
+  rendering a first frame.
+- The current Drift setup uses direct `NativeDatabase(...)` opening rather than
+  `NativeDatabase.createInBackground(...)`.
+- Recent host validation reopened a seeded database with 1,000 entries in about
+  20 ms, which was acceptable for the current startup path. Re-measure before
+  revisiting a more complex background-open design.
 
 ### Validation knowledge
 
@@ -257,6 +270,47 @@ US-002 was validated successfully with both automated and manual checks:
 - Native validation that has already succeeded:
   - Android debug build: `flutter build apk --debug`
   - iOS simulator debug build: `flutter build ios --simulator --debug --no-codesign`
+
+## US-028: Device Registration Launch Hardening
+
+### Startup and retry behavior
+
+- The first visible app state should come from the Flutter bootstrap shell, not
+  the launcher icon. When launch work fails, the user should land in an
+  explicit retryable failure state instead of appearing stuck during startup.
+- Bootstrap retry is intentionally single-flight. Keep retry actions from
+  issuing overlapping launch requests.
+
+### Deployment and backend registration guidance
+
+- Prefer `./deploy_debug.sh` for Android real-device validation when a story
+  depends on backend registration or proxy-authenticated traffic.
+- `PROXY_SECRET` must be set for those debug deployments so runtime config can
+  populate the expected `X-Proxy-Secret` header.
+- The deploy script now guards against a few easy-to-miss failure modes:
+  - no connected target device
+  - missing or zero-byte APK output
+  - reinstalling stale build artifacts
+
+### Recording and permission behavior
+
+- Recording startup now relies on richer microphone permission interpretation in
+  the service layer:
+  - granted
+  - denied
+  - permanently denied
+  - restricted
+- UI currently collapses blocked permission outcomes into the existing
+  microphone-blocked feedback state. Keep that mapping in mind before adding
+  more granular copy or settings deep links.
+- Native Android recording-start failures are surfaced back through the Flutter
+  controller path and should remain user-visible instead of failing silently.
+
+### Test guidance
+
+- Main-screen flow tests should use stable selectors from
+  `lib/presentation/main/main_screen_test_keys.dart` instead of depending on
+  display text.
 
 ## US-011: Main Screen UI
 

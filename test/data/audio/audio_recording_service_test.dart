@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:record/record.dart';
 import 'package:wrait/data/audio/audio_recording_service.dart';
+import 'package:wrait/data/audio/microphone_permission_service.dart';
 import 'package:wrait/data/audio/record_audio_recording_service.dart';
 
 import '../../test_doubles/fake_monotonic_clock.dart';
@@ -12,6 +13,7 @@ void main() {
   late Directory tempDirectory;
   late FakeMonotonicClock monotonicClock;
   late _FakeRecorderAdapter recorder;
+  late _FakeMicrophonePermissionService microphonePermissionService;
   late RecordAudioRecordingService service;
 
   String pathFor(String fileName) => '${tempDirectory.path}/$fileName';
@@ -20,8 +22,10 @@ void main() {
     tempDirectory = await Directory.systemTemp.createTemp('wrait-audio-test');
     monotonicClock = FakeMonotonicClock(5000);
     recorder = _FakeRecorderAdapter();
+    microphonePermissionService = _FakeMicrophonePermissionService();
     service = RecordAudioRecordingService(
       recorder: recorder,
+      microphonePermissionService: microphonePermissionService,
       monotonicClock: monotonicClock,
       hardCap: const Duration(seconds: 120),
     );
@@ -85,6 +89,46 @@ void main() {
     expect(config.numChannels, 1);
   });
 
+  test('fails cleanly when microphone permission is denied', () async {
+    microphonePermissionService.nextState = MicrophoneAccessState.denied;
+
+    await expectLater(
+      service.startRecording(pathFor('permission-denied.m4a')),
+      throwsA(
+        isA<RecordingPermissionDeniedFailure>().having(
+          (error) => error.accessState,
+          'accessState',
+          MicrophoneAccessState.denied,
+        ),
+      ),
+    );
+
+    expect(microphonePermissionService.ensureCallCount, 1);
+    expect(recorder.startCalls, isEmpty);
+    expect(service.isRecording, isFalse);
+  });
+
+  test(
+    'preserves permanently denied microphone state in the failure',
+    () async {
+      microphonePermissionService.nextState =
+          MicrophoneAccessState.permanentlyDenied;
+
+      await expectLater(
+        service.startRecording(pathFor('permission-permanently-denied.m4a')),
+        throwsA(
+          isA<RecordingPermissionDeniedFailure>().having(
+            (error) => error.accessState,
+            'accessState',
+            MicrophoneAccessState.permanentlyDenied,
+          ),
+        ),
+      );
+
+      expect(recorder.startCalls, isEmpty);
+    },
+  );
+
   test('returns the completed output path for a valid recording', () async {
     final path = pathFor('valid-recording.m4a');
     await service.startRecording(path);
@@ -129,6 +173,7 @@ void main() {
   test('derives the hard-cap deadline from the configured duration', () async {
     final shortCapService = RecordAudioRecordingService(
       recorder: recorder,
+      microphonePermissionService: microphonePermissionService,
       monotonicClock: monotonicClock,
       hardCap: const Duration(seconds: 15),
     );
@@ -254,6 +299,17 @@ class _FakeRecorderAdapter implements RecorderAdapter {
 
   @override
   Future<void> dispose() async {}
+}
+
+class _FakeMicrophonePermissionService implements MicrophonePermissionService {
+  MicrophoneAccessState nextState = MicrophoneAccessState.granted;
+  int ensureCallCount = 0;
+
+  @override
+  Future<MicrophoneAccessState> ensureMicrophoneAccess() async {
+    ensureCallCount += 1;
+    return nextState;
+  }
 }
 
 class _StartCall {
