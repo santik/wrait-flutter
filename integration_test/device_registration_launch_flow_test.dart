@@ -8,12 +8,14 @@ import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
+import 'package:wrait/data/api/backend_client.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/preferences/platform_device_id_provider.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/preferences/preferences_repository_impl.dart';
 import 'package:wrait/main.dart';
+import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +26,6 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final sharedPreferences = await SharedPreferences.getInstance();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
 
       final requests = <_ObservedRequest>[];
       final requestSeen = Completer<void>();
@@ -33,13 +34,22 @@ void main() {
         server,
         requests,
         onRegister: (request) async {
-          requestSeen.complete();
+          if (!requestSeen.isCompleted) {
+            requestSeen.complete();
+          }
           await releaseResponse.future;
           return _StubResponse.created(
             '{"ok":true,"quota":{"limit":5,"count":1,"remaining":4,"resetAt":"2026-06-10T00:00:00Z"}}',
           );
         },
       );
+      addTearDown(() async {
+        if (!releaseResponse.isCompleted) {
+          releaseResponse.complete();
+        }
+        await server.close(force: true);
+        await serverFuture;
+      });
 
       final container = createAppContainer(
         appConfig: AppConfig.fromValues(
@@ -65,13 +75,15 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Capture'), findsOneWidget);
-      await requestSeen.future.timeout(const Duration(seconds: 5));
+      _expectMainLaunchUiVisible();
+      await _pumpUntil(tester, () => requestSeen.isCompleted);
       expect(container.read(sessionRecordQuotaStateProvider), isNull);
 
       releaseResponse.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => container.read(sessionRecordQuotaStateProvider) != null,
+      );
 
       final quota = container.read(sessionRecordQuotaStateProvider);
       final storedDeviceId = sharedPreferences.getString(
@@ -81,9 +93,6 @@ void main() {
       expect(quota?.remaining, 4);
       expect(storedDeviceId, matches(RegExp(r'^[0-9a-f]{64}$')));
       expect(requests.single.deviceId, storedDeviceId);
-
-      await server.close(force: true);
-      await serverFuture;
     },
   );
 
@@ -93,7 +102,6 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final sharedPreferences = await SharedPreferences.getInstance();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
 
       final requests = <_ObservedRequest>[];
       var registerCount = 0;
@@ -108,6 +116,10 @@ void main() {
           );
         },
       );
+      addTearDown(() async {
+        await server.close(force: true);
+        await serverFuture;
+      });
 
       final firstContainer = createAppContainer(
         appConfig: AppConfig.fromValues(
@@ -129,8 +141,10 @@ void main() {
           child: const WraitApp(),
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => firstContainer.read(sessionRecordQuotaStateProvider) != null,
+      );
 
       final firstLaunchDeviceId = requests.single.deviceId;
       expect(
@@ -163,8 +177,12 @@ void main() {
           child: const WraitApp(),
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () =>
+            requests.length == 2 &&
+            secondContainer.read(sessionRecordQuotaStateProvider) != null,
+      );
 
       expect(requests, hasLength(2));
       expect(requests[1].deviceId, firstLaunchDeviceId);
@@ -172,9 +190,6 @@ void main() {
         secondContainer.read(sessionRecordQuotaStateProvider)?.remaining,
         3,
       );
-
-      await server.close(force: true);
-      await serverFuture;
     },
   );
 
@@ -184,7 +199,6 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final sharedPreferences = await SharedPreferences.getInstance();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
 
       final requests = <_ObservedRequest>[];
       final serverFuture = _serveBackend(
@@ -193,6 +207,10 @@ void main() {
         onRegister: (request) async =>
             _StubResponse.json(500, '{"error":"temporary backend failure"}'),
       );
+      addTearDown(() async {
+        await server.close(force: true);
+        await serverFuture;
+      });
 
       final container = createAppContainer(
         appConfig: AppConfig.fromValues(
@@ -222,17 +240,42 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Capture'), findsOneWidget);
-      await Future<void>.delayed(const Duration(seconds: 4));
-      await tester.pump();
+      _expectMainLaunchUiVisible();
+      await _pumpUntil(
+        tester,
+        () => requests.length == WraitBackendClient.maxRegisterAttempts,
+        timeout: const Duration(seconds: 5),
+        step: const Duration(milliseconds: 100),
+      );
 
-      expect(requests, hasLength(3));
+      expect(requests, hasLength(WraitBackendClient.maxRegisterAttempts));
       expect(container.read(sessionRecordQuotaStateProvider)?.remaining, 4);
-
-      await server.close(force: true);
-      await serverFuture;
     },
   );
+}
+
+void _expectMainLaunchUiVisible() {
+  expect(find.byKey(mainActionButtonKey), findsOneWidget);
+  expect(find.byKey(mainStatusLineSlotKey), findsOneWidget);
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 2),
+  Duration step = const Duration(milliseconds: 10),
+}) async {
+  final endTime = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(endTime)) {
+    if (condition()) {
+      return;
+    }
+    await tester.pump(step);
+  }
+
+  if (!condition()) {
+    fail('Timed out waiting for condition after $timeout.');
+  }
 }
 
 Future<void> _serveBackend(

@@ -18,6 +18,7 @@ import 'package:wrait/data/entries/local_entry_database.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 import '../test/test_doubles/fake_secure_storage.dart';
@@ -228,7 +229,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entryListBackButton')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+    expect(find.byKey(mainActionButtonKey), findsOneWidget);
   });
 }
 

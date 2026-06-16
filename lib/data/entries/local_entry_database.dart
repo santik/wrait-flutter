@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -53,24 +54,50 @@ class LocalEntryDatabase extends _$LocalEntryDatabase {
     final dbFile = databaseFile ?? await defaultDatabaseFile();
     final key = await keyStore.readOrCreateKey();
     final existedBefore = await dbFile.exists();
+    final openStopwatch = Stopwatch()..start();
 
     try {
-      return await _openVerified(
+      final database = await _openVerified(
         dbFile,
         key,
         logStatements: logStatements,
         verifyCipherSupport: verifyCipherSupport,
       );
-    } catch (_) {
-      if (!existedBefore) rethrow;
+      developer.log(
+        'Encrypted database opened in ${openStopwatch.elapsedMilliseconds}ms (existing=$existedBefore).',
+        name: 'LocalEntryDatabase',
+      );
+      return database;
+    } catch (error, stackTrace) {
+      if (!existedBefore) {
+        developer.log(
+          'Encrypted database open failed after ${openStopwatch.elapsedMilliseconds}ms.',
+          name: 'LocalEntryDatabase',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        rethrow;
+      }
 
+      developer.log(
+        'Encrypted database open failed after ${openStopwatch.elapsedMilliseconds}ms; deleting artifacts and retrying.',
+        name: 'LocalEntryDatabase',
+        error: error,
+        stackTrace: stackTrace,
+      );
       await deleteDatabaseArtifacts(dbFile);
-      return _openVerified(
+      final recoveryStopwatch = Stopwatch()..start();
+      final database = await _openVerified(
         dbFile,
         key,
         logStatements: logStatements,
         verifyCipherSupport: verifyCipherSupport,
       );
+      developer.log(
+        'Encrypted database reopened after recovery in ${recoveryStopwatch.elapsedMilliseconds}ms.',
+        name: 'LocalEntryDatabase',
+      );
+      return database;
     }
   }
 
@@ -101,8 +128,11 @@ class LocalEntryDatabase extends _$LocalEntryDatabase {
     required bool logStatements,
     required CipherSupportVerifier verifyCipherSupport,
   }) async {
+    // Real Android installs were stalling before the first Flutter frame while
+    // opening the encrypted store through createInBackground. Opening directly
+    // keeps bootstrap behavior deterministic across host tests and device runs.
     final database = LocalEntryDatabase(
-      NativeDatabase.createInBackground(
+      NativeDatabase(
         databaseFile,
         logStatements: logStatements,
         setup: (rawDb) {

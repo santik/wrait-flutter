@@ -14,6 +14,7 @@ import 'button_area.dart';
 import 'main_recording_controller.dart';
 import 'main_screen_stats.dart';
 import 'main_screen_status.dart';
+import 'main_screen_test_keys.dart';
 import 'recording_state.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -178,7 +179,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                               height: WraitStatusLineTokens.gapAbove,
                             ),
                             SizedBox(
-                              key: const ValueKey('statusLineSlot'),
+                              key: mainStatusLineSlotKey,
                               height: WraitStatusLineTokens.reservedHeight,
                               child: Center(
                                 child: AnimatedSwitcher(

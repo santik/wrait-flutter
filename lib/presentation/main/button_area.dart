@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../theme/adaptive_button_size.dart';
 import '../theme/design_tokens.dart';
 import 'countdown_ring.dart';
+import 'main_screen_test_keys.dart';
 import 'pulse_ring.dart';
 import 'recording_state.dart';
 
@@ -113,7 +114,7 @@ class _ButtonAreaState extends State<ButtonArea>
                       color: colorScheme.primary,
                       shape: const CircleBorder(),
                       child: InkWell(
-                        key: const ValueKey('actionButton'),
+                        key: mainActionButtonKey,
                         customBorder: const CircleBorder(),
                         onTap: widget.onPressed,
                         child: SizedBox(
@@ -122,7 +123,7 @@ class _ButtonAreaState extends State<ButtonArea>
                           child: Center(
                             child: Text(
                               widget.buttonLabel,
-                              key: const ValueKey('actionButtonLabel'),
+                              key: mainActionButtonLabelKey,
                               textAlign: TextAlign.center,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: colorScheme.onPrimary,

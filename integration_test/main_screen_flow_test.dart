@@ -22,6 +22,7 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 
 import '../test/test_doubles/fake_monotonic_clock.dart';
 import '../test/test_doubles/fake_secure_storage.dart';
@@ -66,7 +67,7 @@ void main() {
       expect(find.text('listening...'), findsOneWidget);
 
       harness.monotonicClock.advance(const Duration(seconds: 6));
-      await tester.tap(find.byKey(const ValueKey('actionButton')));
+      await tester.tap(find.byKey(mainActionButtonKey));
       await _pumpUntilFound(
         tester,
         find.text('saved, tap to read'),
@@ -106,7 +107,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));
     await tester.pump();
     harness.monotonicClock.advance(const Duration(seconds: 6));
-    await tester.tap(find.byKey(const ValueKey('actionButton')));
+    await tester.tap(find.byKey(mainActionButtonKey));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));

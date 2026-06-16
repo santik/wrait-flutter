@@ -30,10 +30,13 @@ visual shell, and the first encrypted local persistence layer needed for
 upcoming feature work:
 
 - app bootstrap
+- immediate first-frame bootstrap shell with loading and retry states while
+  launch dependencies finish asynchronously
 - routing shell
 - runtime configuration loading
 - centralized light/dark theme and design tokens
-- encrypted local entry database bootstrap
+- encrypted local entry database bootstrap through the app startup flow rather
+  than a fully blocking pre-UI initialization step
 - encrypted local entry persistence and stale-draft cleanup
 - shared preferences bootstrap
 - persisted recording-state preference
@@ -63,6 +66,8 @@ upcoming feature work:
 - cross-platform file-based audio recording service with mono 16 kHz AAC/M4A
   capture, monotonic hard-cap deadline exposure, too-short invalidation, and
   caller-owned post-recording file lifecycle
+- runtime microphone permission interpretation for granted, denied,
+  permanently denied, and restricted states before recording begins
 - app-facing cloud transcription service for the Best-mode flow, including
   sequential live record-stop-upload orchestration, optional detected-language
   normalization, retryable failed-live audio retention, and immediate cleanup
@@ -82,6 +87,9 @@ upcoming feature work:
 - approved main-screen status behavior including first-time
   `tap button to write`, idle `wrait`, listening `stop`, uploading,
   processing, saved, draft-preserved, and microphone-blocked feedback states
+- native Android recording start failures are surfaced back into Flutter as
+  controller-visible errors instead of leaving the app stuck on the launcher
+  icon or a silent no-op path
 - listening-state pulse/countdown presentation driven by the configured
   recording hard cap
 - main-screen navigation from saved feedback to `/entry/:id` and from entry
@@ -145,6 +153,9 @@ Current runtime behavior on top of that generated client:
   rendering
 - successful registration can seed the current in-memory quota state for later
   quota-aware flows in the same app session
+- proxy-authenticated debug deployments require `PROXY_SECRET` to be present so
+  the app can send the expected `X-Proxy-Secret` request header during launch
+  registration and later backend calls
 
 ## Reference
 

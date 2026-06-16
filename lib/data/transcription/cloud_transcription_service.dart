@@ -61,6 +61,9 @@ class CloudTranscriptionService implements TranscriptionService {
 
       _state = _CloudTranscriptionState.liveRecording;
       onStatus(RecordingStarted(deadline));
+    } on RecordingPermissionDeniedFailure {
+      _state = _CloudTranscriptionState.idle;
+      throw const MicBlockedTranscriptionServiceFailure();
     } catch (_) {
       _state = _CloudTranscriptionState.idle;
       rethrow;

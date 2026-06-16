@@ -6,6 +6,7 @@ import 'package:record/record.dart';
 
 import '../../core/time/monotonic_clock.dart';
 import 'audio_recording_service.dart';
+import 'microphone_permission_service.dart';
 
 abstract interface class RecorderAdapter {
   Future<void> start({required RecordConfig config, required String path});
@@ -38,6 +39,7 @@ class AudioRecorderAdapter implements RecorderAdapter {
 class RecordAudioRecordingService implements AudioRecordingService {
   RecordAudioRecordingService({
     required this.recorder,
+    required this.microphonePermissionService,
     required this.monotonicClock,
     required this.hardCap,
   }) {
@@ -51,6 +53,7 @@ class RecordAudioRecordingService implements AudioRecordingService {
   }
 
   final RecorderAdapter recorder;
+  final MicrophonePermissionService microphonePermissionService;
   final MonotonicClock monotonicClock;
   final Duration hardCap;
 
@@ -83,6 +86,11 @@ class RecordAudioRecordingService implements AudioRecordingService {
       }
       if (_activeSession != null) {
         throw const RecordingAlreadyInProgressFailure();
+      }
+      final microphoneAccessState = await microphonePermissionService
+          .ensureMicrophoneAccess();
+      if (microphoneAccessState != MicrophoneAccessState.granted) {
+        throw RecordingPermissionDeniedFailure(microphoneAccessState);
       }
 
       final preparedPath = await _prepareOutputPath(trimmedPath);
