@@ -1,10 +1,8 @@
-import 'dart:developer' as developer;
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/entries/entry_providers.dart';
 import '../../domain/model/entry.dart';
-import '../../domain/repository/entry_repository.dart';
+import 'entry_deletion_controller.dart';
 
 final entryListEntriesProvider = StreamProvider<List<Entry>>((ref) {
   return ref
@@ -14,27 +12,19 @@ final entryListEntriesProvider = StreamProvider<List<Entry>>((ref) {
 });
 
 final entryListControllerProvider = Provider<EntryListController>((ref) {
-  return EntryListController(ref.read(entryRepositoryProvider));
+  return EntryListController(ref.read(entryDeletionControllerProvider));
 });
 
 class EntryListController {
-  const EntryListController(this._entryRepository);
+  const EntryListController(this._entryDeletionController);
 
-  final EntryRepository _entryRepository;
+  final EntryDeletionController _entryDeletionController;
 
   Future<void> deleteEntry(int id) async {
-    try {
-      await _entryRepository.deleteEntry(id);
-    } catch (error, stackTrace) {
-      developer.log(
-        'Failed to delete entry from the entry list.',
-        name: 'EntryListController',
-        error: error,
-        stackTrace: stackTrace,
-        sequenceNumber: id,
-      );
-      // Keep the current list visible when deletion fails.
-    }
+    await _entryDeletionController.deleteEntry(
+      id,
+      failureContext: 'Failed to delete entry from the entry list.',
+    );
   }
 
   static List<Entry> sortEntriesNewestFirst(List<Entry> entries) {

@@ -114,8 +114,8 @@ void main() {
     await tester.pumpAndSettle();
     await binding.takeScreenshot('main-screen-entry-detail');
 
-    expect(find.text('Entry preview'), findsOneWidget);
-    expect(find.byKey(const ValueKey('entryIdValue')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('Cleaned transcript.'), findsOneWidget);
   });
 
   testWidgets(

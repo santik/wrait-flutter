@@ -81,6 +81,16 @@ class EntryRepositoryImpl implements EntryRepository {
   }
 
   @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {
+    final affectedRows = await entryDao.updateEditedCleanedText(
+      id,
+      cleanedText,
+      _countWords(cleanedText),
+    );
+    _throwIfMissing(id, affectedRows);
+  }
+
+  @override
   Future<void> updateWithCleanedText(
     int id,
     String cleanedText,

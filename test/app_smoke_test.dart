@@ -96,6 +96,9 @@ class _SmokeEntryRepository implements EntryRepository {
   Future<int> saveAudioDraft(String audioPath, String language) async => 1;
 
   @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {}
+
+  @override
   Future<void> updateWithCleanedText(
     int id,
     String cleanedText,

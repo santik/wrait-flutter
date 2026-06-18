@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/entries/entry_detail_screen.dart';
 import '../../presentation/entries/entry_list_screen.dart';
 import '../../presentation/main/main_screen.dart';
-import '../../presentation/shell/shell_placeholder_screen.dart';
 
 GoRouter buildAppRouter({String? initialLocation}) {
   return GoRouter(
@@ -17,18 +17,15 @@ GoRouter buildAppRouter({String? initialLocation}) {
       GoRoute(
         path: '/entry/:id',
         redirect: (context, state) {
-          final entryId = state.pathParameters['id']?.trim() ?? '';
-          return entryId.isEmpty ? '/entries' : null;
+          return _parseEntryId(state) == null ? '/entries' : null;
         },
         builder: (context, state) {
-          final entryId = state.pathParameters['id']!.trim();
+          final entryId = _parseEntryId(state);
+          if (entryId == null) {
+            return const EntryListScreen();
+          }
 
-          return ShellPlaceholderScreen(
-            title: 'Entry preview',
-            description:
-                'Individual entry content will render here once entry loading and detail flows are implemented.',
-            entryId: entryId,
-          );
+          return EntryDetailScreen(entryId: entryId);
         },
       ),
     ],
@@ -47,4 +44,18 @@ String _resolveInitialLocation(String? initialLocation) {
   }
 
   return '/';
+}
+
+int? _parseEntryId(GoRouterState state) {
+  final rawEntryId = state.pathParameters['id']?.trim() ?? '';
+  if (rawEntryId.isEmpty) {
+    return null;
+  }
+
+  final parsedEntryId = int.tryParse(rawEntryId);
+  if (parsedEntryId == null || parsedEntryId <= 0) {
+    return null;
+  }
+
+  return parsedEntryId;
 }

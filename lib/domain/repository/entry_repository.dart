@@ -7,6 +7,7 @@ abstract interface class EntryRepository {
   Future<int> saveDraft(String transcript, String language);
   Future<int> saveEntry(String transcript, String language);
   Future<int> saveAudioDraft(String audioPath, String language);
+  Future<void> updateEditedCleanedText(int id, String cleanedText);
   Future<void> updateWithCleanedText(int id, String cleanedText, int wordCount);
   Future<void> updateDraftTranscript(
     int id,
