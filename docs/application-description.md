@@ -32,6 +32,9 @@ upcoming feature work:
 - app bootstrap
 - immediate first-frame bootstrap shell with loading and retry states while
   launch dependencies finish asynchronously
+- Android manifest-level Impeller disablement for reliable real-device cold
+  launch instead of hanging behind the splash screen on the current validation
+  phone
 - routing shell
 - runtime configuration loading
 - centralized light/dark theme and design tokens
@@ -104,17 +107,26 @@ upcoming feature work:
   with audio-only drafts shown as `pending · will retry`
 - right-swipe row deletion on `/entries` with immediate confirmation, cancel
   reset, and stay-on-list behavior after confirmed deletion
-- placeholder route body still backing `/entry/:id` until a later story
-  replaces that screen
+- real entry-detail screen at `/entry/:id` backed by the local entry
+  repository
+- entry detail text display derived from cleaned text first, then raw
+  transcript fallback
+- entry detail metadata showing localized weekday/date plus stored word count
+- selectable entry-detail read mode and explicit edit mode
+- automatic entry-detail edit persistence to `cleanedText` and `wordCount`
+  without mutating the original `rawTranscript`
+- entry-detail share action through the platform share surface
+- shared entry deletion confirmation behavior between entry list and entry
+  detail
+- safe redirect from invalid, missing, deleted, or unreadable detail routes
+  back to `/entries`
 - platform setup for Android and iOS
-- placeholder screen still used behind `/entry/:id` to validate route coverage
-  until later entry-detail stories land
 
 Feature behavior such as network-preflight handling for Best mode, offline-mode
 routing, retry UX, quota presentation beyond the current session state,
 preferences persistence beyond the current basic flags and identifiers,
-settings UI, full entry detail, entry editing, entry sharing, and richer
-entry-management UI still belongs to later user stories.
+settings UI, and richer entry-management UI still belongs to later user
+stories.
 
 ## Important product themes
 
@@ -156,6 +168,9 @@ Current runtime behavior on top of that generated client:
 - proxy-authenticated debug deployments require `PROXY_SECRET` to be present so
   the app can send the expected `X-Proxy-Secret` request header during launch
   registration and later backend calls
+- Android developers can also build the debug APK manually with
+  `flutter build apk --debug --dart-define=PROXY_SECRET=...` and install
+  `build/app/outputs/flutter-apk/app-debug.apk` directly through `adb`
 
 ## Reference
 

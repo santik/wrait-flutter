@@ -83,10 +83,44 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   traffic.
 - Set `PROXY_SECRET` before running `./deploy_debug.sh`. The deployed app must
   send the backend `X-Proxy-Secret` header from that runtime config value.
+- `./deploy_debug.sh` now uses two Android build artifacts on the validation
+  phone:
+  - it builds and runs the debug app for the `flutter test` phase
+  - it builds and installs the profile APK as the final deployed app because
+    the standalone debug install can remain stuck on the Flutter splash screen
+    on the physical validation phone even when the debug test phase succeeds
+- When you need a manual fallback instead of the deploy script, build the debug
+  APK with:
+  - `PROXY_SECRET=... /opt/homebrew/bin/flutter build apk --debug --dart-define=PROXY_SECRET=...`
+- When you need to manually validate the same final install artifact that
+  `./deploy_debug.sh` uses, build and install the profile APK with:
+  - `PROXY_SECRET=... /opt/homebrew/bin/flutter build apk --profile --dart-define=PROXY_SECRET=...`
+- The current Android manifest explicitly disables Impeller with
+  `io.flutter.embedding.android.EnableImpeller=false` because cold launches on
+  the physical validation device could hang behind the Android splash screen
+  while Vulkan/Impeller was active.
+- The deploy script temporarily enables the namespaced Android global setting
+  `com.wrait.flutter.debug.automation_lockscreen_mode` so the debuggable
+  `MainActivity` can launch over the lock screen during automated runs. Keep
+  that automation gate namespaced and restore-on-exit.
+- The deploy script temporarily enables USB stay-awake mode and restores the
+  previous `stay_on_while_plugged_in` value on exit. Keep that restoration
+  behavior intact.
+- The deploy script maintains `android.permission.RECORD_AUDIO` during the
+  deploy-time Flutter test session because `flutter test` can reinstall both
+  `com.wrait.flutter` and `com.wrait.flutter.test`, which would otherwise let
+  the system recording prompt reappear on a locked phone.
 - Keep the current deploy-script safety checks intact:
-  - require a connected target device
+  - require exactly one connected physical Android phone and ignore emulators
   - reject missing or empty APK artifacts
   - avoid silently reinstalling stale build output
+  - run `flutter test --no-pub -d <phone-serial> integration_test` before any
+    final install
+  - restore temporary automation and stay-awake settings on both success and
+    failure paths
+  - verify `com.wrait.flutter` exists after install
+  - verify `com.wrait.app` remains installed when it existed before deployment
+  - never uninstall `com.wrait.app`
 
 ### Testing guidance
 
@@ -95,6 +129,9 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   lookups wherever practical.
 - Reuse existing bootstrap and recording-controller tests before adding new
   startup-specific harnesses.
+- For Android startup or rendering work, verify a launcher-style cold start
+  with `adb shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity`
+  in addition to ordinary `flutter run` checks.
 
 ### Android identity note
 
