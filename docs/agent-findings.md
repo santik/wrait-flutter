@@ -104,6 +104,95 @@ US-001 was validated successfully on both platforms:
 - Treat iOS dependency changes carefully because the current project is now
   SPM-only and future Pod-required plugins would need an explicit re-migration.
 
+## US-027: Android Deploy Script and App Namespace Isolation
+
+### Android debug deployment contract
+
+- Prefer `./deploy_debug.sh` for real-device Android debug deployment when the
+  story depends on backend registration, transcription, or proxy-authenticated
+  traffic.
+- The Flutter Android package/application ID is `com.wrait.flutter`.
+- The native Android app remains `com.wrait.app`; treat that package as a
+  separate install that must be preserved.
+
+### Deploy-script behavior worth preserving
+
+- `./deploy_debug.sh` intentionally ignores emulators and requires one
+  connected physical Android phone in `device` state.
+- The script builds the debug APK, runs
+  `flutter test --no-pub -d <phone-serial> integration_test`, and only then
+  performs the final APK install.
+- When the deploy script is not the right validation tool, the manual debug APK
+  fallback is:
+  - `PROXY_SECRET=... /opt/homebrew/bin/flutter build apk --debug --dart-define=PROXY_SECRET=...`
+  - install `build/app/outputs/flutter-apk/app-debug.apk` with `adb`
+- The script verifies `com.wrait.flutter` exists after install.
+- If `com.wrait.app` existed before deployment, the script verifies it still
+  exists after install.
+- The script must never uninstall `com.wrait.app`.
+- Shell regression coverage for this behavior lives in
+  `test/deploy_debug_script_test.sh`.
+
+### Current validation state
+
+- The most recent real-device run confirmed that `./deploy_debug.sh` uses the
+  connected physical Android phone and stops before final install when
+  integration tests fail.
+- That same run confirmed `com.wrait.app` remained installed after the aborted
+  deploy attempt.
+- Two current real-device integration failures are tracked as follow-up work in
+  `plan/us_028.md`:
+  - `launch registration is non-blocking and updates session quota on success`
+  - `transient launch registration failure is non-blocking and preserves quota`
+
+## US-029: Connected Device Tests With Screen Off
+
+### Locked-screen deploy behavior
+
+- `./deploy_debug.sh` now supports starting from a connected physical Android
+  phone whose screen is off and whose keyguard is still active.
+- The script wakes the phone, attempts best-effort keyguard dismissal, and
+  uses an automation-gated debug Android activity path so the test flow can
+  proceed without manual interaction on an ordinarily locked phone.
+
+### Deploy artifact split worth preserving
+
+- The deploy script still uses the debug/integration channel for
+  `flutter test --no-pub -d <phone-serial> integration_test`.
+- On the current physical validation phone, the final standalone debug install
+  can remain stuck on the Flutter splash screen even though the debug test
+  phase succeeds.
+- Because of that validated device behavior, `./deploy_debug.sh` now builds
+  and installs the profile APK as the final deployed app artifact after the
+  debug test phase passes.
+- When reproducing or manually validating the same final deployed app state,
+  prefer the profile artifact instead of assuming the final install is debug.
+
+### Automation-state contract
+
+- The temporary Android automation switch for locked-screen launch is the
+  namespaced global setting
+  `com.wrait.flutter.debug.automation_lockscreen_mode`.
+- `MainActivity` should only enable show-over-lock-screen, turn-screen-on, and
+  keep-screen-on behavior when both of these are true:
+  - the process is debuggable
+  - that automation setting is set to `1`
+- Keep the setting namespaced, validate readback after writes, and restore the
+  previous value when the script exits.
+
+### Permission and cleanup guidance
+
+- The deploy script must keep `android.permission.RECORD_AUDIO` granted during
+  the Flutter test session because `flutter test` can reinstall both
+  `com.wrait.flutter` and `com.wrait.flutter.test`, which can otherwise bring
+  back the system recording prompt on a locked phone.
+- The permission watchdog should stay bounded and should clean up stale PID
+  state at startup.
+- The deploy script should continue restoring temporary stay-awake and
+  automation-setting state on both success and failure paths.
+- Shell regression coverage for this behavior lives in
+  `test/deploy_debug_script_test.sh`.
+
 ## US-002: Theme, Design Tokens & Core UI Shell
 
 ### Established presentation foundation
@@ -311,6 +400,38 @@ US-002 was validated successfully with both automated and manual checks:
 - Main-screen flow tests should use stable selectors from
   `lib/presentation/main/main_screen_test_keys.dart` instead of depending on
   display text.
+
+## US-028: Android Cold-Launch Rendering Fix
+
+### Rendering and startup finding
+
+- Some physical-device Android launches could reach `MainActivity` but remain
+  stuck behind the Android splash screen with no completed first frame.
+- The failing launches showed:
+  - `adb shell am start -W ...` returning `Status: timeout`
+  - repeated `FlutterRenderer: Width is zero. 0,0`
+  - the splash window still layered above `com.wrait.flutter/.MainActivity`
+- On the current validation phone, that behavior correlated with
+  Impeller/Vulkan startup.
+
+### Current mitigation
+
+- `android/app/src/main/AndroidManifest.xml` now sets:
+  - `io.flutter.embedding.android.EnableImpeller=false`
+- Treat that manifest setting as intentional until a future story re-validates
+  Android startup stability with Impeller enabled.
+
+### Validation knowledge
+
+- The failing cold-launch path reproduced after plain `adb install -r` followed
+  by launcher-style app start.
+- After disabling Impeller, explicit cold start validation succeeded with:
+  - `Status: ok`
+  - `LaunchState: COLD`
+  - `WaitTime` around `1743 ms`
+- Launcher-intent validation also succeeded afterward, and Android reported:
+  - `Displayed com.wrait.flutter/.MainActivity`
+  - `Fully drawn com.wrait.flutter/.MainActivity`
 
 ## US-011: Main Screen UI
 
@@ -989,6 +1110,65 @@ Important workflow implication:
 - If a future story expands entry detail, editing, or bulk management, treat
   audio-only drafts as a distinct state instead of assuming every listed entry
   is immediately readable.
+
+## US-014: Entry Detail Screen
+
+### Established entry-detail surface
+
+- The `/entry/:id` route now renders the real entry-detail screen through:
+  - `lib/presentation/entries/entry_detail_screen.dart`
+- Entry-detail presentation and orchestration now live under:
+  - `lib/presentation/entries/entry_detail_controller.dart`
+  - `lib/presentation/entries/entry_detail_formatters.dart`
+  - `lib/presentation/entries/entry_share_service.dart`
+- Shared entry-deletion behavior now lives under:
+  - `lib/presentation/entries/entry_delete_confirmation.dart`
+  - `lib/presentation/entries/entry_deletion_controller.dart`
+
+### Entry-detail behavior worth preserving
+
+- `/entry/:id` accepts only positive integer ids. Invalid ids redirect to
+  `/entries`.
+- Missing, deleted, and unreadable entries redirect to `/entries` instead of
+  rendering a fallback detail shell.
+- Readable detail text prefers `cleanedText` and falls back to
+  `rawTranscript`.
+- Entry edits update `cleanedText` and `wordCount` only. They do not mutate
+  `rawTranscript`.
+- Back navigation flushes the latest pending edit before returning to
+  `/entries`.
+- Entry list previews react to edited `cleanedText` because previews already
+  prefer cleaned text.
+- Entry detail and entry list intentionally reuse the same delete
+  confirmation copy, semantics, and non-destructive failure handling.
+
+### Architecture guidance
+
+- Keep entry-detail persistence orchestration in
+  `EntryDetailController` rather than pushing edit timing into widgets.
+- The current auto-save path is revision-based and single-flight. Preserve that
+  shape if future stories expand editing; it avoids stale completion races and
+  keeps save draining finite.
+- Keep route-id parsing shared between router redirect and builder logic so a
+  validation change in one place does not reopen a runtime parse crash in the
+  other.
+- Programmatic editor sync should suspend the text-controller listener during
+  controller writes instead of relying on a mutable boolean guard.
+- Share-service injection already works through provider overrides. Do not add
+  bootstrap complexity in `lib/main.dart` unless a future story actually needs
+  a broader runtime seam.
+
+### Accessibility and validation guidance
+
+- Preserve explicit semantics labels for back, edit, share, delete, delete
+  confirmation actions, and the multiline editor.
+- Screenshot-heavy integration coverage works well on emulator and simulator,
+  but physical Android verification is more stable with a screenshot-free smoke
+  test:
+  - `integration_test/entry_detail_device_smoke_test.dart`
+- Keep Android/iOS integration coverage for the real `/entry/:id` route, and
+  use the device smoke path when physical-device timing makes screenshot flows
+  unreliable.
 
 ## Cross-cutting: iOS Swift Package Manager Cleanup
 

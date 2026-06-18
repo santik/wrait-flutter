@@ -2,11 +2,28 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APK_PATH="${DEPLOY_DEBUG_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-debug.apk}"
+DEBUG_APK_PATH="${DEPLOY_DEBUG_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-debug.apk}"
+PROFILE_APK_PATH="${DEPLOY_PROFILE_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-profile.apk}"
+AUTOMATION_LOCKSCREEN_MODE_SETTING="com.wrait.flutter.debug.automation_lockscreen_mode"
+FLUTTER_PACKAGE="com.wrait.flutter"
+FLUTTER_TEST_PACKAGE="com.wrait.flutter.test"
+NATIVE_WRAIT_PACKAGE="com.wrait.app"
+MAIN_ACTIVITY_SHORT_COMPONENT="$FLUTTER_PACKAGE/.MainActivity"
+MAIN_ACTIVITY_FULL_COMPONENT="$FLUTTER_PACKAGE/$FLUTTER_PACKAGE.MainActivity"
+RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS="${DEPLOY_RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS:-900}"
+RUNTIME_PERMISSION_WATCHDOG_PID_FILE="${TMPDIR:-/tmp}/wrait-runtime-permission-watchdog.pid"
+RUNTIME_PERMISSION_WATCHDOG_PID=""
+CLEANUP_PHONE_SERIAL=""
+ORIGINAL_STAY_AWAKE_SETTING=""
+ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING=""
 
 fail() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+warn() {
+  printf 'warning: %s\n' "$*" >&2
 }
 
 require_command() {
@@ -17,6 +34,13 @@ require_non_empty_env() {
   local name="$1"
   local value="${!name:-}"
   [[ -n "$value" ]] || fail "required environment variable $name is not set"
+}
+
+validate_positive_integer() {
+  local name="$1"
+  local value="$2"
+
+  [[ "$value" =~ ^[1-9][0-9]*$ ]] || fail "$name must be a positive integer"
 }
 
 validate_proxy_secret() {
@@ -98,12 +122,321 @@ package_installed() {
   adb -s "$phone_serial" shell pm path "$package_name" >/dev/null 2>&1
 }
 
+grant_runtime_permission_if_possible() {
+  local phone_serial="$1"
+  local package_name="$2"
+  local permission_name="$3"
+  local app_op_name="${4:-}"
+
+  package_installed "$phone_serial" "$package_name" || return 1
+
+  adb -s "$phone_serial" shell pm grant "$package_name" "$permission_name" >/dev/null 2>&1 || return 1
+
+  if [[ -n "$app_op_name" ]]; then
+    if ! adb -s "$phone_serial" shell appops set "$package_name" "$app_op_name" allow >/dev/null 2>&1; then
+      warn "failed to set app op $app_op_name=allow for $package_name on $phone_serial after granting $permission_name"
+    fi
+  fi
+
+  return 0
+}
+
 ensure_phone_connected() {
   local phone_serial="$1"
   local state
 
   state="$(adb -s "$phone_serial" get-state 2>/dev/null || true)"
   [[ "$state" == "device" ]] || fail "Android phone $phone_serial is no longer connected and ready"
+}
+
+ensure_phone_ready_for_phase() {
+  local phone_serial="$1"
+  local phase_description="$2"
+  local state
+
+  state="$(adb -s "$phone_serial" get-state 2>/dev/null || true)"
+  [[ "$state" == "device" ]] || fail \
+    "Android phone $phone_serial is not ready for $phase_description"
+}
+
+force_stop_package() {
+  local phone_serial="$1"
+  local package_name="$2"
+
+  adb -s "$phone_serial" shell am force-stop "$package_name" >/dev/null 2>&1 || true
+}
+
+read_stay_awake_setting() {
+  local phone_serial="$1"
+  local setting
+
+  setting="$(adb -s "$phone_serial" shell settings get global stay_on_while_plugged_in 2>/dev/null || true)"
+  setting="${setting//$'\r'/}"
+  printf '%s\n' "$setting"
+}
+
+enable_stay_awake() {
+  local phone_serial="$1"
+
+  if [[ -z "$ORIGINAL_STAY_AWAKE_SETTING" ]]; then
+    ORIGINAL_STAY_AWAKE_SETTING="$(read_stay_awake_setting "$phone_serial")"
+  fi
+
+  adb -s "$phone_serial" shell svc power stayon usb >/dev/null 2>&1 || fail \
+    "failed to keep Android phone $phone_serial awake over USB"
+  printf 'Keeping Android phone %s awake over USB while deploy_debug.sh runs.\n' "$phone_serial"
+}
+
+restore_stay_awake() {
+  local phone_serial="${1:-$CLEANUP_PHONE_SERIAL}"
+
+  [[ -n "$phone_serial" ]] || return 0
+  [[ -n "$ORIGINAL_STAY_AWAKE_SETTING" ]] || return 0
+
+  case "$ORIGINAL_STAY_AWAKE_SETTING" in
+    ""|null|0)
+      if ! adb -s "$phone_serial" shell svc power stayon false >/dev/null 2>&1; then
+        warn "failed to restore stay-awake mode to false on $phone_serial"
+      fi
+      ;;
+    *)
+      if ! adb -s "$phone_serial" shell settings put global stay_on_while_plugged_in \
+        "$ORIGINAL_STAY_AWAKE_SETTING" >/dev/null 2>&1; then
+        warn "failed to restore stay_on_while_plugged_in=$ORIGINAL_STAY_AWAKE_SETTING on $phone_serial"
+      fi
+      ;;
+  esac
+}
+
+read_global_setting() {
+  local phone_serial="$1"
+  local setting_name="$2"
+  local setting
+
+  setting="$(adb -s "$phone_serial" shell settings get global "$setting_name" 2>/dev/null || true)"
+  setting="${setting//$'\r'/}"
+  printf '%s\n' "$setting"
+}
+
+set_global_setting() {
+  local phone_serial="$1"
+  local setting_name="$2"
+  local setting_value="$3"
+  local confirmed_value
+
+  adb -s "$phone_serial" shell settings put global "$setting_name" "$setting_value" >/dev/null 2>&1 || fail \
+    "failed to set Android global setting $setting_name=$setting_value on $phone_serial"
+
+  confirmed_value="$(read_global_setting "$phone_serial" "$setting_name")"
+  [[ "$confirmed_value" == "$setting_value" ]] || fail \
+    "Android global setting $setting_name did not stick on $phone_serial; expected $setting_value but read $confirmed_value"
+}
+
+enable_automation_lockscreen_mode() {
+  local phone_serial="$1"
+
+  if [[ -z "$ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING" ]]; then
+    ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING="$(
+      read_global_setting "$phone_serial" "$AUTOMATION_LOCKSCREEN_MODE_SETTING"
+    )"
+  fi
+
+  set_global_setting "$phone_serial" "$AUTOMATION_LOCKSCREEN_MODE_SETTING" "1"
+  printf 'Enabled Android debug lock-screen automation mode on %s.\n' "$phone_serial"
+}
+
+restore_automation_lockscreen_mode() {
+  local phone_serial="${1:-$CLEANUP_PHONE_SERIAL}"
+
+  [[ -n "$phone_serial" ]] || return 0
+  [[ -n "$ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING" ]] || return 0
+
+  case "$ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING" in
+    ""|null)
+      set_global_setting "$phone_serial" "$AUTOMATION_LOCKSCREEN_MODE_SETTING" "0"
+      ;;
+    *)
+      set_global_setting \
+        "$phone_serial" \
+        "$AUTOMATION_LOCKSCREEN_MODE_SETTING" \
+        "$ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING"
+      ;;
+  esac
+
+  ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING=""
+}
+
+cleanup_on_exit() {
+  stop_background_watchdog
+  restore_automation_lockscreen_mode
+  restore_stay_awake
+}
+
+prepare_phone_for_automation() {
+  local phone_serial="$1"
+  local phase_description="$2"
+
+  printf 'Preparing Android phone %s for %s...\n' "$phone_serial" "$phase_description"
+  ensure_phone_ready_for_phase "$phone_serial" "$phase_description"
+
+  adb -s "$phone_serial" shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1 || fail \
+    "failed to wake Android phone $phone_serial for $phase_description"
+
+  if adb -s "$phone_serial" shell wm dismiss-keyguard >/dev/null 2>&1; then
+    printf 'Prepared Android phone %s for %s.\n' "$phone_serial" "$phase_description"
+  else
+    printf 'Android phone %s refused non-interactive keyguard dismissal for %s; continuing with debug locked-screen launch support.\n' \
+      "$phone_serial" "$phase_description"
+  fi
+
+  ensure_phone_ready_for_phase "$phone_serial" "$phase_description"
+}
+
+clear_runtime_permission_watchdog_pid_file() {
+  rm -f "$RUNTIME_PERMISSION_WATCHDOG_PID_FILE"
+}
+
+clear_stale_runtime_permission_watchdog() {
+  local stale_pid
+  local command_line
+
+  [[ -f "$RUNTIME_PERMISSION_WATCHDOG_PID_FILE" ]] || return 0
+
+  stale_pid="$(tr -d '[:space:]' <"$RUNTIME_PERMISSION_WATCHDOG_PID_FILE" 2>/dev/null || true)"
+  [[ "$stale_pid" =~ ^[0-9]+$ ]] || {
+    clear_runtime_permission_watchdog_pid_file
+    return 0
+  }
+
+  if ! kill -0 "$stale_pid" >/dev/null 2>&1; then
+    clear_runtime_permission_watchdog_pid_file
+    return 0
+  fi
+
+  command_line="$(ps -p "$stale_pid" -o command= 2>/dev/null || true)"
+  if [[ "$command_line" == *"--watch-runtime-permissions"* ]]; then
+    kill "$stale_pid" >/dev/null 2>&1 || warn \
+      "failed to stop stale runtime-permission watchdog process $stale_pid"
+  fi
+
+  clear_runtime_permission_watchdog_pid_file
+}
+
+grant_automation_audio_recording_permissions() {
+  local phone_serial="$1"
+  grant_runtime_permission_if_possible \
+    "$phone_serial" \
+    "$FLUTTER_PACKAGE" \
+    "android.permission.RECORD_AUDIO" \
+    "RECORD_AUDIO"
+}
+
+run_runtime_permission_watchdog() {
+  local phone_serial="$1"
+  local max_seconds="$2"
+  local deadline=$((SECONDS + max_seconds))
+  local announced_flutter_package=false
+
+  while (( SECONDS < deadline )); do
+    if grant_runtime_permission_if_possible \
+      "$phone_serial" \
+      "$FLUTTER_PACKAGE" \
+      "android.permission.RECORD_AUDIO" \
+      "RECORD_AUDIO"; then
+      if [[ "$announced_flutter_package" == false ]]; then
+        printf 'Granted android.permission.RECORD_AUDIO to %s for automated tests.\n' "$FLUTTER_PACKAGE"
+        announced_flutter_package=true
+      fi
+    fi
+
+    # `flutter test` can reinstall both the app and the companion test package.
+    grant_runtime_permission_if_possible \
+      "$phone_serial" \
+      "$FLUTTER_TEST_PACKAGE" \
+      "android.permission.RECORD_AUDIO" \
+      "RECORD_AUDIO" || true
+    sleep 0.5
+  done
+}
+
+start_runtime_permission_watchdog() {
+  local phone_serial="$1"
+
+  clear_stale_runtime_permission_watchdog
+  "$0" --watch-runtime-permissions "$phone_serial" "$RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS" &
+  RUNTIME_PERMISSION_WATCHDOG_PID="$!"
+  printf '%s\n' "$RUNTIME_PERMISSION_WATCHDOG_PID" >"$RUNTIME_PERMISSION_WATCHDOG_PID_FILE"
+}
+
+stop_background_watchdog() {
+  local watchdog_pid="${1:-$RUNTIME_PERMISSION_WATCHDOG_PID}"
+
+  [[ -n "$watchdog_pid" ]] || return 0
+
+  if kill -0 "$watchdog_pid" >/dev/null 2>&1; then
+    kill "$watchdog_pid" >/dev/null 2>&1 || true
+  fi
+
+  wait "$watchdog_pid" >/dev/null 2>&1 || true
+  RUNTIME_PERMISSION_WATCHDOG_PID=""
+  clear_runtime_permission_watchdog_pid_file
+}
+
+read_first_matching_line() {
+  local text="$1"
+  local pattern="$2"
+  local line
+
+  while IFS= read -r line; do
+    if [[ "$line" =~ $pattern ]]; then
+      printf '%s\n' "$line"
+      return 0
+    fi
+  done <<<"$text"
+
+  return 1
+}
+
+flutter_app_is_foreground() {
+  local phone_serial="$1"
+  local activity_output
+  local resumed_line
+  local window_output
+  local focused_line
+
+  activity_output="$(adb -s "$phone_serial" shell dumpsys activity activities 2>/dev/null || true)"
+  resumed_line="$(read_first_matching_line "$activity_output" 'ResumedActivity:')" || true
+  if [[ -n "$resumed_line" && "$resumed_line" == *"$MAIN_ACTIVITY_SHORT_COMPONENT"* ]]; then
+    return 0
+  fi
+
+  window_output="$(adb -s "$phone_serial" shell dumpsys window 2>/dev/null || true)"
+  focused_line="$(read_first_matching_line "$window_output" 'mCurrentFocus=')" || true
+  [[ -n "$focused_line" && "$focused_line" == *"$MAIN_ACTIVITY_FULL_COMPONENT"* ]]
+}
+
+launch_flutter_app() {
+  local phone_serial="$1"
+  local output
+
+  output="$(
+    adb -s "$phone_serial" shell am start -W \
+      -n "$MAIN_ACTIVITY_FULL_COMPONENT" 2>&1
+  )" || fail "failed to launch $FLUTTER_PACKAGE after install"
+
+  printf '%s\n' "$output"
+
+  if [[ "$output" == *"Status: timeout"* ]]; then
+    if flutter_app_is_foreground "$phone_serial"; then
+      printf '%s launch reported timeout, but foreground verification succeeded.\n' "$FLUTTER_PACKAGE"
+      return 0
+    fi
+
+    fail "$FLUTTER_PACKAGE launch timed out after install and foreground verification failed; force-stop the app and inspect device logs"
+  fi
+
+  [[ "$output" == *"Activity: $MAIN_ACTIVITY_SHORT_COMPONENT"* ]] || fail \
+    "$FLUTTER_PACKAGE launch verification did not report MainActivity"
 }
 
 prepare_apk_output() {
@@ -115,9 +448,18 @@ prepare_apk_output() {
 
 verify_built_apk() {
   local apk_path="$1"
+  local artifact_label="$2"
 
-  [[ -f "$apk_path" ]] || fail "debug APK was not created at $apk_path"
-  [[ -s "$apk_path" ]] || fail "debug APK at $apk_path is empty"
+  [[ -f "$apk_path" ]] || fail "$artifact_label was not created at $apk_path"
+  [[ -s "$apk_path" ]] || fail "$artifact_label at $apk_path is empty"
+}
+
+handle_watchdog_mode() {
+  local phone_serial="$1"
+  local max_seconds="$2"
+
+  validate_positive_integer "DEPLOY_RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS" "$max_seconds"
+  run_runtime_permission_watchdog "$phone_serial" "$max_seconds"
 }
 
 main() {
@@ -127,42 +469,80 @@ main() {
   require_command flutter
   require_non_empty_env PROXY_SECRET
   validate_proxy_secret "$PROXY_SECRET"
+  validate_positive_integer "DEPLOY_RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS" \
+    "$RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS"
 
   local phone_serial
   phone_serial="$(find_connected_phone)"
+  CLEANUP_PHONE_SERIAL="$phone_serial"
+  trap cleanup_on_exit EXIT
   local native_wrait_was_installed=false
   local flutter_build_args=(
     "--dart-define=PROXY_SECRET=$PROXY_SECRET"
   )
 
   printf 'Building Flutter debug APK...\n'
-  prepare_apk_output "$APK_PATH"
+  prepare_apk_output "$DEBUG_APK_PATH"
   flutter build apk --debug "${flutter_build_args[@]}"
 
-  verify_built_apk "$APK_PATH"
+  verify_built_apk "$DEBUG_APK_PATH" "debug APK"
 
+  enable_stay_awake "$phone_serial"
+  enable_automation_lockscreen_mode "$phone_serial"
+  prepare_phone_for_automation "$phone_serial" "Flutter integration tests"
+  grant_automation_audio_recording_permissions "$phone_serial" || true
+  start_runtime_permission_watchdog "$phone_serial"
   printf 'Running Flutter integration tests on %s...\n' "$phone_serial"
-  flutter test --no-pub -d "$phone_serial" integration_test
+  if ! flutter test --no-pub -d "$phone_serial" integration_test; then
+    stop_background_watchdog
+    return 1
+  fi
+  stop_background_watchdog
 
-  if package_installed "$phone_serial" "com.wrait.app"; then
+  printf 'Building Flutter profile APK for the final installed app...\n'
+  prepare_apk_output "$PROFILE_APK_PATH"
+  flutter build apk --profile "${flutter_build_args[@]}"
+  verify_built_apk "$PROFILE_APK_PATH" "profile APK"
+
+  printf 'Stopping any stale Flutter app task before install...\n'
+  force_stop_package "$phone_serial" "$FLUTTER_PACKAGE"
+
+  if package_installed "$phone_serial" "$NATIVE_WRAIT_PACKAGE"; then
     native_wrait_was_installed=true
-    printf 'Detected existing native Wrait app (com.wrait.app); it will be left installed.\n'
+    printf 'Detected existing native Wrait app (%s); it will be left installed.\n' "$NATIVE_WRAIT_PACKAGE"
   else
-    printf 'Native Wrait app (com.wrait.app) was not installed before deployment.\n'
+    printf 'Native Wrait app (%s) was not installed before deployment.\n' "$NATIVE_WRAIT_PACKAGE"
   fi
 
   ensure_phone_connected "$phone_serial"
-  printf 'Installing debug APK on %s...\n' "$phone_serial"
-  adb -s "$phone_serial" install -r "$APK_PATH"
+  printf 'Installing profile APK on %s...\n' "$phone_serial"
+  adb -s "$phone_serial" install -r "$PROFILE_APK_PATH"
 
-  package_installed "$phone_serial" "com.wrait.flutter" || fail "com.wrait.flutter was not found after install"
+  package_installed "$phone_serial" "$FLUTTER_PACKAGE" || fail "$FLUTTER_PACKAGE was not found after install"
 
   if [[ "$native_wrait_was_installed" == true ]]; then
-    package_installed "$phone_serial" "com.wrait.app" || fail "com.wrait.app was installed before deployment but is missing after install"
-    printf 'Verified com.wrait.app remains installed.\n'
+    package_installed "$phone_serial" "$NATIVE_WRAIT_PACKAGE" || fail \
+      "$NATIVE_WRAIT_PACKAGE was installed before deployment but is missing after install"
+    printf 'Verified %s remains installed.\n' "$NATIVE_WRAIT_PACKAGE"
   fi
 
-  printf 'Installed com.wrait.flutter on %s.\n' "$phone_serial"
+  printf 'Stopping Flutter app before final launch verification...\n'
+  force_stop_package "$phone_serial" "$FLUTTER_PACKAGE"
+  restore_automation_lockscreen_mode "$phone_serial"
+  prepare_phone_for_automation "$phone_serial" "final installed app launch"
+  printf 'Launching %s on %s...\n' "$FLUTTER_PACKAGE" "$phone_serial"
+  launch_flutter_app "$phone_serial"
+
+  printf 'Installed and launched %s on %s.\n' "$FLUTTER_PACKAGE" "$phone_serial"
+
+  trap - EXIT
+  cleanup_on_exit
 }
+
+if [[ "${1:-}" == "--watch-runtime-permissions" ]]; then
+  shift
+  handle_watchdog_mode "$@"
+  exit 0
+fi
 
 main "$@"

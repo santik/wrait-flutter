@@ -128,8 +128,8 @@ What remains incomplete:
 
 ## Review notes
 
-- `review.md` has not been provided yet.
-- No review fixes have been applied.
+- The user explicitly skipped `review.md` for US-027 after implementation.
+- No review fixes were applied.
 - Final approval is blocked until physical Android phone verification is
   completed or the user explicitly changes the validation requirement.
 
@@ -137,12 +137,11 @@ What remains incomplete:
 
 Likely needed after final approval:
 
-- Update `docs/agent-findings.md` entries that still describe the Flutter
-  Android package/application ID as `com.wrait.app`.
+- Updated `docs/agent-findings.md` with the `US-027` deploy-script contract and
+  coexistence guidance.
+- Updated `AGENTS.md` with deploy-script safety expectations.
 
-Likely not needed:
+No update needed:
 
 - `docs/application-description.md`, because this feature is developer tooling
   rather than user-facing product behavior.
-- `AGENTS.md`, unless the final verified deploy flow becomes a reusable rule
-  for future agents.

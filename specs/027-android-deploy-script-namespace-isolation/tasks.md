@@ -130,28 +130,28 @@ Capture implementation details and evidence for review.
 
 Handle external review after implementation.
 
-- [ ] Stop and wait for external `review.md`, unless the user explicitly skips
+- [x] Stop and wait for external `review.md`, unless the user explicitly skips
       review
-- [ ] Read `review.md` and prepare a remediation plan without changing files
-- [ ] Present the remediation plan and wait for approval before making any
+- [x] Read `review.md` and prepare a remediation plan without changing files
+- [x] Present the remediation plan and wait for approval before making any
       changes
-- [ ] Implement approved review fixes and update `spec.md`, `plan.md`,
+- [x] Implement approved review fixes and update `spec.md`, `plan.md`,
       `tasks.md`, `implementation.md`, code, and tests when review changes
       scope, approach, or validation
-- [ ] Repeat the review/fix loop if the same `review.md` file is updated for
+- [x] Repeat the review/fix loop if the same `review.md` file is updated for
       another pass
 
 ### Group 8: Finalization
 
 Handle durable documentation follow-up and closeout.
 
-- [ ] Decide whether the feature produced durable learnings or long-lived
+- [x] Decide whether the feature produced durable learnings or long-lived
       product/architecture changes worth preserving
-- [ ] Propose any needed updates to `AGENTS.md`,
+- [x] Propose any needed updates to `AGENTS.md`,
       `docs/application-description.md`, and `docs/agent-findings.md`
-- [ ] Wait for explicit approval before editing those long-lived guidance
+- [x] Wait for explicit approval before editing those long-lived guidance
       documents
-- [ ] Record whether the knowledge-capture gate resulted in updates or an
+- [x] Record whether the knowledge-capture gate resulted in updates or an
       explicit no-update decision
 - [ ] Update the spec status to `Complete` only after implementation,
       validation, review handling, and knowledge capture are complete —
@@ -214,6 +214,12 @@ Current state: the real Android phone path is confirmed, `integration_test`
 runs before final install as designed, `com.wrait.app` is still installed, and
 `com.wrait.flutter` was not installed because the deploy script stopped on
 failing real-device tests before the final install step.
+
+Review handling: user explicitly skipped `review.md` for US-027 after
+implementation.
+
+Knowledge capture: updated `AGENTS.md` and `docs/agent-findings.md`; no update
+was needed for `docs/application-description.md`.
 ```
 
 ## Notes
