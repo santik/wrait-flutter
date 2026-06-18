@@ -43,6 +43,19 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
     return into(entryRecords).insert(entry);
   }
 
+  Future<int> updateEditedCleanedText(
+    int id,
+    String cleanedText,
+    int wordCount,
+  ) {
+    return (update(entryRecords)..where((table) => table.id.equals(id))).write(
+      EntryRecordsCompanion(
+        cleanedText: Value(cleanedText),
+        wordCount: Value(wordCount),
+      ),
+    );
+  }
+
   Future<int> updateWithCleanedText(int id, String cleanedText, int wordCount) {
     return (update(entryRecords)..where((table) => table.id.equals(id))).write(
       EntryRecordsCompanion(

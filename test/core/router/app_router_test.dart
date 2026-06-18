@@ -26,12 +26,12 @@ void main() {
   testWidgets('renders the entry-detail route for a non-empty id', (
     tester,
   ) async {
-    await tester.pumpWidget(_buildTestApp(initialLocation: '/entry/day-001'));
+    await tester.pumpWidget(_buildTestApp(initialLocation: '/entry/1'));
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Entry preview'), findsOneWidget);
-    expect(find.textContaining('day-001'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('router entry'), findsOneWidget);
   });
 
   testWidgets('redirects an empty entry id route back to entries', (
@@ -42,7 +42,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('no entries yet'), findsOneWidget);
-    expect(find.text('Entry preview'), findsNothing);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
+  });
+
+  testWidgets('redirects a non-positive entry id route back to entries', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_buildTestApp(initialLocation: '/entry/0'));
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('no entries yet'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
   });
 
   testWidgets('supports the approved route user flow', (tester) async {
@@ -57,10 +68,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('no entries yet'), findsOneWidget);
 
-    router.go('/entry/today');
+    router.go('/entry/1');
     await tester.pumpAndSettle();
-    expect(find.text('Entry preview'), findsOneWidget);
-    expect(find.textContaining('today'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('router entry'), findsOneWidget);
 
     router.go('/');
     await tester.pumpAndSettle();
@@ -112,10 +123,12 @@ class _RouterEntryRepository implements EntryRepository {
       Stream<List<Entry>>.value(const <Entry>[]);
 
   @override
-  Stream<Entry?> watchEntryById(int id) => const Stream<Entry?>.empty();
+  Stream<Entry?> watchEntryById(int id) =>
+      Stream<Entry?>.value(id == 1 ? _routerEntry(id) : null);
 
   @override
-  Future<Entry?> getEntryById(int id) async => null;
+  Future<Entry?> getEntryById(int id) async =>
+      id == 1 ? _routerEntry(id) : null;
 
   @override
   Future<int> saveDraft(String transcript, String language) async => 1;
@@ -125,6 +138,9 @@ class _RouterEntryRepository implements EntryRepository {
 
   @override
   Future<int> saveAudioDraft(String audioPath, String language) async => 1;
+
+  @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {}
 
   @override
   Future<void> updateWithCleanedText(
@@ -167,6 +183,18 @@ class _RouterEntryRepository implements EntryRepository {
 
   @override
   Future<void> deleteStaleDrafts({int daysOld = 7}) async {}
+}
+
+Entry _routerEntry(int id) {
+  return Entry(
+    id: id,
+    rawTranscript: 'router entry',
+    cleanedText: null,
+    isDraft: false,
+    language: 'en-US',
+    createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+    wordCount: 2,
+  );
 }
 
 class _RouterPreferencesRepository implements PreferencesRepository {

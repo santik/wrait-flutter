@@ -151,6 +151,29 @@ void main() {
     },
   );
 
+  test(
+    'updates only cleaned text and recalculates word count for edits',
+    () async {
+      final id = await repository!.saveEntry('original transcript', 'en-US');
+
+      await repository!.updateEditedCleanedText(id, 'edited cleaned text');
+
+      final entry = await repository!.getEntryById(id);
+
+      expect(entry, isNotNull);
+      expect(entry!.cleanedText, 'edited cleaned text');
+      expect(entry.rawTranscript, 'original transcript');
+      expect(entry.wordCount, 3);
+    },
+  );
+
+  test('throws when editing a missing entry', () async {
+    await expectLater(
+      repository!.updateEditedCleanedText(999, 'edited cleaned text'),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('canonicalizes language updates by base language', () async {
     final id = await repository!.saveEntry('hello world', 'en-US');
 

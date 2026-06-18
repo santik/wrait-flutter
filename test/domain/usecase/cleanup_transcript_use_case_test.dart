@@ -454,6 +454,15 @@ class _FakeEntryRepository implements EntryRepository {
   }
 
   @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {
+    final existing = _requireEntry(id);
+    _entries[id] = existing.copyWith(
+      cleanedText: cleanedText,
+      wordCount: cleanedText.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).length,
+    );
+  }
+
+  @override
   Future<void> updateDraftTranscript(
     int id,
     String rawTranscript,

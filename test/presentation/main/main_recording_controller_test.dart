@@ -823,6 +823,9 @@ class _FakeEntryRepository implements EntryRepository {
   Future<int> saveEntry(String transcript, String language) async => 1;
 
   @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {}
+
+  @override
   Future<void> updateDraftTranscript(
     int id,
     String rawTranscript,

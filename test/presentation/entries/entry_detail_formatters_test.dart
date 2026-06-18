@@ -1,0 +1,61 @@
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:wrait/domain/model/entry.dart';
+import 'package:wrait/presentation/entries/entry_detail_formatters.dart';
+
+void main() {
+  test('prefers cleaned text when it is available', () {
+    final entry = _entry(cleanedText: 'clean text', rawTranscript: 'raw text');
+
+    expect(entryDetailDisplayText(entry), 'clean text');
+  });
+
+  test('falls back to raw transcript when cleaned text is unavailable', () {
+    final entry = _entry(cleanedText: null, rawTranscript: 'raw text');
+
+    expect(entryDetailDisplayText(entry), 'raw text');
+  });
+
+  test('treats blank entries as unreadable', () {
+    final entry = _entry(cleanedText: null, rawTranscript: '');
+
+    expect(entryDetailIsReadable(entry), isFalse);
+  });
+
+  test('formats a full weekday and date label', () {
+    final label = formatEntryDetailDate(
+      createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+      locale: const Locale('en', 'US'),
+    );
+
+    expect(label.weekday, 'Tuesday');
+    expect(label.date, contains('June'));
+  });
+
+  test('falls back safely for unsupported locales', () {
+    final label = formatEntryDetailDate(
+      createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+      locale: const Locale('zz', 'ZZ'),
+    );
+
+    expect(label.weekday, isNotEmpty);
+    expect(label.date, isNotEmpty);
+  });
+
+  test('formats singular and plural word counts', () {
+    expect(formatEntryWordCount(1), '1 word');
+    expect(formatEntryWordCount(4), '4 words');
+  });
+}
+
+Entry _entry({required String? cleanedText, required String rawTranscript}) {
+  return Entry(
+    id: 1,
+    rawTranscript: rawTranscript,
+    cleanedText: cleanedText,
+    isDraft: false,
+    language: 'en-US',
+    createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+    wordCount: 2,
+  );
+}

@@ -69,8 +69,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entryCard-7')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Entry preview'), findsOneWidget);
-    expect(find.textContaining('7'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('clean entry 7'), findsOneWidget);
   });
 
   testWidgets('audio-only draft shows retry preview and does not navigate', (
@@ -86,7 +86,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
-    expect(find.text('Entry preview'), findsNothing);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
   });
 
   testWidgets('back button returns to the main screen', (tester) async {
@@ -246,10 +246,15 @@ class _TestEntryRepository implements EntryRepository {
   }
 
   @override
-  Stream<Entry?> watchEntryById(int id) => const Stream<Entry?>.empty();
+  Stream<Entry?> watchEntryById(int id) async* {
+    yield _findEntry(id);
+    yield* _controller.stream.map((entries) {
+      return _findEntry(id, entries: entries);
+    });
+  }
 
   @override
-  Future<Entry?> getEntryById(int id) async => null;
+  Future<Entry?> getEntryById(int id) async => _findEntry(id);
 
   @override
   Future<int> saveDraft(String transcript, String language) async => 1;
@@ -259,6 +264,9 @@ class _TestEntryRepository implements EntryRepository {
 
   @override
   Future<int> saveAudioDraft(String audioPath, String language) async => 1;
+
+  @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {}
 
   @override
   Future<void> updateWithCleanedText(
@@ -308,6 +316,16 @@ class _TestEntryRepository implements EntryRepository {
 
   @override
   Future<void> deleteStaleDrafts({int daysOld = 7}) async {}
+
+  Entry? _findEntry(int id, {List<Entry>? entries}) {
+    final source = entries ?? _entries;
+    for (final entry in source) {
+      if (entry.id == id) {
+        return entry;
+      }
+    }
+    return null;
+  }
 }
 
 class _TestPreferencesRepository implements PreferencesRepository {

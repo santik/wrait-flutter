@@ -93,8 +93,8 @@ void main() {
     await tester.tap(find.byKey(ValueKey('entryCard-$id')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Entry preview'), findsOneWidget);
-    expect(find.byKey(const ValueKey('entryIdValue')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('entry to open'), findsOneWidget);
   });
 
   testWidgets('audio-only draft stays on the list when tapped', (tester) async {
@@ -120,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
-    expect(find.text('Entry preview'), findsNothing);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
   });
 
   testWidgets('cancel keeps the row after swipe-to-delete', (tester) async {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/design_tokens.dart';
+import 'entry_delete_confirmation.dart';
 import 'entry_list_controller.dart';
 import 'entry_list_row.dart';
 
@@ -76,40 +77,8 @@ class EntryListScreen extends ConsumerWidget {
     WidgetRef ref,
     int entryId,
   ) async {
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Delete entry?'),
-          content: const Text('This entry will be permanently removed.'),
-          actions: [
-            Semantics(
-              button: true,
-              label: 'Cancel deletion',
-              hint: 'Keeps this entry in the list.',
-              child: TextButton(
-                key: const ValueKey('entryDeleteCancelButton'),
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const ExcludeSemantics(child: Text('Cancel')),
-              ),
-            ),
-            Semantics(
-              button: true,
-              label: 'Delete entry permanently',
-              hint: 'Removes this entry from the list.',
-              child: TextButton(
-                key: const ValueKey('entryDeleteConfirmButton'),
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const ExcludeSemantics(child: Text('Delete')),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldDelete != true) {
+    final shouldDelete = await showEntryDeleteConfirmationDialog(context);
+    if (!shouldDelete) {
       return;
     }
 

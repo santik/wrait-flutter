@@ -96,8 +96,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Entry preview'), findsOneWidget);
-    expect(find.textContaining('42'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('entry 42'), findsOneWidget);
   });
 
   testWidgets('stats tap navigates to entries', (tester) async {
@@ -453,10 +453,12 @@ class _TestEntryRepository implements EntryRepository {
   }
 
   @override
-  Stream<Entry?> watchEntryById(int id) => const Stream<Entry?>.empty();
+  Stream<Entry?> watchEntryById(int id) =>
+      Stream<Entry?>.value(_entry(id: id, createdAt: DateTime(2026, 6, 16, 9)));
 
   @override
-  Future<Entry?> getEntryById(int id) async => null;
+  Future<Entry?> getEntryById(int id) async =>
+      _entry(id: id, createdAt: DateTime(2026, 6, 16, 9));
 
   @override
   Future<int> saveDraft(String transcript, String language) async => 1;
@@ -466,6 +468,9 @@ class _TestEntryRepository implements EntryRepository {
 
   @override
   Future<int> saveAudioDraft(String audioPath, String language) async => 1;
+
+  @override
+  Future<void> updateEditedCleanedText(int id, String cleanedText) async {}
 
   @override
   Future<void> updateWithCleanedText(
