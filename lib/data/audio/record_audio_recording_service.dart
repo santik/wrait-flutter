@@ -88,7 +88,7 @@ class RecordAudioRecordingService implements AudioRecordingService {
         throw const RecordingAlreadyInProgressFailure();
       }
       final microphoneAccessState = await microphonePermissionService
-          .ensureMicrophoneAccess();
+          .requestMicrophoneAccess();
       if (microphoneAccessState != MicrophoneAccessState.granted) {
         throw RecordingPermissionDeniedFailure(microphoneAccessState);
       }
@@ -143,6 +143,20 @@ class RecordAudioRecordingService implements AudioRecordingService {
 
       await _ensureOutputFileIsUsable(resolvedPath);
       return resolvedPath;
+    });
+  }
+
+  @override
+  Future<void> cancelRecording() {
+    return _runExclusive(() async {
+      final session = _activeSession;
+      _activeSession = null;
+      if (session == null) {
+        return;
+      }
+
+      await _cancelRecorderBestEffort();
+      await _deleteFileIfPresent(session.outputPath);
     });
   }
 

@@ -61,9 +61,9 @@ class CloudTranscriptionService implements TranscriptionService {
 
       _state = _CloudTranscriptionState.liveRecording;
       onStatus(RecordingStarted(deadline));
-    } on RecordingPermissionDeniedFailure {
+    } on RecordingPermissionDeniedFailure catch (error) {
       _state = _CloudTranscriptionState.idle;
-      throw const MicBlockedTranscriptionServiceFailure();
+      throw MicBlockedTranscriptionServiceFailure(error.accessState);
     } catch (_) {
       _state = _CloudTranscriptionState.idle;
       rethrow;
@@ -104,6 +104,30 @@ class CloudTranscriptionService implements TranscriptionService {
       );
     } finally {
       _state = _CloudTranscriptionState.idle;
+    }
+  }
+
+  @override
+  Future<void> cancelLiveTranscription() async {
+    if (_state != _CloudTranscriptionState.liveRecording ||
+        !audioRecordingService.isRecording) {
+      return;
+    }
+
+    _state = _CloudTranscriptionState.stoppingLiveRecording;
+    try {
+      await audioRecordingService.cancelRecording();
+      _state = _CloudTranscriptionState.idle;
+    } catch (error, stackTrace) {
+      _logWarning(
+        'Cloud transcription failed to cancel live recording.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _state = audioRecordingService.isRecording
+          ? _CloudTranscriptionState.liveRecording
+          : _CloudTranscriptionState.idle;
+      rethrow;
     }
   }
 

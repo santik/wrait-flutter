@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
 import 'package:wrait/data/audio/audio_recording_providers.dart';
+import 'package:wrait/data/audio/microphone_permission_service.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
@@ -24,6 +25,7 @@ void main() {
   late _FakeCleanupTranscriptUseCase cleanupUseCase;
   late _FakeEntryRepository entryRepository;
   late _FakePreferencesRepository preferencesRepository;
+  late _FakeMicrophonePermissionService microphonePermissionService;
   late FakeMonotonicClock monotonicClock;
   late List<String> logMessages;
   late List<Object?> logErrors;
@@ -34,11 +36,13 @@ void main() {
     RecordingFeedbackDelays feedbackDelays = const RecordingFeedbackDelays(
       errorAndDeletedAutoClear: Duration(milliseconds: 1),
     ),
+    Duration resumePermissionTimeout = const Duration(seconds: 2),
   }) {
     transcriptionService = _FakeTranscriptionService();
     cleanupUseCase = _FakeCleanupTranscriptUseCase();
     entryRepository = _FakeEntryRepository();
     preferencesRepository = _FakePreferencesRepository();
+    microphonePermissionService = _FakeMicrophonePermissionService();
     monotonicClock = FakeMonotonicClock(0);
     logMessages = <String>[];
     logErrors = <Object?>[];
@@ -49,8 +53,14 @@ void main() {
         cleanupTranscriptUseCaseProvider.overrideWithValue(cleanupUseCase),
         entryRepositoryProvider.overrideWithValue(entryRepository),
         preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
+        microphonePermissionServiceProvider.overrideWithValue(
+          microphonePermissionService,
+        ),
         monotonicClockProvider.overrideWithValue(monotonicClock),
         recordingFeedbackDelaysProvider.overrideWithValue(feedbackDelays),
+        recordingResumePermissionTimeoutProvider.overrideWithValue(
+          resumePermissionTimeout,
+        ),
         recordingControllerWarningLoggerProvider.overrideWithValue((
           message, {
           error,
@@ -116,19 +126,43 @@ void main() {
     },
   );
 
-  test('start failure from blocked microphone publishes mic error', () async {
-    transcriptionService.startError =
-        const MicBlockedTranscriptionServiceFailure();
+  test(
+    'start failure from retryable microphone denial publishes mic-needed error',
+    () async {
+      transcriptionService.startError =
+          const MicBlockedTranscriptionServiceFailure(
+            MicrophoneAccessState.denied,
+          );
 
-    await container
-        .read(mainRecordingControllerProvider.notifier)
-        .onMainButtonTapped();
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
 
-    expect(
-      container.read(mainRecordingControllerProvider).recordingState,
-      const RecordingErrorState(RecordingError.insufficientPermissions),
-    );
-  });
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneDenied),
+      );
+    },
+  );
+
+  test(
+    'start failure from blocked microphone publishes blocked mic error',
+    () async {
+      transcriptionService.startError =
+          const MicBlockedTranscriptionServiceFailure(
+            MicrophoneAccessState.permanentlyDenied,
+          );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneBlocked),
+      );
+    },
+  );
 
   test(
     'Listening stop before five seconds publishes TooShort, increments shake once, and auto-clears',
@@ -282,33 +316,159 @@ void main() {
     },
   );
 
-  test('insufficient-permissions Error tap resets to Idle', () async {
-    await container
-        .read(mainRecordingControllerProvider.notifier)
-        .onMainButtonTapped();
-    monotonicClock.advance(const Duration(seconds: 6));
-    transcriptionService.nextStopResult = const TranscriptionFailure(
-      reason: TranscriptionFailureReason.micBlocked,
-    );
+  test(
+    'blocked microphone Error tap opens settings without leaving blocked state',
+    () async {
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      transcriptionService.nextStopResult = const TranscriptionFailure(
+        reason: TranscriptionFailureReason.micBlocked,
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneBlocked),
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneBlocked),
+      );
+      expect(microphonePermissionService.openSettingsCallCount, 1);
+    },
+  );
+
+  test('resume after settings grant clears blocked microphone state', () async {
+    transcriptionService.startError =
+        const MicBlockedTranscriptionServiceFailure(
+          MicrophoneAccessState.permanentlyDenied,
+        );
 
     await container
         .read(mainRecordingControllerProvider.notifier)
         .onMainButtonTapped();
 
-    expect(
-      container.read(mainRecordingControllerProvider).recordingState,
-      const RecordingErrorState(RecordingError.insufficientPermissions),
-    );
-
+    microphonePermissionService.currentState = MicrophoneAccessState.granted;
     await container
         .read(mainRecordingControllerProvider.notifier)
-        .onMainButtonTapped();
+        .onAppResumed();
 
     expect(
       container.read(mainRecordingControllerProvider).recordingState,
       const RecordingIdle(),
     );
   });
+
+  test(
+    'resume while permission is still blocked preserves blocked state',
+    () async {
+      transcriptionService.startError =
+          const MicBlockedTranscriptionServiceFailure(
+            MicrophoneAccessState.permanentlyDenied,
+          );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onAppResumed();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneBlocked),
+      );
+    },
+  );
+
+  test(
+    'resume with revoked permission during listening cancels active recording',
+    () async {
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      microphonePermissionService.currentState = MicrophoneAccessState.denied;
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onAppResumed();
+
+      expect(transcriptionService.cancelCallCount, 1);
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneDenied),
+      );
+    },
+  );
+
+  test('concurrent resume checks reuse the same permission lookup', () async {
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    final permissionCompleter = Completer<MicrophoneAccessState>();
+    microphonePermissionService.getFutureFactory = () =>
+        permissionCompleter.future;
+
+    final firstResume = container
+        .read(mainRecordingControllerProvider.notifier)
+        .onAppResumed();
+    final secondResume = container
+        .read(mainRecordingControllerProvider.notifier)
+        .onAppResumed();
+
+    expect(microphonePermissionService.getCallCount, 1);
+
+    permissionCompleter.complete(MicrophoneAccessState.granted);
+    await Future.wait([firstResume, secondResume]);
+
+    expect(microphonePermissionService.getCallCount, 1);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
+    );
+  });
+
+  test(
+    'resume permission timeout logs and preserves the current recording',
+    () async {
+      container.dispose();
+      container = buildContainer(
+        resumePermissionTimeout: const Duration(milliseconds: 1),
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      microphonePermissionService.getFutureFactory = () =>
+          Completer<MicrophoneAccessState>().future;
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onAppResumed();
+
+      expect(transcriptionService.cancelCallCount, 0);
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
+      );
+      expect(
+        logMessages,
+        contains('Timed out checking microphone permission after app resume.'),
+      );
+      expect(logErrors.last, isA<TimeoutException>());
+    },
+  );
 
   test('transcription failure mapping covers all supported outcomes', () async {
     final cases = <TranscriptionFailureReason, RecordingError>{
@@ -678,6 +838,7 @@ class _CleanupCall {
 class _FakeTranscriptionService implements TranscriptionService {
   int startCallCount = 0;
   int stopCallCount = 0;
+  int cancelCallCount = 0;
   Object? startError;
   TranscriptionResult nextStopResult = const TranscriptionFailure(
     reason: TranscriptionFailureReason.apiError,
@@ -747,8 +908,47 @@ class _FakeTranscriptionService implements TranscriptionService {
   }
 
   @override
+  Future<void> cancelLiveTranscription() async {
+    cancelCallCount += 1;
+    _isRecording = false;
+    _isTranscribing = false;
+    _hardCapDeadlineElapsedRealtime = null;
+  }
+
+  @override
   Future<TranscriptionResult> transcribeAudioDraft(String audioPath) async {
     return nextStopResult;
+  }
+}
+
+class _FakeMicrophonePermissionService implements MicrophonePermissionService {
+  MicrophoneAccessState currentState = MicrophoneAccessState.permanentlyDenied;
+  int getCallCount = 0;
+  int requestCallCount = 0;
+  int openSettingsCallCount = 0;
+  bool openSettingsResult = true;
+  Future<MicrophoneAccessState> Function()? getFutureFactory;
+
+  @override
+  Future<MicrophoneAccessState> getMicrophoneAccess() async {
+    getCallCount += 1;
+    final pendingResult = getFutureFactory?.call();
+    if (pendingResult != null) {
+      return pendingResult;
+    }
+    return currentState;
+  }
+
+  @override
+  Future<bool> openMicrophonePermissionSettings() async {
+    openSettingsCallCount += 1;
+    return openSettingsResult;
+  }
+
+  @override
+  Future<MicrophoneAccessState> requestMicrophoneAccess() async {
+    requestCallCount += 1;
+    return currentState;
   }
 }
 

@@ -15,6 +15,7 @@ import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
 import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/audio/audio_recording_providers.dart';
+import 'package:wrait/data/audio/microphone_permission_service.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
@@ -28,7 +29,7 @@ import '../test/test_doubles/fake_monotonic_clock.dart';
 import '../test/test_doubles/fake_secure_storage.dart';
 
 void main() {
-  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
   testWidgets(
@@ -56,14 +57,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await _prepareScreenshots(binding, tester);
-      await binding.takeScreenshot('main-screen-idle-first-time');
-
       expect(find.text('tap button to write'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('statusLineButton')));
       await tester.pump();
-      await binding.takeScreenshot('main-screen-listening');
       expect(find.text('listening...'), findsOneWidget);
 
       harness.monotonicClock.advance(const Duration(seconds: 6));
@@ -73,7 +70,6 @@ void main() {
         find.text('saved, tap to read'),
         timeout: const Duration(milliseconds: 40),
       );
-      await binding.takeScreenshot('main-screen-saved');
 
       expect(find.text('saved, tap to read'), findsOneWidget);
 
@@ -101,8 +97,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _prepareScreenshots(binding, tester);
-    await binding.takeScreenshot('main-screen-saved-navigation-start');
 
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));
     await tester.pump();
@@ -112,7 +106,6 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));
     await tester.pumpAndSettle();
-    await binding.takeScreenshot('main-screen-entry-detail');
 
     expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
     expect(find.text('Cleaned transcript.'), findsOneWidget);
@@ -136,15 +129,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await _prepareScreenshots(binding, tester);
-      await binding.takeScreenshot('main-screen-stats');
 
       expect(find.text('2 entries - 2 days'), findsOneWidget);
 
       await tester.ensureVisible(find.byKey(const ValueKey('statsLineButton')));
       await tester.tap(find.byKey(const ValueKey('statsLineButton')));
       await tester.pumpAndSettle();
-      await binding.takeScreenshot('main-screen-entry-list');
       expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
     },
   );
@@ -171,14 +161,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _prepareScreenshots(binding, tester);
-    await binding.takeScreenshot('main-screen-quota-idle');
 
     expect(find.text('9 total / 6 left'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));
     await tester.pump();
-    await binding.takeScreenshot('main-screen-quota-listening');
     expect(find.text('listening...'), findsOneWidget);
     expect(find.text('9 total / 6 left'), findsOneWidget);
   });
@@ -189,7 +176,9 @@ void main() {
     final harness = await _createHarness();
     addTearDown(harness.dispose);
     harness.transcriptionService.startFailure =
-        const MicBlockedTranscriptionServiceFailure();
+        const MicBlockedTranscriptionServiceFailure(
+          MicrophoneAccessState.permanentlyDenied,
+        );
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -198,22 +187,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _prepareScreenshots(binding, tester);
 
     await tester.tap(find.byKey(const ValueKey('statusLineButton')));
     await tester.pumpAndSettle();
-    await binding.takeScreenshot('main-screen-mic-blocked');
 
-    expect(find.text('mic blocked'), findsOneWidget);
+    expect(find.text('mic blocked · tap settings'), findsOneWidget);
   });
-}
-
-Future<void> _prepareScreenshots(
-  IntegrationTestWidgetsFlutterBinding binding,
-  WidgetTester tester,
-) async {
-  await binding.convertFlutterSurfaceToImage();
-  await tester.pump();
 }
 
 class _CleanupCallbackHolder {
@@ -374,6 +353,13 @@ class _FakeTranscriptionService implements TranscriptionService {
     onStatus(const Uploading());
     isTranscribing = false;
     return nextStopResult;
+  }
+
+  @override
+  Future<void> cancelLiveTranscription() async {
+    isRecording = false;
+    isTranscribing = false;
+    hardCapDeadlineElapsedRealtime = null;
   }
 
   @override
