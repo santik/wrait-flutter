@@ -342,6 +342,13 @@ class _FakeTranscriptionService implements TranscriptionService {
   }
 
   @override
+  Future<void> cancelLiveTranscription() async {
+    isRecording = false;
+    isTranscribing = false;
+    hardCapDeadlineElapsedRealtime = null;
+  }
+
+  @override
   Future<TranscriptionResult> transcribeAudioDraft(String audioPath) async {
     return nextStopResult;
   }

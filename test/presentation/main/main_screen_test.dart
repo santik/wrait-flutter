@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,6 +43,7 @@ void main() {
         preferencesRepository: preferencesRepository,
         quotaNotifier: quotaNotifier,
       );
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
       expect(
@@ -318,9 +320,7 @@ void main() {
   testWidgets('shows microphone-blocked status text', (tester) async {
     controller.setTestState(
       const RecordingControllerState(
-        recordingState: RecordingErrorState(
-          RecordingError.insufficientPermissions,
-        ),
+        recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
       ),
     );
 
@@ -332,7 +332,100 @@ void main() {
       quotaNotifier: quotaNotifier,
     );
 
-    expect(find.text('mic blocked'), findsOneWidget);
+    expect(find.text('mic blocked · tap settings'), findsOneWidget);
+    expect(find.byKey(const ValueKey('statusLineButton')), findsOneWidget);
+  });
+
+  testWidgets('blocked status tap routes to microphone settings action', (
+    tester,
+  ) async {
+    controller.setTestState(
+      const RecordingControllerState(
+        recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
+      ),
+    );
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+    await tester.pump();
+
+    expect(controller.openSettingsCount, 1);
+  });
+
+  testWidgets(
+    'permission statuses expose specific semantics for assistive tech',
+    (tester) async {
+      final semanticsHandle = tester.ensureSemantics();
+
+      controller.setTestState(
+        const RecordingControllerState(
+          recordingState: RecordingErrorState(RecordingError.microphoneDenied),
+        ),
+      );
+      await _pumpTestApp(
+        tester,
+        controller: controller,
+        entryRepository: entryRepository,
+        preferencesRepository: preferencesRepository,
+        quotaNotifier: quotaNotifier,
+      );
+      await tester.pumpAndSettle();
+
+      final deniedNode = tester.getSemantics(
+        find.byKey(const ValueKey('statusLineButton')),
+      );
+      expect(
+        deniedNode.label,
+        'Microphone access is required to start recording.',
+      );
+      expect(deniedNode.hint, 'Double tap to request microphone access again.');
+      expect(
+        deniedNode.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      controller.setTestState(
+        const RecordingControllerState(
+          recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final blockedNode = tester.getSemantics(
+        find.byKey(const ValueKey('statusLineButton')),
+      );
+      expect(blockedNode.label, 'Microphone access is blocked for Wrait.');
+      expect(blockedNode.hint, 'Double tap to open app settings.');
+      expect(
+        blockedNode.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      semanticsHandle.dispose();
+    },
+  );
+
+  testWidgets('app resume notifies the controller', (tester) async {
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(controller.resumeCount, 1);
   });
 }
 
@@ -380,6 +473,8 @@ class _TestMainRecordingController extends MainRecordingController {
   RecordingControllerState _initialState = const RecordingControllerState();
   int tapCount = 0;
   int clearSavedCount = 0;
+  int openSettingsCount = 0;
+  int resumeCount = 0;
 
   @override
   RecordingControllerState build() => _initialState;
@@ -397,6 +492,16 @@ class _TestMainRecordingController extends MainRecordingController {
     } catch (_) {
       _initialState = const RecordingControllerState();
     }
+  }
+
+  @override
+  Future<void> onAppResumed() async {
+    resumeCount += 1;
+  }
+
+  @override
+  Future<void> openMicrophoneSettings() async {
+    openSettingsCount += 1;
   }
 
   void setTestState(RecordingControllerState nextState) {

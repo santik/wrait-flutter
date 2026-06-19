@@ -1,6 +1,10 @@
 import 'recording_state.dart';
 
-enum MainScreenStatusAction { startRecording, openSavedEntry }
+enum MainScreenStatusAction {
+  startRecording,
+  openSavedEntry,
+  openMicrophoneSettings,
+}
 
 class MainScreenStatusPresentation {
   const MainScreenStatusPresentation({
@@ -8,12 +12,16 @@ class MainScreenStatusPresentation {
     required this.statusText,
     this.action,
     this.savedEntryId,
+    this.semanticsLabel,
+    this.semanticsHint,
   });
 
   final String buttonLabel;
   final String statusText;
   final MainScreenStatusAction? action;
   final int? savedEntryId;
+  final String? semanticsLabel;
+  final String? semanticsHint;
 
   bool get isStatusTappable => action != null;
 }
@@ -74,10 +82,21 @@ MainScreenStatusPresentation resolveMainScreenStatus({
         buttonLabel: buttonLabel,
         statusText: 'nothing caught · too quiet?',
       ),
-    RecordingErrorState(error: RecordingError.insufficientPermissions) =>
+    RecordingErrorState(error: RecordingError.microphoneDenied) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'mic blocked',
+        statusText: 'mic needed · tap again',
+        action: MainScreenStatusAction.startRecording,
+        semanticsLabel: 'Microphone access is required to start recording.',
+        semanticsHint: 'Double tap to request microphone access again.',
+      ),
+    RecordingErrorState(error: RecordingError.microphoneBlocked) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: 'mic blocked · tap settings',
+        action: MainScreenStatusAction.openMicrophoneSettings,
+        semanticsLabel: 'Microphone access is blocked for Wrait.',
+        semanticsHint: 'Double tap to open app settings.',
       ),
     RecordingErrorState(error: RecordingError.noInternet) =>
       MainScreenStatusPresentation(

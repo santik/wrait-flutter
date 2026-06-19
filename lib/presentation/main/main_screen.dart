@@ -24,7 +24,8 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen>
+    with WidgetsBindingObserver {
   Timer? _savedAutoClearTimer;
   Timer? _countdownTicker;
   final ValueNotifier<double?> _countdownProgress = ValueNotifier<double?>(
@@ -37,15 +38,28 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHasEverRecorded();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _savedAutoClearTimer?.cancel();
     _countdownTicker?.cancel();
     _countdownProgress.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+
+    unawaited(
+      ref.read(mainRecordingControllerProvider.notifier).onAppResumed(),
+    );
   }
 
   Future<void> _loadHasEverRecorded() async {
@@ -328,6 +342,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         }
         context.go('/entry/$entryId');
         return;
+      case MainScreenStatusAction.openMicrophoneSettings:
+        ref
+            .read(mainRecordingControllerProvider.notifier)
+            .openMicrophoneSettings();
+        return;
       case null:
         return;
     }
@@ -347,24 +366,31 @@ class _StatusLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final text = Text(
-      presentation.statusText,
-      key: const ValueKey('statusLineText'),
-      textAlign: TextAlign.center,
-      style: theme.textTheme.bodyLarge,
+    final text = ExcludeSemantics(
+      child: Text(
+        presentation.statusText,
+        key: const ValueKey('statusLineText'),
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodyLarge,
+      ),
     );
+    final semanticsLabel =
+        presentation.semanticsLabel ??
+        'Status message ${presentation.statusText}.';
 
     if (!presentation.isStatusTappable) {
       return Semantics(
         container: true,
-        label: 'Status message ${presentation.statusText}.',
+        label: semanticsLabel,
+        hint: presentation.semanticsHint,
         child: text,
       );
     }
 
     return Semantics(
       button: true,
-      label: 'Status message ${presentation.statusText}.',
+      label: semanticsLabel,
+      hint: presentation.semanticsHint,
       child: InkWell(
         key: const ValueKey('statusLineButton'),
         borderRadius: BorderRadius.circular(WraitRadiusTokens.card),
