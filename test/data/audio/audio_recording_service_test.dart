@@ -103,7 +103,7 @@ void main() {
       ),
     );
 
-    expect(microphonePermissionService.ensureCallCount, 1);
+    expect(microphonePermissionService.requestCallCount, 1);
     expect(recorder.startCalls, isEmpty);
     expect(service.isRecording, isFalse);
   });
@@ -196,6 +196,22 @@ void main() {
       expect(recorder.cancelCallCount, 1);
       expect(await File(path).exists(), isFalse);
       expect(service.isRecording, isFalse);
+    },
+  );
+
+  test(
+    'cancelRecording clears the active session and deletes partial audio',
+    () async {
+      final path = pathFor('cancel-active.m4a');
+      recorder.writeFileOnStart = true;
+
+      await service.startRecording(path);
+      await service.cancelRecording();
+
+      expect(recorder.cancelCallCount, 1);
+      expect(service.isRecording, isFalse);
+      expect(service.hardCapDeadlineElapsedRealtime, isNull);
+      expect(await File(path).exists(), isFalse);
     },
   );
 
@@ -303,11 +319,25 @@ class _FakeRecorderAdapter implements RecorderAdapter {
 
 class _FakeMicrophonePermissionService implements MicrophonePermissionService {
   MicrophoneAccessState nextState = MicrophoneAccessState.granted;
-  int ensureCallCount = 0;
+  int getCallCount = 0;
+  int requestCallCount = 0;
+  int openSettingsCallCount = 0;
 
   @override
-  Future<MicrophoneAccessState> ensureMicrophoneAccess() async {
-    ensureCallCount += 1;
+  Future<MicrophoneAccessState> getMicrophoneAccess() async {
+    getCallCount += 1;
+    return nextState;
+  }
+
+  @override
+  Future<bool> openMicrophonePermissionSettings() async {
+    openSettingsCallCount += 1;
+    return true;
+  }
+
+  @override
+  Future<MicrophoneAccessState> requestMicrophoneAccess() async {
+    requestCallCount += 1;
     return nextState;
   }
 }

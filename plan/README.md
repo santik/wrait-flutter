@@ -18,9 +18,9 @@ Story IDs stay stable, but implementation order follows the sequence below.
 12. US-013 - done
 13. US-027 - done
 14. US-028 - done
-15. US-014
-16. US-010
-17. US-012
+15. US-014 - done
+16. US-010 - spec is redy
+17. US-012 - done
 18. US-015
 19. US-017
 20. US-018

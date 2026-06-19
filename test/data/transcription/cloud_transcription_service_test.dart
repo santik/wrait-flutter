@@ -80,12 +80,69 @@ void main() {
 
     await expectLater(
       service.startLiveTranscription(onStatus: (_) {}),
-      throwsA(isA<MicBlockedTranscriptionServiceFailure>()),
+      throwsA(
+        isA<MicBlockedTranscriptionServiceFailure>().having(
+          (error) => error.accessState,
+          'accessState',
+          MicrophoneAccessState.denied,
+        ),
+      ),
     );
 
     expect(service.isRecording, isFalse);
     expect(service.isTranscribing, isFalse);
   });
+
+  test(
+    'cancelLiveTranscription cancels recording without uploading audio',
+    () async {
+      await service.startLiveTranscription(onStatus: (_) {});
+
+      await service.cancelLiveTranscription();
+
+      expect(audioRecordingService.cancelCallCount, 1);
+      expect(transcribeCallCount, 0);
+      expect(service.isRecording, isFalse);
+      expect(service.isTranscribing, isFalse);
+      expect(await File(livePath).exists(), isFalse);
+    },
+  );
+
+  test(
+    'cancelLiveTranscription is a no-op when no live recording is active',
+    () async {
+      await service.cancelLiveTranscription();
+
+      expect(audioRecordingService.cancelCallCount, 0);
+      expect(service.isRecording, isFalse);
+      expect(service.isTranscribing, isFalse);
+    },
+  );
+
+  test(
+    'cancelLiveTranscription logs cancel failures and keeps the live session recoverable',
+    () async {
+      await service.startLiveTranscription(onStatus: (_) {});
+      audioRecordingService.cancelFailure = StateError('cancel failed');
+
+      await expectLater(
+        service.cancelLiveTranscription(),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(
+        logMessages,
+        contains('Cloud transcription failed to cancel live recording.'),
+      );
+      expect(logErrors.single, isA<StateError>());
+      expect(service.isRecording, isTrue);
+      expect(service.isTranscribing, isFalse);
+
+      final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+      expect(result, isA<TranscriptionSuccess>());
+    },
+  );
 
   test(
     'successful live transcription uploads and deletes the temp file',
@@ -520,6 +577,8 @@ class _FakeAudioRecordingService implements AudioRecordingService {
   String? _currentPath;
   AudioRecordingFailure? startFailure;
   AudioRecordingFailure? stopFailure;
+  Object? cancelFailure;
+  int cancelCallCount = 0;
 
   @override
   Future<void> startRecording(String outputPath) async {
@@ -555,5 +614,24 @@ class _FakeAudioRecordingService implements AudioRecordingService {
     isRecording = false;
     hardCapDeadlineElapsedRealtime = null;
     return path;
+  }
+
+  @override
+  Future<void> cancelRecording() async {
+    if (cancelFailure case final error?) {
+      cancelFailure = null;
+      throw error;
+    }
+    final path = _currentPath;
+    if (path != null) {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+    cancelCallCount += 1;
+    _currentPath = null;
+    isRecording = false;
+    hardCapDeadlineElapsedRealtime = null;
   }
 }

@@ -89,7 +89,18 @@ upcoming feature work:
   quota data exists
 - approved main-screen status behavior including first-time
   `tap button to write`, idle `wrait`, listening `stop`, uploading,
-  processing, saved, draft-preserved, and microphone-blocked feedback states
+  processing, saved, draft-preserved, retryable microphone-denied, and
+  microphone-blocked feedback states
+- retryable microphone denial now surfaces `mic needed · tap again` and lets
+  the next user-initiated tap request microphone access again
+- blocked microphone access, permanently denied access, and restricted access
+  now surface `mic blocked · tap settings` from both the status line and the
+  primary main button
+- the main screen refreshes microphone permission state on app resume so
+  granting permission in system settings clears the blocked state without an
+  app restart
+- active live recording is canceled instead of uploaded or saved if microphone
+  access is revoked while the app is listening
 - native Android recording start failures are surfaced back into Flutter as
   controller-visible errors instead of leaving the app stuck on the launcher
   icon or a silent no-op path

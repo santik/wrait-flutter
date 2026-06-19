@@ -314,4 +314,18 @@ class _FakeAudioRecordingService implements AudioRecordingService {
     hardCapDeadlineElapsedRealtime = null;
     return path;
   }
+
+  @override
+  Future<void> cancelRecording() async {
+    final path = _currentPath;
+    if (path != null) {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+    _currentPath = null;
+    isRecording = false;
+    hardCapDeadlineElapsedRealtime = null;
+  }
 }

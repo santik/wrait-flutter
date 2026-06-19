@@ -1,3 +1,4 @@
+import '../audio/microphone_permission_service.dart';
 import '../api/record_quota_state.dart';
 
 typedef TranscriptionStatusCallback = void Function(TranscriptionStatus status);
@@ -22,6 +23,9 @@ abstract interface class TranscriptionService {
   Future<TranscriptionResult> stopLiveTranscription({
     required TranscriptionStatusCallback onStatus,
   });
+
+  /// Cancels the active live recording without uploading audio.
+  Future<void> cancelLiveTranscription();
 
   /// Uploads an already-retained draft audio file without starting recording.
   Future<TranscriptionResult> transcribeAudioDraft(String audioPath);
@@ -111,6 +115,8 @@ final class NoActiveLiveTranscriptionFailure
 
 final class MicBlockedTranscriptionServiceFailure
     extends TranscriptionServiceFailure {
-  const MicBlockedTranscriptionServiceFailure()
-    : super('The microphone is blocked or unavailable for recording.');
+  const MicBlockedTranscriptionServiceFailure(this.accessState)
+    : super('The microphone is unavailable for recording.');
+
+  final MicrophoneAccessState accessState;
 }

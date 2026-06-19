@@ -163,7 +163,8 @@ final class RecordingDeleted extends RecordingState {
 enum RecordingError {
   tooShort,
   noMatch,
-  insufficientPermissions,
+  microphoneDenied,
+  microphoneBlocked,
   noInternet,
   backendUnavailable,
   proxyAuthFailed,

@@ -9,6 +9,7 @@ import '../../data/api/backend_providers.dart';
 import '../../data/api/backend_results.dart' as backend;
 import '../../data/audio/audio_recording_providers.dart';
 import '../../data/audio/audio_recording_service.dart';
+import '../../data/audio/microphone_permission_service.dart';
 import '../../data/entries/entry_providers.dart';
 import '../../data/preferences/preferences_providers.dart';
 import '../../data/transcription/transcription_providers.dart';
@@ -47,6 +48,10 @@ final recordingFeedbackDelaysProvider = Provider<RecordingFeedbackDelays>(
   (ref) => const RecordingFeedbackDelays(),
 );
 
+final recordingResumePermissionTimeoutProvider = Provider<Duration>(
+  (ref) => const Duration(seconds: 2),
+);
+
 final mainRecordingControllerProvider =
     NotifierProvider<MainRecordingController, RecordingControllerState>(
       MainRecordingController.new,
@@ -60,15 +65,20 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
   EntryRepository get _entryRepository => ref.read(entryRepositoryProvider);
   PreferencesRepository get _preferencesRepository =>
       ref.read(preferencesRepositoryProvider);
+  MicrophonePermissionService get _microphonePermissionService =>
+      ref.read(microphonePermissionServiceProvider);
   MonotonicClock get _monotonicClock => ref.read(monotonicClockProvider);
   RecordingControllerWarningLogger get _logWarning =>
       ref.read(recordingControllerWarningLoggerProvider);
   RecordingFeedbackDelays get _feedbackDelays =>
       ref.read(recordingFeedbackDelaysProvider);
+  Duration get _resumePermissionTimeout =>
+      ref.read(recordingResumePermissionTimeoutProvider);
 
   Timer? _autoClearTimer;
   int? _listeningStartedAtElapsedRealtime;
   bool _buttonActionInFlight = false;
+  Future<void>? _resumePermissionCheckInFlight;
 
   @override
   RecordingControllerState build() {
@@ -100,8 +110,8 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         await _startListening();
         return;
       case RecordingErrorState():
-        if (current.error == RecordingError.insufficientPermissions) {
-          resetToIdle();
+        if (current.error == RecordingError.microphoneBlocked) {
+          await openMicrophoneSettings();
           return;
         }
         await _startListening();
@@ -132,6 +142,99 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     final deletedState = RecordingDeleted(count);
     state = state.copyWith(recordingState: deletedState);
     _scheduleAutoClear(deletedState);
+  }
+
+  Future<void> onAppResumed() async {
+    final current = state.recordingState;
+    if (current is! RecordingListening && current is! RecordingErrorState) {
+      return;
+    }
+
+    final inFlight = _resumePermissionCheckInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final future = _runResumePermissionCheck();
+    _resumePermissionCheckInFlight = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_resumePermissionCheckInFlight, future)) {
+        _resumePermissionCheckInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _runResumePermissionCheck() async {
+    final current = state.recordingState;
+    if (current is! RecordingListening && current is! RecordingErrorState) {
+      return;
+    }
+
+    final accessState = await _readMicrophoneAccessForResume();
+    if (accessState == null) {
+      return;
+    }
+
+    final latest = state.recordingState;
+    if (accessState == MicrophoneAccessState.granted) {
+      if (latest is RecordingErrorState &&
+          latest.error == RecordingError.microphoneBlocked) {
+        resetToIdle();
+      }
+      return;
+    }
+
+    if (latest is RecordingListening) {
+      await _cancelListeningForPermissionLoss(accessState);
+    }
+  }
+
+  Future<MicrophoneAccessState?> _readMicrophoneAccessForResume() async {
+    try {
+      return await _microphonePermissionService.getMicrophoneAccess().timeout(
+        _resumePermissionTimeout,
+      );
+    } on TimeoutException catch (error, stackTrace) {
+      _logWarning(
+        'Timed out checking microphone permission after app resume.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    } catch (error, stackTrace) {
+      _logWarning(
+        'Failed to check microphone permission after app resume.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  Future<void> openMicrophoneSettings() async {
+    if (_buttonActionInFlight) {
+      return;
+    }
+
+    _buttonActionInFlight = true;
+    try {
+      final opened = await _microphonePermissionService
+          .openMicrophonePermissionSettings();
+      if (!opened) {
+        _logWarning('Failed to open microphone permission settings.');
+      }
+    } catch (error, stackTrace) {
+      _logWarning(
+        'Failed to open microphone permission settings.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _buttonActionInFlight = false;
+    }
   }
 
   Future<void> _startListening() async {
@@ -213,8 +316,9 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
   ) {
     _emitError(
       switch (error) {
-        MicBlockedTranscriptionServiceFailure() =>
-          RecordingError.insufficientPermissions,
+        MicBlockedTranscriptionServiceFailure() => _mapMicrophoneAccessState(
+          error.accessState,
+        ),
         _ => RecordingError.apiFailed,
       },
       cause: error,
@@ -340,8 +444,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     return switch (reason) {
       TranscriptionFailureReason.tooShort => RecordingError.tooShort,
       TranscriptionFailureReason.nothingCaught => RecordingError.noMatch,
-      TranscriptionFailureReason.micBlocked =>
-        RecordingError.insufficientPermissions,
+      TranscriptionFailureReason.micBlocked => RecordingError.microphoneBlocked,
       TranscriptionFailureReason.network ||
       TranscriptionFailureReason.timeout => RecordingError.noInternet,
       TranscriptionFailureReason.backendUnavailable =>
@@ -350,6 +453,33 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         RecordingError.proxyAuthFailed,
       TranscriptionFailureReason.apiError => RecordingError.apiFailed,
     };
+  }
+
+  RecordingError _mapMicrophoneAccessState(MicrophoneAccessState accessState) {
+    return switch (accessState) {
+      MicrophoneAccessState.granted => RecordingError.apiFailed,
+      MicrophoneAccessState.denied => RecordingError.microphoneDenied,
+      MicrophoneAccessState.permanentlyDenied ||
+      MicrophoneAccessState.restricted => RecordingError.microphoneBlocked,
+    };
+  }
+
+  Future<void> _cancelListeningForPermissionLoss(
+    MicrophoneAccessState accessState,
+  ) async {
+    try {
+      await _transcriptionService.cancelLiveTranscription();
+    } catch (error, stackTrace) {
+      _emitError(
+        RecordingError.apiFailed,
+        cause: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
+
+    _listeningStartedAtElapsedRealtime = null;
+    _emitError(_mapMicrophoneAccessState(accessState));
   }
 
   RecordingError _mapCleanupFailure(backend.BackendFailureReason reason) {
@@ -393,7 +523,9 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
       recordingState: errorState,
       shakeErrorKey: nextShakeKey,
     );
-    _scheduleAutoClear(errorState);
+    if (nextError != RecordingError.microphoneBlocked) {
+      _scheduleAutoClear(errorState);
+    }
   }
 
   void _scheduleAutoClear(RecordingState targetState) {

@@ -193,6 +193,66 @@ US-001 was validated successfully on both platforms:
 - Shell regression coverage for this behavior lives in
   `test/deploy_debug_script_test.sh`.
 
+## US-012: Microphone Permission Handling
+
+### Main-screen permission behavior
+
+- The main recording flow now distinguishes retryable microphone denial from
+  blocked microphone access.
+- `MicrophoneAccessState.denied` maps to retryable UI with
+  `mic needed · tap again`.
+- `MicrophoneAccessState.permanentlyDenied` and
+  `MicrophoneAccessState.restricted` map to blocked UI with
+  `mic blocked · tap settings`.
+- Blocked state recovery is driven by app resume: granting permission in
+  system settings and returning to the app clears the blocked state without a
+  restart.
+
+### iOS-specific permission nuance
+
+- Keep the first unseen iOS microphone `denied` state retryable so the initial
+  tap can still show the native prompt.
+- After the app has already attempted a microphone permission request in the
+  current session, iOS `denied` should be treated as blocked rather than
+  retryable because the platform may stop re-presenting the prompt.
+- This behavior is covered in
+  `test/data/audio/microphone_permission_service_test.dart`.
+
+### Resume-path guidance
+
+- `MainRecordingController.onAppResumed()` should keep its single-flight guard.
+- Resume-time permission checks should stay timeout-bounded so a hung platform
+  permission query does not wedge the foreground recovery path.
+- Current controller coverage for that behavior lives in
+  `test/presentation/main/main_recording_controller_test.dart`.
+
+### Recording revocation guidance
+
+- When microphone access disappears while the app is already listening, use
+  cancel semantics rather than the normal stop/upload flow.
+- The cancel path exists to avoid uploading or saving audio captured after the
+  permission loss event.
+- `CloudTranscriptionService.cancelLiveTranscription()` should preserve state
+  honestly if recorder cancellation throws: log the failure and reflect
+  whether the recorder still reports an active session.
+
+### Accessibility guidance
+
+- Retryable and blocked permission statuses now carry explicit semantics
+  labels and hints instead of the generic status-message wording.
+- Future changes to permission-related status copy should update both the
+  visible text and the accessibility strings together.
+
+### Real-device test caveat
+
+- Keep `integration_test/main_screen_flow_test.dart` focused on behavioral
+  assertions when validating against the locked physical Android phone.
+- Screenshot capture in that suite caused the real-device run to hang on a
+  locked screen, even though the behavioral checks themselves were valid.
+- The focused permission suite
+  `integration_test/main_screen_permission_flow_test.dart` remains safe for
+  real-device and simulator coverage of the microphone permission flows.
+
 ## US-002: Theme, Design Tokens & Core UI Shell
 
 ### Established presentation foundation

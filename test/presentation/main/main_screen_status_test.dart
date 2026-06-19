@@ -73,8 +73,10 @@ void main() {
           'too short · keep talking',
       const RecordingErrorState(RecordingError.noMatch):
           'nothing caught · too quiet?',
-      const RecordingErrorState(RecordingError.insufficientPermissions):
-          'mic blocked',
+      const RecordingErrorState(RecordingError.microphoneDenied):
+          'mic needed · tap again',
+      const RecordingErrorState(RecordingError.microphoneBlocked):
+          'mic blocked · tap settings',
       const RecordingDeleted(2): 'deleted',
       const RecordingUploading(): 'uploading...',
       const RecordingProcessing(): 'cleaning up...',
@@ -88,4 +90,44 @@ void main() {
       expect(presentation.statusText, entry.value);
     }
   });
+
+  test('returns microphone settings action for blocked microphone status', () {
+    final presentation = resolveMainScreenStatus(
+      controllerState: const RecordingControllerState(
+        recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
+      ),
+      hasEverRecorded: true,
+    );
+
+    expect(presentation.action, MainScreenStatusAction.openMicrophoneSettings);
+  });
+
+  test(
+    'returns permission-specific accessibility copy for denied and blocked states',
+    () {
+      final denied = resolveMainScreenStatus(
+        controllerState: const RecordingControllerState(
+          recordingState: RecordingErrorState(RecordingError.microphoneDenied),
+        ),
+        hasEverRecorded: true,
+      );
+      final blocked = resolveMainScreenStatus(
+        controllerState: const RecordingControllerState(
+          recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
+        ),
+        hasEverRecorded: true,
+      );
+
+      expect(
+        denied.semanticsLabel,
+        'Microphone access is required to start recording.',
+      );
+      expect(
+        denied.semanticsHint,
+        'Double tap to request microphone access again.',
+      );
+      expect(blocked.semanticsLabel, 'Microphone access is blocked for Wrait.');
+      expect(blocked.semanticsHint, 'Double tap to open app settings.');
+    },
+  );
 }

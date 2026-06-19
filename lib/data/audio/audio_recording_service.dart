@@ -8,6 +8,7 @@ abstract interface class AudioRecordingService {
 
   Future<void> startRecording(String outputPath);
   Future<String> stopRecording();
+  Future<void> cancelRecording();
 }
 
 sealed class AudioRecordingFailure implements Exception {
