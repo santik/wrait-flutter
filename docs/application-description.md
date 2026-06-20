@@ -6,9 +6,9 @@ entry creation.
 ## Product summary
 
 The user records a spoken entry, the app converts that recording into text, and
-the result is stored as a diary entry. The product is designed to support both
-cloud-backed and offline-oriented behaviors, with strong attention to privacy,
-local data protection, and a simple interaction model.
+the result is stored as a diary entry. The current product is a single
+cloud-backed voice flow with strong attention to privacy, local data
+protection, and a simple interaction model.
 
 ## Primary experience
 
@@ -20,8 +20,9 @@ The core user flow is:
 4. Optionally clean up the transcript.
 5. Save and review the resulting entry.
 
-The early product roadmap prioritizes the "best mode" cloud-backed recording
-and transcription flow first, then offline capabilities, and then polish work.
+The current product scope centers on one launch path: cloud-backed recording,
+transcription, cleanup, and local entry persistence with retryable drafts when
+backend work cannot fully complete in one attempt.
 
 ## Current implementation scope
 
@@ -50,6 +51,7 @@ upcoming feature work:
 - OpenAPI-driven backend contract consumption from `api/wrait-backend.yaml`
 - backend request wiring through runtime config plus persisted device identity
 - non-blocking launch-time backend device registration
+- launch-only background draft retry after successful device registration
 - session-only quota state populated from successful backend registration and
   refreshed by valid transcription responses in the same app session
 - app-facing transcript cleanup use case for Best-mode flows, including fresh
@@ -59,6 +61,14 @@ upcoming feature work:
 - incremental Best-mode draft persistence across recording, transcription, and
   cleanup so partially completed work remains retryable until the full happy
   path succeeds
+- launch retry for pending audio and text drafts in newest-first order, with
+  one failed draft not blocking later drafts in the same launch pass
+- automatic stale-draft cleanup for drafts older than seven days before launch
+  retry begins
+- malformed audio-draft deletion when the retained local audio file is blank,
+  missing, unreadable, or empty
+- silent draft finalization through the existing entry list, entry detail, and
+  stats surfaces instead of separate foreground success feedback
 - cleanup request truncation to 10,000 characters while preserving the full
   stored raw transcript, transcript-language reuse with `en-US` fallback only
   when required, and session quota refresh from valid cleanup responses on
@@ -133,11 +143,10 @@ upcoming feature work:
   back to `/entries`
 - platform setup for Android and iOS
 
-Feature behavior such as network-preflight handling for Best mode, offline-mode
-routing, retry UX, quota presentation beyond the current session state,
-preferences persistence beyond the current basic flags and identifiers,
-settings UI, and richer entry-management UI still belongs to later user
-stories.
+Feature behavior such as network-preflight handling, richer retry UX, quota
+presentation beyond the current session state, preferences persistence beyond
+the current basic flags and identifiers, settings UI, and broader
+entry-management UI still belongs to later user stories.
 
 ## Important product themes
 
@@ -145,7 +154,7 @@ stories.
 - Cross-platform mobile support on Android and iOS
 - Privacy-aware handling of sensitive journal content
 - Secure local storage
-- Support for both backend-assisted and offline-oriented flows
+- Backend-assisted voice journaling with durable local retry
 
 ## Key planned technical capabilities
 
@@ -153,11 +162,11 @@ Planned future stories cover:
 
 - expanded preferences and settings
 - recording UI on top of the existing app-facing recording controller
-- Best-mode network preflight and offline-mode routing on top of the existing
+- network preflight and richer retry UX on top of the existing
   recording/transcription controller surface
 - retry UX on top of the existing transcription and cleanup use cases
 - entry detail and broader entry-management screens
-- privacy mode and offline behavior
+- additional privacy-oriented behavior if a future approved story introduces it
 
 ## Backend integration note
 

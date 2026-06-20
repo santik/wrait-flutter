@@ -6,6 +6,8 @@ typedef SetRecordQuotaCallback = void Function(RecordQuotaState quota);
 typedef RegistrationWarningLogger =
     void Function(String message, {Object? error, StackTrace? stackTrace});
 
+enum LaunchDeviceRegistrationResult { success, failure }
+
 class RegisterDeviceOnLaunchUseCase {
   RegisterDeviceOnLaunchUseCase({
     required this.registerDevice,
@@ -17,16 +19,18 @@ class RegisterDeviceOnLaunchUseCase {
   final SetRecordQuotaCallback setRecordQuota;
   final RegistrationWarningLogger logWarning;
 
-  Future<void> call() async {
+  Future<LaunchDeviceRegistrationResult> call() async {
     try {
       final result = await registerDevice();
       switch (result) {
         case RegistrationSuccess(quota: final quota?):
           setRecordQuota(quota);
+          return LaunchDeviceRegistrationResult.success;
         case RegistrationSuccess():
-          return;
+          return LaunchDeviceRegistrationResult.success;
         case RegistrationFailure(reason: final reason):
           logWarning('Device registration failed during app launch: $reason');
+          return LaunchDeviceRegistrationResult.failure;
       }
     } catch (error, stackTrace) {
       logWarning(
@@ -34,6 +38,7 @@ class RegisterDeviceOnLaunchUseCase {
         error: error,
         stackTrace: stackTrace,
       );
+      return LaunchDeviceRegistrationResult.failure;
     }
   }
 }

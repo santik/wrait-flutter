@@ -7,8 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/config/app_config.dart';
-import 'data/api/backend_providers.dart';
 import 'data/entries/entry_providers.dart';
+import 'data/launch/app_launch_providers.dart';
 import 'data/entries/local_entry_database.dart';
 import 'data/preferences/preferences_providers.dart';
 import 'presentation/theme/wrait_theme.dart';
@@ -307,5 +307,5 @@ ProviderContainer createAppContainer({
 }
 
 void startAppLaunchWork(ProviderContainer appContainer) {
-  unawaited(appContainer.read(registerDeviceOnLaunchUseCaseProvider).call());
+  unawaited(appContainer.read(appLaunchWorkUseCaseProvider).call());
 }

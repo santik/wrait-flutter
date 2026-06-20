@@ -41,8 +41,9 @@ void main() {
       );
       registerDevice = () async => RegistrationSuccess(quota: updatedQuota);
 
-      await useCase();
+      final result = await useCase();
 
+      expect(result, LaunchDeviceRegistrationResult.success);
       expect(currentQuota, updatedQuota);
       expect(logMessages, isEmpty);
     },
@@ -53,8 +54,9 @@ void main() {
     () async {
       registerDevice = () async => const RegistrationSuccess();
 
-      await useCase();
+      final result = await useCase();
 
+      expect(result, LaunchDeviceRegistrationResult.success);
       expect(currentQuota?.remaining, 4);
       expect(logMessages, isEmpty);
     },
@@ -66,8 +68,9 @@ void main() {
       registerDevice = () async =>
           const RegistrationFailure(RegistrationFailureReason.transient);
 
-      await useCase();
+      final result = await useCase();
 
+      expect(result, LaunchDeviceRegistrationResult.failure);
       expect(currentQuota?.remaining, 4);
       expect(logMessages, hasLength(1));
       expect(logMessages.single, contains('transient'));
@@ -80,8 +83,9 @@ void main() {
     () async {
       registerDevice = () async => throw StateError('boom');
 
-      await useCase();
+      final result = await useCase();
 
+      expect(result, LaunchDeviceRegistrationResult.failure);
       expect(currentQuota?.remaining, 4);
       expect(logMessages, hasLength(1));
       expect(logMessages.single, contains('crashed'));
