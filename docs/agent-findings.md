@@ -3,6 +3,56 @@
 This document captures implementation findings from completed stories that are
 worth keeping in mind during future feature work.
 
+## US-015: Draft Retry System
+
+### Launch sequencing contract
+
+- Launch-time draft retry must stay sequenced after successful device
+  registration.
+- `startAppLaunchWork(...)` remains fire-and-forget from the UI's perspective:
+  first paint and normal navigation must not wait for registration or retry to
+  finish.
+- Retry is launch-only. If launch registration fails and later recovers in the
+  same app session, draft retry still waits for a future app launch.
+
+### Draft retry behavior worth preserving
+
+- Pending drafts are retried newest-first from local entries where
+  `isDraft=true`.
+- Stale drafts older than seven days are deleted before pending drafts are
+  loaded for retry.
+- Each pending draft is handled independently so one retry failure does not
+  block later drafts in the same launch pass.
+- Audio drafts with blank, missing, unreadable, or empty retained files should
+  be deleted instead of retried indefinitely.
+- Audio transcription failure preserves the audio draft and retained file.
+- Audio transcription success followed by cleanup failure should preserve a
+  text draft at the same entry id and delete the no-longer-needed retained
+  audio file.
+- Retry success should remain silent in the foreground; finalized entries
+  simply appear through the existing list/detail/stats surfaces.
+
+### Retry implementation boundaries
+
+- `RegisterDeviceOnLaunchUseCase` owns launch registration result reporting and
+  session-quota propagation.
+- `AppLaunchWorkUseCase` owns launch-only sequencing of registration followed
+  by draft retry.
+- `RetryPendingDraftsUseCase` owns stale cleanup, pending-draft iteration,
+  malformed-audio deletion, transcription retry, and retained-audio cleanup.
+- `CleanupTranscriptUseCase` continues to own text-draft persistence, language
+  canonicalization, and final entry creation after usable cleanup success.
+
+### Validation guidance
+
+- Android emulator validation for this story succeeded on `emulator-5554`, but
+  the reliable bring-up path in this repo was the direct emulator binary:
+  `/Users/alexander/Library/Android/sdk/emulator/emulator -avd Pixel_8_emulator -no-snapshot-load`
+- If `flutter emulators --launch Pixel_8_emulator` does not surface a
+  connected device, launch the AVD directly, wait for
+  `adb -s emulator-5554 shell getprop sys.boot_completed` to return `1`, and
+  then run Flutter integration tests against `emulator-5554`.
+
 ## US-001: Flutter Project Foundation
 
 ### Established app foundation

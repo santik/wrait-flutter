@@ -11,9 +11,11 @@ import 'package:wrait/core/config/app_config.dart';
 import 'package:wrait/data/api/backend_client.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
+import 'package:wrait/data/launch/app_launch_providers.dart';
 import 'package:wrait/data/preferences/platform_device_id_provider.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/preferences/preferences_repository_impl.dart';
+import 'package:wrait/domain/usecase/app_launch_work_use_case.dart';
 import 'package:wrait/main.dart';
 import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 
@@ -26,6 +28,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final sharedPreferences = await SharedPreferences.getInstance();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var retryCallCount = 0;
 
       final requests = <_ObservedRequest>[];
       final requestSeen = Completer<void>();
@@ -61,6 +64,17 @@ void main() {
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('platform-device-id'),
           ),
+          appLaunchWorkUseCaseProvider.overrideWith(
+            (ref) => AppLaunchWorkUseCase(
+              registerDeviceOnLaunch: ref.watch(
+                registerDeviceOnLaunchUseCaseProvider,
+              ),
+              retryPendingDrafts: () async {
+                retryCallCount += 1;
+              },
+              logWarning: (_, {error, stackTrace}) {},
+            ),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -93,6 +107,7 @@ void main() {
       expect(quota?.remaining, 4);
       expect(storedDeviceId, matches(RegExp(r'^[0-9a-f]{64}$')));
       expect(requests.single.deviceId, storedDeviceId);
+      expect(retryCallCount, 1);
     },
   );
 
@@ -102,6 +117,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final sharedPreferences = await SharedPreferences.getInstance();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var retryCallCount = 0;
 
       final requests = <_ObservedRequest>[];
       var registerCount = 0;
@@ -130,6 +146,17 @@ void main() {
         overrides: [
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('first-platform-device'),
+          ),
+          appLaunchWorkUseCaseProvider.overrideWith(
+            (ref) => AppLaunchWorkUseCase(
+              registerDeviceOnLaunch: ref.watch(
+                registerDeviceOnLaunchUseCaseProvider,
+              ),
+              retryPendingDrafts: () async {
+                retryCallCount += 1;
+              },
+              logWarning: (_, {error, stackTrace}) {},
+            ),
           ),
         ],
       );
@@ -164,6 +191,17 @@ void main() {
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('second-platform-device'),
           ),
+          appLaunchWorkUseCaseProvider.overrideWith(
+            (ref) => AppLaunchWorkUseCase(
+              registerDeviceOnLaunch: ref.watch(
+                registerDeviceOnLaunchUseCaseProvider,
+              ),
+              retryPendingDrafts: () async {
+                retryCallCount += 1;
+              },
+              logWarning: (_, {error, stackTrace}) {},
+            ),
+          ),
         ],
       );
       addTearDown(secondContainer.dispose);
@@ -190,6 +228,7 @@ void main() {
         secondContainer.read(sessionRecordQuotaStateProvider)?.remaining,
         3,
       );
+      expect(retryCallCount, 2);
     },
   );
 
@@ -199,6 +238,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final sharedPreferences = await SharedPreferences.getInstance();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var retryCallCount = 0;
 
       final requests = <_ObservedRequest>[];
       final serverFuture = _serveBackend(
@@ -221,6 +261,17 @@ void main() {
         overrides: [
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('platform-device-id'),
+          ),
+          appLaunchWorkUseCaseProvider.overrideWith(
+            (ref) => AppLaunchWorkUseCase(
+              registerDeviceOnLaunch: ref.watch(
+                registerDeviceOnLaunchUseCaseProvider,
+              ),
+              retryPendingDrafts: () async {
+                retryCallCount += 1;
+              },
+              logWarning: (_, {error, stackTrace}) {},
+            ),
           ),
         ],
       );
@@ -250,6 +301,7 @@ void main() {
 
       expect(requests, hasLength(WraitBackendClient.maxRegisterAttempts));
       expect(container.read(sessionRecordQuotaStateProvider)?.remaining, 4);
+      expect(retryCallCount, 0);
     },
   );
 }
