@@ -81,6 +81,9 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - Prefer `./deploy_debug.sh` for real-device Android debug deployment when the
   story depends on backend registration, transcription, or proxy-authenticated
   traffic.
+- `./deploy_debug.sh` targets the debug/profile Flutter app identity
+  `com.wrait.flutter.dev`. Treat it as a separate install from the release app
+  identity `com.wrait.flutter`.
 - Set `PROXY_SECRET` before running `./deploy_debug.sh`. The deployed app must
   send the backend `X-Proxy-Secret` header from that runtime config value.
 - `./deploy_debug.sh` now uses two Android build artifacts on the validation
@@ -108,8 +111,8 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   behavior intact.
 - The deploy script maintains `android.permission.RECORD_AUDIO` during the
   deploy-time Flutter test session because `flutter test` can reinstall both
-  `com.wrait.flutter` and `com.wrait.flutter.test`, which would otherwise let
-  the system recording prompt reappear on a locked phone.
+  `com.wrait.flutter.dev` and `com.wrait.flutter.dev.test`, which would
+  otherwise let the system recording prompt reappear on a locked phone.
 - Keep the current deploy-script safety checks intact:
   - require exactly one connected physical Android phone and ignore emulators
   - reject missing or empty APK artifacts
@@ -118,8 +121,35 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
     final install
   - restore temporary automation and stay-awake settings on both success and
     failure paths
+  - verify `com.wrait.flutter.dev` exists after install
+  - verify `com.wrait.app` remains installed when it existed before deployment
+  - never uninstall `com.wrait.app`
+
+### Android release deployment guidance
+
+- Prefer `./deploy_release.sh` for physical-phone Android release deployment
+  when the story depends on the stable release signing identity or
+  update-compatible installs.
+- `./deploy_release.sh` targets the release Flutter app identity
+  `com.wrait.flutter` and should preserve any pre-existing
+  `com.wrait.flutter.dev` debug install.
+- Canonical private release config lives in `wrait-android/local.properties`.
+- `./deploy_release.sh` synchronizes only non-secret release keys into the
+  ignored Flutter-local `android/local.properties`.
+- Provide transient signing-password env vars before the release build:
+  - `WRAIT_RELEASE_KEYSTORE_PASSWORD`
+  - `WRAIT_RELEASE_KEY_PASSWORD`
+- `./deploy_release.sh` validates the configured keystore with `keytool`
+  before building and should fail before install if signing inputs are missing
+  or invalid.
+- Keep the release deploy-script safety checks intact:
+  - require exactly one connected physical Android phone and ignore emulators
+  - reject missing or empty APK artifacts
+  - avoid silently reinstalling stale build output
   - verify `com.wrait.flutter` exists after install
   - verify `com.wrait.app` remains installed when it existed before deployment
+  - verify `com.wrait.flutter.dev` remains installed when it existed before
+    deployment
   - never uninstall `com.wrait.app`
 
 ### Testing guidance
@@ -149,10 +179,16 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 
 ### Android identity note
 
-- The current Flutter Android application/package ID is `com.wrait.flutter`.
+- The release/update Flutter Android application/package ID is
+  `com.wrait.flutter`.
+- The debug/profile Flutter Android application/package ID is
+  `com.wrait.flutter.dev`.
 - Older notes or external materials may still mention `com.wrait.app`; verify
   the actual installed target before debugging, uninstalling, or scraping
   device logs.
+- Production backend connectivity on Android depends on keeping
+  `android.permission.INTERNET` in `android/app/src/main/AndroidManifest.xml`,
+  not only in debug/profile manifests.
 
 ## Backend API generation guidance
 

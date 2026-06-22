@@ -1,7 +1,7 @@
 # Feature Specification: Release-Signed Android Deploy Flow
 
 > **Feature number:** 031
-> **Status:** Draft
+> **Status:** In Progress
 > **Author:** Codex
 > **Date:** 2026-06-22
 > **Work item:** US-031
@@ -11,6 +11,13 @@
 | Date | Status | Author | Notes |
 | --- | --- | --- | --- |
 | 2026-06-22 | Draft | Codex | Initial spec created from the request for a release deployment flow that uses a stable real signing identity |
+| 2026-06-22 | Draft | Codex | Incorporated requested Android identity split and debug-flow preservation constraint |
+| 2026-06-22 | Draft | Codex | Clarified signing source, device targeting, release-flow scope, and runtime configuration discovery |
+| 2026-06-22 | Draft | Codex | Added requirement to copy private release-signing settings into the Flutter app's private Android configuration location |
+| 2026-06-22 | Approved | User | Approved finalized spec and authorized planning |
+| 2026-06-22 | In Progress | Codex | Implemented code and automated validation; physical-phone verification and external review still pending |
+| 2026-06-22 | In Progress | Codex | Completed physical-phone validation; external review still pending |
+| 2026-06-22 | In Progress | Codex | Applied approved review fixes for transient signing-secret handling, keystore preflight, atomic config sync, and release connectivity documentation |
 
 ---
 
@@ -35,6 +42,26 @@ Android app identity that real update validation depends on, so that routine
 debug installs and integration-test deploys do not overwrite or reset the app
 state being validated through the release path.
 
+The real release/update-validation Android app identity is
+`com.wrait.flutter`. The debug-only Android app identity is
+`com.wrait.flutter.dev`. Existing debug deployment behavior should remain the
+same from an operator perspective except where identity separation is necessary
+to protect the release/update app state.
+
+The release deployment flow should use the project's existing private Android
+deployment configuration as the canonical source for release-signing inputs.
+That private configuration is not tracked source material and must remain
+outside versioned code. The Flutter Android project should receive those
+release-signing settings in the private app-local configuration location that
+its build uses for signing, without committing or logging secret values.
+Non-secret signing settings may be synchronized into that private app-local
+configuration, while secret passwords may be supplied only for the active
+deployment/build process. The
+release deployment flow should target the same kind of connected physical
+Android phone used by the existing debug deployment flow. It should focus on
+producing and installing the real release-signed app package; integration tests
+are not part of the release deployment flow itself.
+
 > **Reminder:** This spec must be **purely functional and technology-agnostic**.
 > Describe the problem and requirements, not the solution. Technology choices
 > belong in `plan.md`.
@@ -48,8 +75,8 @@ state being validated through the release path.
   to use the stable real app signing identity so that in-place updates behave
   like real user installs.
 - As a developer using the debug deployment flow, I want debug installs to use
-  a separate Android app identity so that debug deployment does not overwrite
-  the locally stored state of the real update-validation install.
+  the `com.wrait.flutter.dev` Android app identity so that debug deployment does
+  not overwrite the locally stored state of the real update-validation install.
 - As a developer or operator, I want signing prerequisites to fail with clear
   guidance so that missing or incorrect release-signing setup does not produce
   confusing deployment failures.
@@ -65,17 +92,34 @@ state being validated through the release path.
 - [ ] The deployment flow installs the Flutter Android app using the stable real
       app signing identity rather than a debug-only signing identity.
 - [ ] The Android release deployment flow targets the existing real Flutter app
-      identity used for update-compatible installs.
+      identity used for update-compatible installs: `com.wrait.flutter`.
 - [ ] The Android debug deployment flow targets a separate debug-only app
-      identity rather than the real release/update app identity.
+      identity, `com.wrait.flutter.dev`, rather than the real release/update app
+      identity.
+- [ ] Existing debug deployment behavior remains functionally unchanged except
+      for the minimum changes required to target the debug-only app identity and
+      preserve release/update app state.
 - [ ] The deployed app remains update-compatible with prior installs that use
       the same app identity and same stable signing identity.
 - [ ] A debug deployment does not overwrite, replace, or clear the locally
       stored state of an installed release/update app that uses the real app
       identity.
+- [ ] The release deployment flow targets the same single connected physical
+      Android phone class as the existing debug deployment flow.
+- [ ] The release deployment flow produces and installs the release-signed app
+      package only; it does not run integration tests as part of the release
+      deployment flow.
 - [ ] If the required release-signing inputs are missing, blank, unreadable, or
       invalid, the deployment flow stops before installation and reports a
       simple actionable error.
+- [ ] The Flutter Android project consumes the release-signing settings from an
+      app-local private configuration location populated from the canonical
+      private Android deployment configuration.
+- [ ] Secret signing passwords are not persisted into the Flutter app-local
+      private configuration file beyond the active deployment/build process.
+- [ ] If required runtime configuration inputs cannot be determined from the
+      existing private Android deployment configuration, the deployment flow
+      stops before installation and reports a simple actionable error.
 - [ ] The release deployment flow does not require committing signing secrets,
       passwords, or private key material into tracked project files.
 - [ ] The deployment flow does not uninstall or remove the older native Android
@@ -107,9 +151,13 @@ deployment concern rather than a diary data-model change.
 - [ ] Existing Flutter Android application identity and build configuration
 - [ ] Existing Android debug deployment workflow and package-identity checks
 - [ ] Existing Android real-device deployment workflow expectations
-- [ ] Existing local/private release-signing material and associated secrets
-- [ ] Existing proxy-authenticated runtime configuration needed for backend
-      access during deployed app use
+- [ ] Existing local/private Android deployment configuration that stores
+      release-signing material references and associated secrets outside tracked
+      source
+- [ ] Flutter Android app-local private configuration location used by the build
+      to consume release-signing settings
+- [ ] Existing runtime configuration needed for backend access during deployed
+      app use
 
 ## UX / design references
 
@@ -128,10 +176,14 @@ workflow feature.
 - **Isolation:** Debug and release deployment flows must not contend for the
   same installed Android app identity when that would risk overwriting local
   state needed for update validation.
+- **Compatibility:** The existing debug deployment flow should retain its
+  current operator-facing behavior with minimal changes, apart from the required
+  move to the debug-only Android app identity.
 - **Scalability:** The flow should support repeated local deployments and
   future update-validation runs without requiring ad hoc manual reconfiguration.
 - **Observability:** Validation evidence should show the build/deploy path used,
-  the target Android app identity, and whether the install succeeded.
+  the target Android app identity, the device targeting path, and whether the
+  install succeeded.
 
 ## Out of scope
 
@@ -147,14 +199,25 @@ workflow feature.
 
 ## Open questions
 
-- [ ] What signing material source should be treated as canonical for this
-      project's real Android signing identity?
-- [ ] Should the release deployment flow keep the same physical-phone-only
-      targeting rules as `deploy_debug.sh`, or may it also support emulators?
-- [ ] Should the release deployment flow run integration tests before final
-      install, or should it focus only on producing and installing the
-      production-identity artifact?
-- [ ] What runtime configuration inputs, if any, must remain mandatory for the
-      deployed release-signed app to function in the current environment?
-- [ ] What exact debug-only Android app identity should replace the current
-      shared debug/release identity for `deploy_debug.sh`?
+None.
+
+## Clarification notes
+
+- Canonical release-signing inputs come from the existing private Android
+  deployment configuration under `wrait-android/local.properties`; tracked
+  project files must not contain signing secrets or private key material.
+- The release-signing settings should be copied or synchronized into the Flutter
+  Android app's private build configuration location during implementation, not
+  into tracked source files. Secret passwords may remain transient inputs
+  rather than persisted file values in that target location.
+- Release deployment should use the same connected physical-phone targeting
+  model as the existing debug deployment flow.
+- Release deployment should only build and install the release-signed artifact;
+  integration tests are outside the release deployment flow.
+- Runtime configuration inputs are not separately known at the specification
+  level. Planning and implementation should discover the required values from
+  existing private deployment configuration and fail clearly before installation
+  when required values are unavailable.
+- Release deployment must preserve backend connectivity for the production app
+  identity, including any Android manifest permissions needed for production
+  backend calls.

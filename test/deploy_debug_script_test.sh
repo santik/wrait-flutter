@@ -128,13 +128,13 @@ case "${1:-}" in
           fi
           printf 'package:/data/app/com.wrait.app/base.apk\n'
           ;;
-        com.wrait.flutter)
+        com.wrait.flutter.dev)
           [[ -f "$install_marker" || -f "$test_install_marker" ]] || exit 1
-          printf 'package:/data/app/com.wrait.flutter/base.apk\n'
+          printf 'package:/data/app/com.wrait.flutter.dev/base.apk\n'
           ;;
-        com.wrait.flutter.test)
+        com.wrait.flutter.dev.test)
           [[ -f "$test_install_marker" ]] || exit 1
-          printf 'package:/data/app/com.wrait.flutter.test/base.apk\n'
+          printf 'package:/data/app/com.wrait.flutter.dev.test/base.apk\n'
           ;;
         *)
           exit 1
@@ -148,10 +148,10 @@ case "${1:-}" in
       install_marker="$DEPLOY_TEST_STATE_DIR/install-complete"
       test_install_marker="$DEPLOY_TEST_STATE_DIR/test-install-complete"
       case "$package_name" in
-        com.wrait.flutter)
+        com.wrait.flutter.dev)
           [[ -f "$install_marker" || -f "$test_install_marker" ]] || exit 1
           ;;
-        com.wrait.flutter.test)
+        com.wrait.flutter.dev.test)
           [[ -f "$test_install_marker" ]] || exit 1
           ;;
         *)
@@ -166,7 +166,7 @@ case "${1:-}" in
       package_name="${6:-}"
       app_op_name="${7:-}"
       app_op_state="${8:-}"
-      [[ "$package_name" == "com.wrait.flutter" || "$package_name" == "com.wrait.flutter.test" ]] || exit 1
+      [[ "$package_name" == "com.wrait.flutter.dev" || "$package_name" == "com.wrait.flutter.dev.test" ]] || exit 1
       [[ "$app_op_name" == "RECORD_AUDIO" ]] || exit 1
       [[ "$app_op_state" == "allow" ]] || exit 1
       touch "$DEPLOY_TEST_STATE_DIR/${package_name##*.}-record-audio-appops-allow"
@@ -193,7 +193,7 @@ ResumedActivity: ActivityRecord{123 u0 com.example.other/.OtherActivity t1}
 EOT
       else
         cat <<'EOT'
-ResumedActivity: ActivityRecord{123 u0 com.wrait.flutter/.MainActivity t1}
+ResumedActivity: ActivityRecord{123 u0 com.wrait.flutter.dev/com.wrait.flutter.MainActivity t1}
 EOT
       fi
       exit 0
@@ -205,7 +205,7 @@ mCurrentFocus=Window{123 u0 com.example.other/.OtherActivity}
 EOT
       else
         cat <<'EOT'
-mCurrentFocus=Window{123 u0 com.wrait.flutter/com.wrait.flutter.MainActivity}
+mCurrentFocus=Window{123 u0 com.wrait.flutter.dev/com.wrait.flutter.MainActivity}
 EOT
       fi
       exit 0
@@ -213,20 +213,20 @@ EOT
     if [[ "${3:-}" == "shell" && "${4:-}" == "am" && "${5:-}" == "start" && "${6:-}" == "-W" ]]; then
       if [[ "${DEPLOY_TEST_SCENARIO:-}" == "launch_timeout" ]]; then
         cat <<'EOT'
-Starting: Intent { cmp=com.wrait.flutter/.MainActivity }
+Starting: Intent { cmp=com.wrait.flutter.dev/com.wrait.flutter.MainActivity }
 Warning: Activity not started, its current task has been brought to the front
 Status: timeout
 LaunchState: UNKNOWN (-1)
-Activity: com.wrait.flutter/.MainActivity
+Activity: com.wrait.flutter.dev/com.wrait.flutter.MainActivity
 WaitTime: 10034
 Complete
 EOT
       else
         cat <<'EOT'
-Starting: Intent { cmp=com.wrait.flutter/.MainActivity }
+Starting: Intent { cmp=com.wrait.flutter.dev/com.wrait.flutter.MainActivity }
 Status: ok
 LaunchState: UNKNOWN (0)
-Activity: com.wrait.flutter/.MainActivity
+Activity: com.wrait.flutter.dev/com.wrait.flutter.MainActivity
 WaitTime: 3026
 Complete
 EOT
@@ -452,15 +452,15 @@ assert_not_contains "$TMP_DIR/offline_phone.log" "install"
 run_script_expect_failure test_failure
 assert_contains "$TMP_DIR/test_failure.log" "flutter build apk --debug"
 assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell svc power stayon usb"
-assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 1"
+assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 1"
 assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell input keyevent KEYCODE_WAKEUP"
-assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell pm grant com.wrait.flutter android.permission.RECORD_AUDIO"
-assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell appops set com.wrait.flutter RECORD_AUDIO allow"
-assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.test android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell appops set com.wrait.flutter.dev RECORD_AUDIO allow"
+assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev.test android.permission.RECORD_AUDIO"
 assert_contains "$TMP_DIR/test_failure.log" "flutter test --no-pub -d PHONE123 integration_test"
-assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 0"
+assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 0"
 assert_contains "$TMP_DIR/test_failure.log" "adb -s PHONE123 shell svc power stayon false"
-assert_file_contents "$TMP_DIR/test_failure/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "0"
+assert_file_contents "$TMP_DIR/test_failure/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "0"
 assert_file_contents "$TMP_DIR/test_failure/state/stay-awake-mode" "false"
 assert_not_contains "$TMP_DIR/test_failure.log" "install"
 
@@ -475,22 +475,22 @@ assert_not_contains "$TMP_DIR/zero_size_apk.log" "install"
 run_script_expect_failure wake_failure
 assert_contains "$TMP_DIR/wake_failure.out" "failed to wake Android phone PHONE123 for Flutter integration tests"
 assert_contains "$TMP_DIR/wake_failure.log" "adb -s PHONE123 shell input keyevent KEYCODE_WAKEUP"
-assert_file_contents "$TMP_DIR/wake_failure/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "0"
+assert_file_contents "$TMP_DIR/wake_failure/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "0"
 assert_file_contents "$TMP_DIR/wake_failure/state/stay-awake-mode" "false"
 assert_not_contains "$TMP_DIR/wake_failure.log" "flutter test --no-pub -d PHONE123 integration_test"
 assert_not_contains "$TMP_DIR/wake_failure.log" "install"
 
 run_script_expect_failure disconnect_before_install
 assert_contains "$TMP_DIR/disconnect_before_install.out" "Android phone PHONE123 is no longer connected and ready"
-assert_file_contents "$TMP_DIR/disconnect_before_install/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "0"
+assert_file_contents "$TMP_DIR/disconnect_before_install/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "0"
 assert_file_contents "$TMP_DIR/disconnect_before_install/state/stay-awake-mode" "false"
 assert_not_contains "$TMP_DIR/disconnect_before_install.log" "adb -s PHONE123 install -r"
 
 run_script_expect_failure launch_timeout
-assert_contains "$TMP_DIR/launch_timeout.out" "com.wrait.flutter launch timed out after install and foreground verification failed"
-assert_contains "$TMP_DIR/launch_timeout.log" "adb -s PHONE123 shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity"
+assert_contains "$TMP_DIR/launch_timeout.out" "com.wrait.flutter.dev launch timed out after install and foreground verification failed"
+assert_contains "$TMP_DIR/launch_timeout.log" "adb -s PHONE123 shell am start -W -n com.wrait.flutter.dev/com.wrait.flutter.MainActivity"
 assert_contains "$TMP_DIR/launch_timeout.log" "adb -s PHONE123 shell dumpsys activity activities"
-assert_file_contents "$TMP_DIR/launch_timeout/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "0"
+assert_file_contents "$TMP_DIR/launch_timeout/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "0"
 assert_file_contents "$TMP_DIR/launch_timeout/state/stay-awake-mode" "false"
 
 run_script_expect_failure native_removed_after_install
@@ -501,60 +501,60 @@ assert_contains "$TMP_DIR/native_removed_after_install.log" "adb -s PHONE123 ins
 
 run_script_expect_success native_absent
 assert_contains "$TMP_DIR/native_absent.out" "Native Wrait app (com.wrait.app) was not installed before deployment."
-assert_contains "$TMP_DIR/native_absent.out" "Installed and launched com.wrait.flutter on PHONE123."
+assert_contains "$TMP_DIR/native_absent.out" "Installed and launched com.wrait.flutter.dev on PHONE123."
 
 run_script_expect_success keyguard_dismiss_refused
 assert_contains "$TMP_DIR/keyguard_dismiss_refused.out" "refused non-interactive keyguard dismissal for Flutter integration tests"
 assert_contains "$TMP_DIR/keyguard_dismiss_refused.out" "refused non-interactive keyguard dismissal for final installed app launch"
-assert_contains "$TMP_DIR/keyguard_dismiss_refused.log" "adb -s PHONE123 shell pm grant com.wrait.flutter android.permission.RECORD_AUDIO"
-assert_contains "$TMP_DIR/keyguard_dismiss_refused.out" "Installed and launched com.wrait.flutter on PHONE123."
+assert_contains "$TMP_DIR/keyguard_dismiss_refused.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/keyguard_dismiss_refused.out" "Installed and launched com.wrait.flutter.dev on PHONE123."
 
 run_script_expect_success locked_phone
 assert_contains "$TMP_DIR/locked_phone.out" "Preparing Android phone PHONE123 for Flutter integration tests..."
 assert_contains "$TMP_DIR/locked_phone.out" "Preparing Android phone PHONE123 for final installed app launch..."
-assert_contains "$TMP_DIR/locked_phone.out" "Granted android.permission.RECORD_AUDIO to com.wrait.flutter for automated tests."
+assert_contains "$TMP_DIR/locked_phone.out" "Granted android.permission.RECORD_AUDIO to com.wrait.flutter.dev for automated tests."
 assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell svc power stayon usb"
-assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 1"
+assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 1"
 assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell input keyevent KEYCODE_WAKEUP"
 assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell wm dismiss-keyguard"
-assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter android.permission.RECORD_AUDIO"
-assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell appops set com.wrait.flutter RECORD_AUDIO allow"
-assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.test android.permission.RECORD_AUDIO"
-assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 0"
+assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell appops set com.wrait.flutter.dev RECORD_AUDIO allow"
+assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev.test android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 0"
 assert_contains "$TMP_DIR/locked_phone.log" "adb -s PHONE123 shell svc power stayon false"
-assert_file_contents "$TMP_DIR/locked_phone/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "0"
+assert_file_contents "$TMP_DIR/locked_phone/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "0"
 assert_file_contents "$TMP_DIR/locked_phone/state/stay-awake-mode" "false"
-assert_contains "$TMP_DIR/locked_phone.out" "Installed and launched com.wrait.flutter on PHONE123."
+assert_contains "$TMP_DIR/locked_phone.out" "Installed and launched com.wrait.flutter.dev on PHONE123."
 
 run_script_expect_success one_phone
 assert_contains "$TMP_DIR/one_phone.log" "flutter build apk --debug --dart-define=PROXY_SECRET=test-proxy-secret"
 assert_contains "$TMP_DIR/one_phone.log" "flutter build apk --profile --dart-define=PROXY_SECRET=test-proxy-secret"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell svc power stayon usb"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 1"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 1"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell input keyevent KEYCODE_WAKEUP"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell wm dismiss-keyguard"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter android.permission.RECORD_AUDIO"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell appops set com.wrait.flutter RECORD_AUDIO allow"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.test android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev android.permission.RECORD_AUDIO"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell appops set com.wrait.flutter.dev RECORD_AUDIO allow"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm grant com.wrait.flutter.dev.test android.permission.RECORD_AUDIO"
 assert_contains "$TMP_DIR/one_phone.log" "flutter test --no-pub -d PHONE123 integration_test"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell am force-stop com.wrait.flutter"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell am force-stop com.wrait.flutter.dev"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm path com.wrait.app"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 get-state"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 install -r $TMP_DIR/one_phone/app-profile.apk"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm path com.wrait.flutter"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity"
-assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 0"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm path com.wrait.flutter.dev"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell am start -W -n com.wrait.flutter.dev/com.wrait.flutter.MainActivity"
+assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 0"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell svc power stayon false"
-assert_file_contents "$TMP_DIR/one_phone/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "0"
+assert_file_contents "$TMP_DIR/one_phone/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "0"
 assert_file_contents "$TMP_DIR/one_phone/state/stay-awake-mode" "false"
 assert_contains "$TMP_DIR/one_phone.out" "Detected existing native Wrait app (com.wrait.app); it will be left installed."
 assert_contains "$TMP_DIR/one_phone.out" "Verified com.wrait.app remains installed."
-assert_contains "$TMP_DIR/one_phone.out" "Installed and launched com.wrait.flutter on PHONE123."
+assert_contains "$TMP_DIR/one_phone.out" "Installed and launched com.wrait.flutter.dev on PHONE123."
 
 run_script_expect_success one_phone_custom_state 7 9
-assert_contains "$TMP_DIR/one_phone_custom_state.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.debug.automation_lockscreen_mode 9"
+assert_contains "$TMP_DIR/one_phone_custom_state.log" "adb -s PHONE123 shell settings put global com.wrait.flutter.dev.automation_lockscreen_mode 9"
 assert_contains "$TMP_DIR/one_phone_custom_state.log" "adb -s PHONE123 shell settings put global stay_on_while_plugged_in 7"
-assert_file_contents "$TMP_DIR/one_phone_custom_state/state/global-com.wrait.flutter.debug.automation_lockscreen_mode" "9"
+assert_file_contents "$TMP_DIR/one_phone_custom_state/state/global-com.wrait.flutter.dev.automation_lockscreen_mode" "9"
 assert_file_contents "$TMP_DIR/one_phone_custom_state/state/global-stay_on_while_plugged_in" "7"
 
 printf 'deploy_debug_script_test.sh: all tests passed\n'
