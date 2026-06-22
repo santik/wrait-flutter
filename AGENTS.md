@@ -129,6 +129,20 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   lookups wherever practical.
 - Reuse existing bootstrap and recording-controller tests before adding new
   startup-specific harnesses.
+- For local-data lifecycle work, treat same-identity update validation and
+  uninstall/fresh-state validation as separate flows:
+  - normal Android and iOS app updates should preserve the encrypted database
+    plus linked app-private files
+  - uninstall/reinstall should start from fresh local state
+  - Android `pm clear` should start from fresh local state
+- `./deploy_debug.sh` is not a reliable validator for same-identity
+  update-preservation behavior on `com.wrait.flutter` because its
+  `flutter test` phase can reinstall or reset app state on-device.
+- When a story depends on verifying update-versus-uninstall persistence,
+  prefer explicit install/update flows or `flutter drive --keep-app-running`
+  instead of `flutter test -d ... integration_test/...`.
+- Keep destructive database cleanup explicit. Do not reintroduce automatic
+  database-artifact deletion on open failure.
 - For Android startup or rendering work, verify a launcher-style cold start
   with `adb shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity`
   in addition to ordinary `flutter run` checks.

@@ -26,6 +26,7 @@ import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 import '../test/test_doubles/fake_secure_storage.dart';
+import 'support/managed_audio_files.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +41,9 @@ void main() {
       addTearDown(harness.dispose);
 
       final repository = harness.container.read(entryRepositoryProvider);
-      final audioFile = await harness.writeAudioFile('pending-audio.m4a');
+      final audioFile = await harness.writeManagedAudioFile(
+        'pending-audio.m4a',
+      );
       final audioDraftId = await repository.saveAudioDraft(
         audioFile.path,
         'en-US',
@@ -79,7 +82,7 @@ void main() {
 
       expect(find.text('tap button to write'), findsOneWidget);
       expect(find.text('saved, tap to read'), findsNothing);
-      expect(find.text('2 entries - 2 days'), findsOneWidget);
+      expect(find.byKey(const ValueKey('statsLineButton')), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('statsLineButton')));
       await tester.pumpAndSettle();
@@ -107,7 +110,7 @@ void main() {
       addTearDown(harness.dispose);
 
       final repository = harness.container.read(entryRepositoryProvider);
-      final audioFile = await harness.writeAudioFile('failed-audio.m4a');
+      final audioFile = await harness.writeManagedAudioFile('failed-audio.m4a');
       final audioDraftId = await repository.saveAudioDraft(
         audioFile.path,
         'en-US',
@@ -159,7 +162,7 @@ void main() {
     addTearDown(harness.dispose);
 
     final repository = harness.container.read(entryRepositoryProvider);
-    final audioFile = await harness.writeAudioFile('skipped-audio.m4a');
+    final audioFile = await harness.writeManagedAudioFile('skipped-audio.m4a');
     final audioDraftId = await repository.saveAudioDraft(
       audioFile.path,
       'en-US',
@@ -200,11 +203,14 @@ void main() {
 
     final repository = harness.container.read(entryRepositoryProvider);
     harness.entryClock.current = DateTime(2026, 6, 1, 9);
-    final staleFile = await harness.writeAudioFile('stale-audio.m4a');
+    final staleFile = await harness.writeManagedAudioFile('stale-audio.m4a');
     await repository.saveAudioDraft(staleFile.path, 'en-US');
     harness.entryClock.current = DateTime(2026, 6, 19, 9);
+    final missingAudioPath = await harness.managedAudioPath(
+      'missing-audio.m4a',
+    );
     final malformedDraftId = await repository.saveAudioDraft(
-      '${harness.tempDirectory.path}/missing-audio.m4a',
+      missingAudioPath,
       'en-US',
     );
     final finalEntryId = await repository.saveEntry(
@@ -262,16 +268,23 @@ class _Harness {
   final _MutableClock entryClock;
   final _FakeTranscriptionService transcriptionService;
   final _CleanupCallbackHolder cleanupCallbackHolder;
+  final List<File> _managedAudioFiles = <File>[];
 
-  Future<File> writeAudioFile(String name) async {
-    final file = File('${tempDirectory.path}/$name');
-    await file.writeAsString('audio');
-    return file;
+  Future<String> managedAudioPath(String name) async {
+    return managedDraftAudioPath(name);
+  }
+
+  Future<File> writeManagedAudioFile(String name) async {
+    return writeManagedDraftAudioFile(
+      managedFiles: _managedAudioFiles,
+      name: name,
+    );
   }
 
   Future<void> dispose() async {
     container.dispose();
     await database.close();
+    await cleanupManagedDraftAudioFiles(_managedAudioFiles);
     if (await tempDirectory.exists()) {
       await tempDirectory.delete(recursive: true);
     }

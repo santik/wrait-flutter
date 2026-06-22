@@ -3,6 +3,22 @@
 This document captures implementation findings from completed stories that are
 worth keeping in mind during future feature work.
 
+## US-032: iOS Draft Audio Update Path Stability
+
+### Shared retained-audio path contract
+
+- Retryable draft audio paths should be stored the same way on iOS and Android:
+  `app-cache://<relative-path>` under the current app temporary directory.
+- Do not persist absolute app-cache paths for retryable draft audio. iOS app
+  container paths can change across update or reinstall-style simulator flows
+  even when logical app data remains continuous.
+- Do not reintroduce basename fallback or legacy absolute-path recovery for
+  retained draft audio. If a stored reference cannot be resolved safely, it
+  should fail explicitly rather than binding a draft to the wrong file.
+- When integration tests seed retryable audio drafts through the production
+  repository/provider graph, create real files in the app temporary directory
+  so tests exercise the same retained-audio contract as production code.
+
 ## US-015: Draft Retry System
 
 ### Launch sequencing contract
@@ -469,6 +485,44 @@ US-002 was validated successfully with both automated and manual checks:
 - Native validation that has already succeeded:
   - Android debug build: `flutter build apk --debug`
   - iOS simulator debug build: `flutter build ios --simulator --debug --no-codesign`
+
+## US-030: Update Preserves Local Data
+
+### Data lifecycle contract
+
+- Same-identity app updates on Android and iOS should preserve the encrypted
+  database and linked app-private retained files.
+- Uninstall/reinstall should remove app-private local state and reopen as a
+  fresh install.
+- Android `pm clear` should remove app-private local state and reopen as a
+  fresh install.
+- Android backup/restore is intentionally disabled for this local-data
+  lifecycle so uninstall stays aligned with a true fresh start.
+
+### Database failure handling worth preserving
+
+- `LocalEntryDatabase.open()` should fail closed on corruption or open errors
+  and leave database artifacts untouched.
+- `deleteDatabaseArtifacts()` is destructive and should stay reserved for
+  explicit reset flows only, not automatic recovery during bootstrap.
+- Preserve the existing startup UX contract: database-open failures should
+  surface through the bootstrap retry/error shell instead of silently wiping
+  persisted data.
+
+### Validation guidance
+
+- `flutter test -d ... integration_test/...` is not a trustworthy harness for
+  same-identity update-preservation checks because it can reinstall the app
+  container and reset local state as part of the test flow.
+- `flutter drive --keep-app-running` is the validated harness for seed/update
+  verification when persistence across installs matters.
+- Recent cross-platform validation succeeded for:
+  - Android same-package update preserving local state
+  - iOS same-bundle update preserving local state
+  - uninstall/reinstall reopening with fresh local state
+  - Android `pm clear` reopening with fresh local state
+- Absolute iOS cache-path portability for retained draft audio remains a
+  separate follow-up tracked in US-032 rather than a solved part of US-030.
 
 ## US-028: Device Registration Launch Hardening
 
