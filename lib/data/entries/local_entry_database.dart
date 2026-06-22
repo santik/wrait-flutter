@@ -69,35 +69,15 @@ class LocalEntryDatabase extends _$LocalEntryDatabase {
       );
       return database;
     } catch (error, stackTrace) {
-      if (!existedBefore) {
-        developer.log(
-          'Encrypted database open failed after ${openStopwatch.elapsedMilliseconds}ms.',
-          name: 'LocalEntryDatabase',
-          error: error,
-          stackTrace: stackTrace,
-        );
-        rethrow;
-      }
-
       developer.log(
-        'Encrypted database open failed after ${openStopwatch.elapsedMilliseconds}ms; deleting artifacts and retrying.',
+        existedBefore
+            ? 'Encrypted database open failed after ${openStopwatch.elapsedMilliseconds}ms; existing artifacts preserved.'
+            : 'Encrypted database open failed after ${openStopwatch.elapsedMilliseconds}ms.',
         name: 'LocalEntryDatabase',
         error: error,
         stackTrace: stackTrace,
       );
-      await deleteDatabaseArtifacts(dbFile);
-      final recoveryStopwatch = Stopwatch()..start();
-      final database = await _openVerified(
-        dbFile,
-        key,
-        logStatements: logStatements,
-        verifyCipherSupport: verifyCipherSupport,
-      );
-      developer.log(
-        'Encrypted database reopened after recovery in ${recoveryStopwatch.elapsedMilliseconds}ms.',
-        name: 'LocalEntryDatabase',
-      );
-      return database;
+      rethrow;
     }
   }
 
@@ -106,6 +86,8 @@ class LocalEntryDatabase extends _$LocalEntryDatabase {
     return File(path.join(directory.path, databaseFileName));
   }
 
+  // Destructive utility for explicit reset flows only. Do not call this from
+  // automatic open-failure handling.
   static Future<void> deleteDatabaseArtifacts(File databaseFile) async {
     final candidates = <String>[
       databaseFile.path,

@@ -6,30 +6,54 @@ import '../../core/time/system_clock.dart';
 import '../../domain/model/entry.dart';
 import '../../domain/model/supported_language.dart';
 import '../../domain/repository/entry_repository.dart';
-import 'entry_mapper.dart';
+import 'draft_audio_path_codec.dart';
 import 'local_entry_database.dart';
 
+typedef StoreDraftAudioPathCallback = Future<String> Function(String audioPath);
+typedef ResolveDraftAudioPathCallback =
+    Future<String> Function(String storedAudioPath);
+
 class EntryRepositoryImpl implements EntryRepository {
-  EntryRepositoryImpl({required this.entryDao, required this.clock});
+  EntryRepositoryImpl({
+    required this.entryDao,
+    required this.clock,
+    StoreDraftAudioPathCallback? storeDraftAudioPath,
+    ResolveDraftAudioPathCallback? resolveDraftAudioPath,
+  }) : _storeDraftAudioPath = storeDraftAudioPath ?? DraftAudioPathCodec.store,
+       _resolveDraftAudioPath =
+           resolveDraftAudioPath ?? DraftAudioPathCodec.resolve;
 
   final EntryDao entryDao;
   final Clock clock;
+  final StoreDraftAudioPathCallback _storeDraftAudioPath;
+  final ResolveDraftAudioPathCallback _resolveDraftAudioPath;
 
   @override
   Stream<List<Entry>> watchAllEntries() {
-    return entryDao.watchAllEntries().map(
-      (rows) => rows.map((row) => row.toDomain()).toList(growable: false),
+    return entryDao.watchAllEntries().asyncMap(
+      (rows) => Future.wait(rows.map(_mapEntryRecord), eagerError: true),
     );
   }
 
   @override
   Stream<Entry?> watchEntryById(int id) {
-    return entryDao.watchEntryById(id).map((row) => row?.toDomain());
+    return entryDao.watchEntryById(id).asyncMap((row) async {
+      if (row == null) {
+        return null;
+      }
+
+      return _mapEntryRecord(row);
+    });
   }
 
   @override
   Future<Entry?> getEntryById(int id) async {
-    return (await entryDao.getEntryById(id))?.toDomain();
+    final row = await entryDao.getEntryById(id);
+    if (row == null) {
+      return null;
+    }
+
+    return _mapEntryRecord(row);
   }
 
   @override
@@ -68,14 +92,24 @@ class EntryRepositoryImpl implements EntryRepository {
       throw ArgumentError.value(audioPath, 'audioPath', 'must not be empty');
     }
     final canonicalLanguage = _requireSupportedLanguage(language);
+    return _saveAudioDraft(
+      audioPath: audioPath,
+      canonicalLanguage: canonicalLanguage,
+    );
+  }
 
+  Future<int> _saveAudioDraft({
+    required String audioPath,
+    required String canonicalLanguage,
+  }) async {
+    final storedAudioPath = await _storeDraftAudioPath(audioPath);
     return entryDao.insertEntry(
       EntryRecordsCompanion.insert(
         rawTranscript: '',
         isDraft: true,
         language: canonicalLanguage,
         createdAt: clock.now(),
-        audioPath: Value(audioPath),
+        audioPath: Value(storedAudioPath),
       ),
     );
   }
@@ -164,7 +198,7 @@ class EntryRepositoryImpl implements EntryRepository {
   @override
   Future<List<Entry>> getPendingDrafts() async {
     final drafts = await entryDao.getPendingDrafts();
-    return drafts.map((draft) => draft.toDomain()).toList(growable: false);
+    return Future.wait(drafts.map(_mapEntryRecord), eagerError: true);
   }
 
   @override
@@ -175,7 +209,7 @@ class EntryRepositoryImpl implements EntryRepository {
     }
 
     await entryDao.deleteEntryById(id);
-    await _deleteFileIfPresent(existing.audioPath);
+    await _deleteFileIfPresent(await _resolveAudioPath(existing.audioPath));
   }
 
   @override
@@ -190,8 +224,29 @@ class EntryRepositoryImpl implements EntryRepository {
     await entryDao.deleteStaleDraftsOlderThan(cutoffTimestamp);
 
     for (final draft in staleDrafts) {
-      await _deleteFileIfPresent(draft.audioPath);
+      await _deleteFileIfPresent(await _resolveAudioPath(draft.audioPath));
     }
+  }
+
+  Future<Entry> _mapEntryRecord(EntryRecord row) async {
+    return Entry(
+      id: row.id,
+      rawTranscript: row.rawTranscript,
+      cleanedText: row.cleanedText,
+      isDraft: row.isDraft,
+      language: row.language,
+      createdAt: row.createdAt,
+      wordCount: row.wordCount,
+      audioPath: await _resolveAudioPath(row.audioPath),
+    );
+  }
+
+  Future<String?> _resolveAudioPath(String? storedAudioPath) async {
+    if (storedAudioPath == null || storedAudioPath.trim().isEmpty) {
+      return storedAudioPath;
+    }
+
+    return _resolveDraftAudioPath(storedAudioPath);
   }
 
   void _throwIfMissing(int id, int affectedRows) {
