@@ -21,6 +21,7 @@ import 'package:wrait/presentation/main/recording_state.dart';
 
 import '../test/test_doubles/fake_monotonic_clock.dart';
 import '../test/test_doubles/fake_secure_storage.dart';
+import 'support/managed_audio_files.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -84,10 +85,9 @@ void main() {
     (tester) async {
       final harness = await _createHarness();
       addTearDown(harness.dispose);
-      final audioDraftFile = File(
-        '${harness.tempDirectory.path}/retry-audio.m4a',
+      final audioDraftFile = await harness.writeManagedAudioFile(
+        'retry-audio.m4a',
       );
-      await audioDraftFile.writeAsString('audio');
 
       harness.transcriptionService.nextStopResult = TranscriptionFailure(
         reason: TranscriptionFailureReason.network,
@@ -242,10 +242,19 @@ class _Harness {
   final _FakeTranscriptionService transcriptionService;
   final SharedPreferences sharedPreferences;
   final _CleanupCallbackHolder cleanupCallbackHolder;
+  final List<File> _managedAudioFiles = <File>[];
+
+  Future<File> writeManagedAudioFile(String name) async {
+    return writeManagedDraftAudioFile(
+      managedFiles: _managedAudioFiles,
+      name: name,
+    );
+  }
 
   Future<void> dispose() async {
     container.dispose();
     await database.close();
+    await cleanupManagedDraftAudioFiles(_managedAudioFiles);
     if (await tempDirectory.exists()) {
       await tempDirectory.delete(recursive: true);
     }

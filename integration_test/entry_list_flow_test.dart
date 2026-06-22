@@ -22,6 +22,7 @@ import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 import '../test/test_doubles/fake_secure_storage.dart';
+import 'support/managed_audio_files.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -102,7 +103,8 @@ void main() {
     addTearDown(harness.dispose);
 
     final repository = harness.container.read(entryRepositoryProvider);
-    final id = await repository.saveAudioDraft('/tmp/pending.m4a', 'en-US');
+    final audioFile = await harness.writeManagedAudioFile('pending.m4a');
+    final id = await repository.saveAudioDraft(audioFile.path, 'en-US');
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -157,10 +159,8 @@ void main() {
     addTearDown(harness.dispose);
 
     final repository = harness.container.read(entryRepositoryProvider);
-    final deletedId = await repository.saveAudioDraft(
-      '/tmp/pending.m4a',
-      'en-US',
-    );
+    final audioFile = await harness.writeManagedAudioFile('pending-delete.m4a');
+    final deletedId = await repository.saveAudioDraft(audioFile.path, 'en-US');
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -253,10 +253,19 @@ class _Harness {
   final LocalEntryDatabase database;
   final Directory tempDirectory;
   final _MutableClock entryClock;
+  final List<File> _managedAudioFiles = <File>[];
+
+  Future<File> writeManagedAudioFile(String name) async {
+    return writeManagedDraftAudioFile(
+      managedFiles: _managedAudioFiles,
+      name: name,
+    );
+  }
 
   Future<void> dispose() async {
     container.dispose();
     await database.close();
+    await cleanupManagedDraftAudioFiles(_managedAudioFiles);
     if (await tempDirectory.exists()) {
       await tempDirectory.delete(recursive: true);
     }

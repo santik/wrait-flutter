@@ -42,6 +42,14 @@ upcoming feature work:
 - encrypted local entry database bootstrap through the app startup flow rather
   than a fully blocking pre-UI initialization step
 - encrypted local entry persistence and stale-draft cleanup
+- same-identity app-update preservation for the encrypted database, linked
+  app-private retained files, persisted device id, pending drafts, and
+  first-recording state
+- uninstall/reinstall and Android clear-data fresh-start behavior for local
+  app-private state
+- bootstrap failure handling that surfaces a simple retry/error shell instead
+  of silently wiping local database artifacts
+- Android backup/restore disabled for this app-private local data lifecycle
 - shared preferences bootstrap
 - persisted recording-state preference
 - persisted stable app device identifier with native lookup/fallback
