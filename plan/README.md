@@ -32,9 +32,4 @@ Story IDs stay stable, but implementation order follows the sequence below.
 26. US-022
 27. US-023
 28. US-026
-
-## Notes
-
-- US-016 is intentionally scheduled before US-006.
-- This keeps device registration and quota bootstrap ahead of the recording and
-  backend transcription work that follows.
+29. US-033

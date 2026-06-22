@@ -33,11 +33,16 @@ upcoming feature work:
 - app bootstrap
 - immediate first-frame bootstrap shell with loading and retry states while
   launch dependencies finish asynchronously
+- split Android install identities for release/update validation
+  (`com.wrait.flutter`) versus debug/profile validation
+  (`com.wrait.flutter.dev`)
 - Android manifest-level Impeller disablement for reliable real-device cold
   launch instead of hanging behind the splash screen on the current validation
   phone
 - routing shell
 - runtime configuration loading
+- physical-phone release-signed Android deployment flow via
+  `./deploy_release.sh`
 - centralized light/dark theme and design tokens
 - encrypted local entry database bootstrap through the app startup flow rather
   than a fully blocking pre-UI initialization step
@@ -196,6 +201,14 @@ Current runtime behavior on top of that generated client:
 - proxy-authenticated debug deployments require `PROXY_SECRET` to be present so
   the app can send the expected `X-Proxy-Secret` request header during launch
   registration and later backend calls
+- release-signed Android deployments use `./deploy_release.sh`, read canonical
+  private config from `wrait-android/local.properties`, and keep signing
+  passwords transient rather than persisting them into
+  `android/local.properties`
+- production Android backend connectivity depends on
+  `android.permission.INTERNET` being declared in
+  `android/app/src/main/AndroidManifest.xml` so release installs can complete
+  launch registration and show quota
 - Android developers can also build the debug APK manually with
   `flutter build apk --debug --dart-define=PROXY_SECRET=...` and install
   `build/app/outputs/flutter-apk/app-debug.apk` directly through `adb`

@@ -108,9 +108,12 @@ Current implementation details:
 
 Android baseline:
 
-- Package/application ID: `com.wrait.flutter`
+- Release/update package/application ID: `com.wrait.flutter`
+- Debug/profile package/application ID: `com.wrait.flutter.dev`
 - `minSdk = 26`
 - `RECORD_AUDIO` permission is already declared
+- `INTERNET` must remain declared in `android/app/src/main/AndroidManifest.xml`
+  so production Android builds can reach the backend
 
 Older notes or external materials may still mention `com.wrait.app`. Treat
 that as historical context and verify the installed package name before
@@ -177,7 +180,10 @@ US-001 was validated successfully on both platforms:
 - Prefer `./deploy_debug.sh` for real-device Android debug deployment when the
   story depends on backend registration, transcription, or proxy-authenticated
   traffic.
-- The Flutter Android package/application ID is `com.wrait.flutter`.
+- The Flutter Android debug/profile package/application ID is
+  `com.wrait.flutter.dev`.
+- The release/update Flutter Android package/application ID remains
+  `com.wrait.flutter`.
 - The native Android app remains `com.wrait.app`; treat that package as a
   separate install that must be preserved.
 
@@ -192,7 +198,7 @@ US-001 was validated successfully on both platforms:
   fallback is:
   - `PROXY_SECRET=... /opt/homebrew/bin/flutter build apk --debug --dart-define=PROXY_SECRET=...`
   - install `build/app/outputs/flutter-apk/app-debug.apk` with `adb`
-- The script verifies `com.wrait.flutter` exists after install.
+- The script verifies `com.wrait.flutter.dev` exists after install.
 - If `com.wrait.app` existed before deployment, the script verifies it still
   exists after install.
 - The script must never uninstall `com.wrait.app`.
@@ -250,14 +256,69 @@ US-001 was validated successfully on both platforms:
 
 - The deploy script must keep `android.permission.RECORD_AUDIO` granted during
   the Flutter test session because `flutter test` can reinstall both
-  `com.wrait.flutter` and `com.wrait.flutter.test`, which can otherwise bring
-  back the system recording prompt on a locked phone.
+  `com.wrait.flutter.dev` and `com.wrait.flutter.dev.test`, which can
+  otherwise bring back the system recording prompt on a locked phone.
 - The permission watchdog should stay bounded and should clean up stale PID
   state at startup.
 - The deploy script should continue restoring temporary stay-awake and
   automation-setting state on both success and failure paths.
 - Shell regression coverage for this behavior lives in
   `test/deploy_debug_script_test.sh`.
+
+## US-031: Release-Signed Android Deploy Flow
+
+### Android release deployment contract
+
+- Prefer `./deploy_release.sh` for physical-phone Android release deployment
+  when a story depends on the stable release signing identity or on
+  update-compatible installs under `com.wrait.flutter`.
+- `./deploy_release.sh` is separate from `./deploy_debug.sh` and must preserve
+  any pre-existing `com.wrait.flutter.dev` install.
+- The native Android app `com.wrait.app` remains a separate install that must
+  not be removed by the Flutter release flow.
+
+### Private config and signing contract
+
+- Canonical private release config lives in `wrait-android/local.properties`.
+- The Flutter-local consumed config remains `android/local.properties`, but
+  only non-secret release keys should be synchronized there:
+  - `KEYSTORE_PATH`
+  - `KEY_ALIAS`
+  - `BACKEND_URL`
+  - `PROXY_SECRET`
+  - `RECORDING_HARD_CAP_MS`
+- Do not persist `KEYSTORE_PASSWORD` or `KEY_PASSWORD` into
+  `android/local.properties`.
+- Release signing passwords should stay transient through the environment:
+  - `WRAIT_RELEASE_KEYSTORE_PASSWORD`
+  - `WRAIT_RELEASE_KEY_PASSWORD`
+- `deploy_release.sh` should validate the configured keystore with `keytool`
+  before building:
+  - `keytool -list` confirms keystore access and alias availability
+  - `keytool -certreq` confirms private-key access with the configured key
+    password
+
+### Release-build behavior worth preserving
+
+- The release Gradle configuration should fail closed for release tasks when
+  required signing inputs are absent.
+- `android/local.properties` synchronization should be atomic and should remove
+  stale persisted signing-password entries from older local files.
+- `deploy_release.sh` intentionally does not run `integration_test`, does not
+  enable debug lock-screen automation settings, and does not install the debug
+  identity.
+- If `com.wrait.flutter.dev` existed before release deployment, the script
+  should verify it still exists afterward.
+- Shell regression coverage for this behavior lives in
+  `test/deploy_release_script_test.sh`.
+
+### Production backend-connectivity note
+
+- Production Android backend registration and quota visibility depend on
+  `android.permission.INTERNET` being declared in
+  `android/app/src/main/AndroidManifest.xml`.
+- Do not move that permission back to debug/profile-only manifests, or release
+  installs can silently stop reaching `/api/register`.
 
 ## US-012: Microphone Permission Handling
 

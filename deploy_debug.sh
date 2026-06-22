@@ -4,12 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEBUG_APK_PATH="${DEPLOY_DEBUG_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-debug.apk}"
 PROFILE_APK_PATH="${DEPLOY_PROFILE_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-profile.apk}"
-AUTOMATION_LOCKSCREEN_MODE_SETTING="com.wrait.flutter.debug.automation_lockscreen_mode"
-FLUTTER_PACKAGE="com.wrait.flutter"
-FLUTTER_TEST_PACKAGE="com.wrait.flutter.test"
+FLUTTER_PACKAGE="com.wrait.flutter.dev"
+FLUTTER_NAMESPACE="com.wrait.flutter"
+FLUTTER_TEST_PACKAGE="${FLUTTER_PACKAGE}.test"
+AUTOMATION_LOCKSCREEN_MODE_SETTING="${FLUTTER_PACKAGE}.automation_lockscreen_mode"
 NATIVE_WRAIT_PACKAGE="com.wrait.app"
 MAIN_ACTIVITY_SHORT_COMPONENT="$FLUTTER_PACKAGE/.MainActivity"
-MAIN_ACTIVITY_FULL_COMPONENT="$FLUTTER_PACKAGE/$FLUTTER_PACKAGE.MainActivity"
+MAIN_ACTIVITY_FULL_COMPONENT="$FLUTTER_PACKAGE/$FLUTTER_NAMESPACE.MainActivity"
 RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS="${DEPLOY_RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS:-900}"
 RUNTIME_PERMISSION_WATCHDOG_PID_FILE="${TMPDIR:-/tmp}/wrait-runtime-permission-watchdog.pid"
 RUNTIME_PERMISSION_WATCHDOG_PID=""
@@ -397,6 +398,11 @@ read_first_matching_line() {
   return 1
 }
 
+line_references_main_activity() {
+  local line="$1"
+  [[ "$line" == *"$MAIN_ACTIVITY_FULL_COMPONENT"* || "$line" == *"$MAIN_ACTIVITY_SHORT_COMPONENT"* ]]
+}
+
 flutter_app_is_foreground() {
   local phone_serial="$1"
   local activity_output
@@ -406,13 +412,13 @@ flutter_app_is_foreground() {
 
   activity_output="$(adb -s "$phone_serial" shell dumpsys activity activities 2>/dev/null || true)"
   resumed_line="$(read_first_matching_line "$activity_output" 'ResumedActivity:')" || true
-  if [[ -n "$resumed_line" && "$resumed_line" == *"$MAIN_ACTIVITY_SHORT_COMPONENT"* ]]; then
+  if [[ -n "$resumed_line" ]] && line_references_main_activity "$resumed_line"; then
     return 0
   fi
 
   window_output="$(adb -s "$phone_serial" shell dumpsys window 2>/dev/null || true)"
   focused_line="$(read_first_matching_line "$window_output" 'mCurrentFocus=')" || true
-  [[ -n "$focused_line" && "$focused_line" == *"$MAIN_ACTIVITY_FULL_COMPONENT"* ]]
+  [[ -n "$focused_line" ]] && line_references_main_activity "$focused_line"
 }
 
 launch_flutter_app() {
@@ -435,7 +441,7 @@ launch_flutter_app() {
     fail "$FLUTTER_PACKAGE launch timed out after install and foreground verification failed; force-stop the app and inspect device logs"
   fi
 
-  [[ "$output" == *"Activity: $MAIN_ACTIVITY_SHORT_COMPONENT"* ]] || fail \
+  [[ "$output" == *"Activity: $MAIN_ACTIVITY_FULL_COMPONENT"* || "$output" == *"Activity: $MAIN_ACTIVITY_SHORT_COMPONENT"* ]] || fail \
     "$FLUTTER_PACKAGE launch verification did not report MainActivity"
 }
 
