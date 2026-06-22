@@ -148,6 +148,12 @@ void main() {
   test(
     'start failure from blocked microphone publishes blocked mic error',
     () async {
+      container.dispose();
+      container = buildContainer(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(minutes: 1),
+        ),
+      );
       transcriptionService.startError =
           const MicBlockedTranscriptionServiceFailure(
             MicrophoneAccessState.permanentlyDenied,
@@ -160,6 +166,37 @@ void main() {
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
         const RecordingErrorState(RecordingError.microphoneBlocked),
+      );
+    },
+  );
+
+  test(
+    'blocked microphone error auto-clears after the configured delay',
+    () async {
+      container.dispose();
+      container = buildContainer(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(milliseconds: 20),
+        ),
+      );
+      transcriptionService.startError =
+          const MicBlockedTranscriptionServiceFailure(
+            MicrophoneAccessState.permanentlyDenied,
+          );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.microphoneBlocked),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingIdle(),
       );
     },
   );
@@ -319,6 +356,12 @@ void main() {
   test(
     'blocked microphone Error tap opens settings without leaving blocked state',
     () async {
+      container.dispose();
+      container = buildContainer(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(minutes: 1),
+        ),
+      );
       await container
           .read(mainRecordingControllerProvider.notifier)
           .onMainButtonTapped();
@@ -349,6 +392,12 @@ void main() {
   );
 
   test('resume after settings grant clears blocked microphone state', () async {
+    container.dispose();
+    container = buildContainer(
+      feedbackDelays: const RecordingFeedbackDelays(
+        errorAndDeletedAutoClear: Duration(minutes: 1),
+      ),
+    );
     transcriptionService.startError =
         const MicBlockedTranscriptionServiceFailure(
           MicrophoneAccessState.permanentlyDenied,
@@ -372,6 +421,12 @@ void main() {
   test(
     'resume while permission is still blocked preserves blocked state',
     () async {
+      container.dispose();
+      container = buildContainer(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(minutes: 1),
+        ),
+      );
       transcriptionService.startError =
           const MicBlockedTranscriptionServiceFailure(
             MicrophoneAccessState.permanentlyDenied,
@@ -474,6 +529,7 @@ void main() {
     final cases = <TranscriptionFailureReason, RecordingError>{
       TranscriptionFailureReason.tooShort: RecordingError.tooShort,
       TranscriptionFailureReason.nothingCaught: RecordingError.noMatch,
+      TranscriptionFailureReason.micBlocked: RecordingError.microphoneBlocked,
       TranscriptionFailureReason.network: RecordingError.noInternet,
       TranscriptionFailureReason.backendUnavailable:
           RecordingError.backendUnavailable,
@@ -533,6 +589,42 @@ void main() {
           preservedDraft: true,
         ),
       );
+      expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+    },
+  );
+
+  test(
+    'transcription failure with audioDraftPath persistence failure keeps fallback error copy without preservedDraft',
+    () async {
+      final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
+      await audioDraftFile.writeAsString('audio');
+      entryRepository.failSaveAudioDraft = true;
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      transcriptionService.nextStopResult = TranscriptionFailure(
+        reason: TranscriptionFailureReason.network,
+        audioDraftPath: audioDraftFile.path,
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(entryRepository.savedAudioDrafts, isEmpty);
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.noInternet),
+      );
+      expect(
+        logMessages,
+        contains(
+          'Failed to persist retryable audio draft after transcription failure.',
+        ),
+      );
+      expect(logErrors.last, isA<StateError>());
     },
   );
 
@@ -597,8 +689,72 @@ void main() {
           preservedDraft: true,
         ),
       );
+      expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
     },
   );
+
+  test('draft-preserved errors do not increment the shake key', () async {
+    final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
+    await audioDraftFile.writeAsString('audio');
+
+    Future<void> triggerTranscriptionDraftError(
+      TranscriptionFailureReason reason,
+    ) async {
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      transcriptionService.nextStopResult = TranscriptionFailure(
+        reason: reason,
+        audioDraftPath: audioDraftFile.path,
+      );
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+    }
+
+    Future<void> triggerCleanupDraftError(
+      backend.BackendFailureReason reason,
+    ) async {
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      cleanupUseCase.nextResult = CleanupTranscriptFailure(
+        entryId: 41,
+        reason: reason,
+      );
+      transcriptionService.nextStopResult = const TranscriptionSuccess(
+        transcript: 'raw transcript',
+        detectedLanguage: 'en-US',
+      );
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+    }
+
+    await triggerTranscriptionDraftError(TranscriptionFailureReason.network);
+    expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    await triggerCleanupDraftError(
+      backend.BackendFailureReason.backendUnavailable,
+    );
+    expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    await triggerTranscriptionDraftError(
+      TranscriptionFailureReason.proxyAuthFailed,
+    );
+    expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    await triggerCleanupDraftError(backend.BackendFailureReason.apiError);
+    expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+  });
 
   test(
     'cleanup success still publishes Saved when preference persistence logs a warning',
@@ -784,6 +940,63 @@ void main() {
       expect(
         container.read(mainRecordingControllerProvider).recordingState,
         RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
+      );
+    },
+  );
+
+  test(
+    'rapid error-to-error transitions keep the newer error until its own auto-clear fires',
+    () async {
+      container.dispose();
+      container = buildContainer(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(milliseconds: 60),
+        ),
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      transcriptionService.nextStopResult = const TranscriptionFailure(
+        reason: TranscriptionFailureReason.tooShort,
+      );
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.tooShort),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      transcriptionService.nextStopResult = const TranscriptionFailure(
+        reason: TranscriptionFailureReason.apiError,
+      );
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.apiFailed),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.apiFailed),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingIdle(),
       );
     },
   );
@@ -989,6 +1202,7 @@ class _FakeCleanupTranscriptUseCase extends CleanupTranscriptUseCase {
 
 class _FakeEntryRepository implements EntryRepository {
   final List<(String, String)> savedAudioDrafts = <(String, String)>[];
+  bool failSaveAudioDraft = false;
 
   @override
   Future<void> deleteEntry(int id) async {}
@@ -1012,6 +1226,9 @@ class _FakeEntryRepository implements EntryRepository {
 
   @override
   Future<int> saveAudioDraft(String audioPath, String language) async {
+    if (failSaveAudioDraft) {
+      throw StateError('saveAudioDraft failed');
+    }
     savedAudioDrafts.add((audioPath, language));
     return 1;
   }

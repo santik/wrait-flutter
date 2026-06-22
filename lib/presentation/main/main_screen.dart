@@ -33,6 +33,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   );
   bool? _storedHasEverRecorded;
   bool _hasRecordedThisSession = false;
+  int _statusLineGeneration = 0;
   int _savedAutoClearGeneration = 0;
 
   @override
@@ -200,7 +201,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                   duration: WraitAnimationTokens.fade,
                                   child: _StatusLine(
                                     key: ValueKey(
-                                      '${status.statusText}-${status.action}-${status.savedEntryId}',
+                                      '${status.statusText}-${status.action}-${status.savedEntryId}-$_statusLineGeneration',
                                     ),
                                     presentation: status,
                                     onTap: () => _handleStatusAction(status),
@@ -259,6 +260,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
     RecordingState? previous,
     RecordingState next,
   ) {
+    if (previous != next &&
+        (previous is RecordingErrorState || next is RecordingErrorState)) {
+      _statusLineGeneration += 1;
+    }
+
     if (next is RecordingSaved) {
       _hasRecordedThisSession = true;
       if (previous != next) {
