@@ -85,41 +85,129 @@ void main() {
     },
   );
 
-  test('recreates a fresh usable database after key loss', () async {
-    final initialStorage = FakeSecureKeyValueStore();
-    final initialHarness = await _createHarness(
-      directory: tempDirectory,
-      storage: initialStorage,
-      clock: FakeClock(_ts(2026, 6, 8)),
-      random: Random(3),
-    );
-    await initialHarness.repository.saveEntry(
-      'persisted before key loss',
-      'en-US',
-    );
-    await initialHarness.database.close();
+  test(
+    'fails to open an existing database after key loss without replacing it',
+    () async {
+      final initialStorage = FakeSecureKeyValueStore();
+      final initialHarness = await _createHarness(
+        directory: tempDirectory,
+        storage: initialStorage,
+        clock: FakeClock(_ts(2026, 6, 8)),
+        random: Random(3),
+      );
+      await initialHarness.repository.saveEntry(
+        'persisted before key loss',
+        'en-US',
+      );
+      await initialHarness.database.close();
 
-    final recoveredHarness = await _createHarness(
+      final lostKeyStorage = FakeSecureKeyValueStore();
+      await expectLater(
+        LocalEntryDatabase.open(
+          keyStore: DatabaseKeyStore(lostKeyStorage, random: Random(4)),
+          databaseFile: _databaseFile(tempDirectory),
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(await initialHarness.databaseFile.exists(), isTrue);
+
+      final reopenedWithOriginalKey = await _createHarness(
+        directory: tempDirectory,
+        storage: initialStorage,
+        clock: FakeClock(_ts(2026, 6, 9)),
+        random: Random(3),
+      );
+      final entries = await reopenedWithOriginalKey.repository
+          .watchAllEntries()
+          .first;
+
+      expect(entries, hasLength(1));
+      expect(entries.single.rawTranscript, 'persisted before key loss');
+      await reopenedWithOriginalKey.database.close();
+    },
+  );
+
+  test('preserves existing database artifacts when open fails', () async {
+    final harness = await _createHarness(
       directory: tempDirectory,
       storage: FakeSecureKeyValueStore(),
-      clock: FakeClock(_ts(2026, 6, 9)),
+      clock: FakeClock(_ts(2026, 6, 8)),
       random: Random(4),
     );
+    await harness.repository.saveEntry('persisted entry', 'en-US');
+    await harness.database.close();
 
-    final entries = await recoveredHarness.repository.watchAllEntries().first;
+    final databaseFile = harness.databaseFile;
+    final walFile = File('${databaseFile.path}-wal');
+    final shmFile = File('${databaseFile.path}-shm');
+    final journalFile = File('${databaseFile.path}-journal');
+    await walFile.writeAsString('wal');
+    await shmFile.writeAsString('shm');
+    await journalFile.writeAsString('journal');
 
-    expect(entries, isEmpty);
-
-    await recoveredHarness.repository.saveEntry(
-      'fresh after recovery',
-      'en-US',
+    await expectLater(
+      LocalEntryDatabase.open(
+        keyStore: DatabaseKeyStore(
+          FakeSecureKeyValueStore(),
+          random: Random(5),
+        ),
+        databaseFile: databaseFile,
+        verifyCipherSupport: (_) {
+          throw StateError('simulated existing database open failure');
+        },
+      ),
+      throwsA(
+        predicate(
+          (error) => error.toString().contains(
+            'simulated existing database open failure',
+          ),
+          'error containing the injected failure message',
+        ),
+      ),
     );
-    final recoveredEntries = await recoveredHarness.repository
-        .watchAllEntries()
-        .firstWhere((items) => items.isNotEmpty);
-    expect(recoveredEntries.single.rawTranscript, 'fresh after recovery');
-    await recoveredHarness.database.close();
+
+    expect(await databaseFile.exists(), isTrue);
+    expect(await walFile.exists(), isTrue);
+    expect(await shmFile.exists(), isTrue);
+    expect(await journalFile.exists(), isTrue);
   });
+
+  test(
+    'preserves database artifacts when the database file is corrupted',
+    () async {
+      final storage = FakeSecureKeyValueStore();
+      final harness = await _createHarness(
+        directory: tempDirectory,
+        storage: storage,
+        clock: FakeClock(_ts(2026, 6, 8)),
+        random: Random(12),
+      );
+      await harness.repository.saveEntry('entry before corruption', 'en-US');
+      await harness.database.close();
+
+      final databaseFile = harness.databaseFile;
+      final originalBytes = await databaseFile.readAsBytes();
+      expect(originalBytes, isNotEmpty);
+
+      final corruptedBytes = Uint8List.fromList(originalBytes);
+      final overwriteLength = min(32, corruptedBytes.length);
+      for (var index = 0; index < overwriteLength; index++) {
+        corruptedBytes[index] = 0xFF;
+      }
+      await databaseFile.writeAsBytes(corruptedBytes, flush: true);
+
+      await expectLater(
+        LocalEntryDatabase.open(
+          keyStore: DatabaseKeyStore(storage, random: Random(12)),
+          databaseFile: databaseFile,
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(await databaseFile.exists(), isTrue);
+    },
+  );
 
   test(
     'startup bootstrap initializes the store and deletes stale drafts',
@@ -135,6 +223,8 @@ void main() {
       final seedRepository = EntryRepositoryImpl(
         entryDao: seedDatabase.entryDao,
         clock: oldClock,
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
       );
       final staleAudioFile = File('${tempDirectory.path}/stale-audio.m4a');
       await staleAudioFile.writeAsString('audio');
@@ -144,6 +234,8 @@ void main() {
       final freshRepository = EntryRepositoryImpl(
         entryDao: seedDatabase.entryDao,
         clock: freshClock,
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
       );
       await freshRepository.saveDraft('keep me', 'en-US');
       await seedDatabase.close();
@@ -151,6 +243,8 @@ void main() {
       final bootstrap = LocalEntryStartupBootstrap(
         keyStore: keyStore,
         clock: FakeClock(_ts(2026, 6, 8)),
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
         openDatabase: (keyStore, file) =>
             LocalEntryDatabase.open(keyStore: keyStore, databaseFile: file),
       );
@@ -161,6 +255,8 @@ void main() {
       final bootstrappedRepository = EntryRepositoryImpl(
         entryDao: bootstrappedDatabase.entryDao,
         clock: const SystemClock(),
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
       );
 
       final remainingDrafts = await bootstrappedRepository.getPendingDrafts();

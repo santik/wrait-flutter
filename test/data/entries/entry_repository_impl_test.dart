@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as path;
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/entry_repository_impl.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
@@ -30,6 +31,8 @@ void main() {
     repository = EntryRepositoryImpl(
       entryDao: database!.entryDao,
       clock: clock,
+      storeDraftAudioPath: (audioPath) async => audioPath,
+      resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
     );
   });
 
@@ -235,6 +238,54 @@ void main() {
       expect(pendingDrafts, hasLength(1));
       expect(pendingDrafts.single.rawTranscript, 'fresh draft');
       expect(await staleAudioFile.exists(), isFalse);
+    },
+  );
+
+  test(
+    'resolves managed draft audio paths after the app cache root changes',
+    () async {
+      final originalCacheDirectory = Directory(
+        '${tempDirectory.path}/cache-before-update',
+      );
+      await originalCacheDirectory.create(recursive: true);
+      final updatedCacheDirectory = Directory(
+        '${tempDirectory.path}/cache-after-update',
+      );
+      await updatedCacheDirectory.create(recursive: true);
+
+      var activeCacheDirectory = originalCacheDirectory.path;
+      repository = EntryRepositoryImpl(
+        entryDao: database!.entryDao,
+        clock: clock,
+        storeDraftAudioPath: (audioPath) async =>
+            'app-cache://${path.basename(audioPath)}',
+        resolveDraftAudioPath: (storedAudioPath) async {
+          final relativePath = storedAudioPath.substring('app-cache://'.length);
+          return path.join(activeCacheDirectory, relativePath);
+        },
+      );
+
+      final originalAudioFile = File(
+        path.join(originalCacheDirectory.path, 'draft-audio.m4a'),
+      );
+      await originalAudioFile.writeAsString('audio');
+      final draftId = await repository!.saveAudioDraft(
+        originalAudioFile.path,
+        'en-US',
+      );
+
+      activeCacheDirectory = updatedCacheDirectory.path;
+      final updatedAudioFile = File(
+        path.join(updatedCacheDirectory.path, 'draft-audio.m4a'),
+      );
+      await updatedAudioFile.writeAsString('audio');
+
+      final draft = await repository!.getEntryById(draftId);
+      expect(draft, isNotNull);
+      expect(draft!.audioPath, updatedAudioFile.path);
+
+      await repository!.deleteEntry(draftId);
+      expect(await updatedAudioFile.exists(), isFalse);
     },
   );
 }

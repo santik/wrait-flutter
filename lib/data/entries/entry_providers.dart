@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/time/system_clock.dart';
 import '../../domain/repository/entry_repository.dart';
 import 'database_key_store.dart';
+import 'draft_audio_path_codec.dart';
 import 'entry_repository_impl.dart';
 import 'local_entry_database.dart';
 
@@ -13,15 +14,22 @@ class LocalEntryStartupBootstrap {
   LocalEntryStartupBootstrap({
     required this.keyStore,
     required this.clock,
+    StoreDraftAudioPathCallback? storeDraftAudioPath,
+    ResolveDraftAudioPathCallback? resolveDraftAudioPath,
     Future<LocalEntryDatabase> Function(DatabaseKeyStore keyStore, File? file)?
     openDatabase,
-  }) : openDatabase =
+  }) : storeDraftAudioPath = storeDraftAudioPath ?? DraftAudioPathCodec.store,
+       resolveDraftAudioPath =
+           resolveDraftAudioPath ?? DraftAudioPathCodec.resolve,
+       openDatabase =
            openDatabase ??
            ((keyStore, file) =>
                LocalEntryDatabase.open(keyStore: keyStore, databaseFile: file));
 
   final DatabaseKeyStore keyStore;
   final Clock clock;
+  final StoreDraftAudioPathCallback storeDraftAudioPath;
+  final ResolveDraftAudioPathCallback resolveDraftAudioPath;
   final Future<LocalEntryDatabase> Function(
     DatabaseKeyStore keyStore,
     File? file,
@@ -33,6 +41,8 @@ class LocalEntryStartupBootstrap {
     final repository = EntryRepositoryImpl(
       entryDao: database.entryDao,
       clock: clock,
+      storeDraftAudioPath: storeDraftAudioPath,
+      resolveDraftAudioPath: resolveDraftAudioPath,
     );
     await repository.deleteStaleDrafts();
     return database;
