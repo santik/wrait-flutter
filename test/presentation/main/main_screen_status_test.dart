@@ -53,18 +53,32 @@ void main() {
     expect(presentation.savedEntryId, 14);
   });
 
-  test('returns draft-preserved error text when a draft was saved', () {
-    final presentation = resolveMainScreenStatus(
-      controllerState: const RecordingControllerState(
-        recordingState: RecordingErrorState(
-          RecordingError.noInternet,
-          preservedDraft: true,
-        ),
-      ),
-      hasEverRecorded: true,
-    );
+  test('returns approved draft-preserved copy by error category', () {
+    final cases = <RecordingState, String>{
+      const RecordingErrorState(
+        RecordingError.noInternet,
+        preservedDraft: true,
+      ): 'no connection · saved as draft',
+      const RecordingErrorState(
+        RecordingError.backendUnavailable,
+        preservedDraft: true,
+      ): 'service unavailable · saved as draft',
+      const RecordingErrorState(
+        RecordingError.proxyAuthFailed,
+        preservedDraft: true,
+      ): 'server config error · saved as draft',
+      const RecordingErrorState(RecordingError.apiFailed, preservedDraft: true):
+          'saved as draft · will retry',
+    };
 
-    expect(presentation.statusText, 'saved as draft');
+    for (final entry in cases.entries) {
+      final presentation = resolveMainScreenStatus(
+        controllerState: RecordingControllerState(recordingState: entry.key),
+        hasEverRecorded: true,
+      );
+
+      expect(presentation.statusText, entry.value);
+    }
   });
 
   test('returns approved error copy for specific non-draft errors', () {
@@ -77,6 +91,13 @@ void main() {
           'mic needed · tap again',
       const RecordingErrorState(RecordingError.microphoneBlocked):
           'mic blocked · tap settings',
+      const RecordingErrorState(RecordingError.noInternet): 'no connection',
+      const RecordingErrorState(RecordingError.backendUnavailable):
+          'service unavailable',
+      const RecordingErrorState(RecordingError.proxyAuthFailed):
+          'server config error',
+      const RecordingErrorState(RecordingError.apiFailed):
+          'something went wrong',
       const RecordingDeleted(2): 'deleted',
       const RecordingUploading(): 'uploading...',
       const RecordingProcessing(): 'cleaning up...',

@@ -523,9 +523,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
       recordingState: errorState,
       shakeErrorKey: nextShakeKey,
     );
-    if (nextError != RecordingError.microphoneBlocked) {
-      _scheduleAutoClear(errorState);
-    }
+    _scheduleAutoClear(errorState);
   }
 
   void _scheduleAutoClear(RecordingState targetState) {

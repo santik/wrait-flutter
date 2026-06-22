@@ -17,6 +17,7 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/main_screen_status.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 import '../test/test_doubles/fake_monotonic_clock.dart';
@@ -109,6 +110,15 @@ void main() {
           preservedDraft: true,
         ),
       );
+      expect(
+        resolveMainScreenStatus(
+          controllerState: harness.container.read(
+            mainRecordingControllerProvider,
+          ),
+          hasEverRecorded: false,
+        ).statusText,
+        'no connection · saved as draft',
+      );
 
       final drafts = await harness.container
           .read(entryRepositoryProvider)
@@ -151,6 +161,15 @@ void main() {
           preservedDraft: true,
         ),
       );
+      expect(
+        resolveMainScreenStatus(
+          controllerState: harness.container.read(
+            mainRecordingControllerProvider,
+          ),
+          hasEverRecorded: false,
+        ).statusText,
+        'service unavailable · saved as draft',
+      );
 
       final entry = await harness.container
           .read(entryRepositoryProvider)
@@ -160,6 +179,91 @@ void main() {
       expect(entry.rawTranscript, 'raw transcript');
       expect(entry.cleanedText, isNull);
       expect(harness.sharedPreferences.getBool('has_ever_recorded'), isNull);
+    },
+  );
+
+  testWidgets(
+    'provider graph preserves an audio draft and exposes proxy-auth draft copy',
+    (tester) async {
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+      final audioDraftFile = await harness.writeManagedAudioFile(
+        'retry-proxy-auth.m4a',
+      );
+
+      harness.transcriptionService.nextStopResult = TranscriptionFailure(
+        reason: TranscriptionFailureReason.proxyAuthFailed,
+        audioDraftPath: audioDraftFile.path,
+      );
+
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      harness.monotonicClock.advance(const Duration(seconds: 6));
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        harness.container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(
+          RecordingError.proxyAuthFailed,
+          preservedDraft: true,
+        ),
+      );
+      expect(
+        resolveMainScreenStatus(
+          controllerState: harness.container.read(
+            mainRecordingControllerProvider,
+          ),
+          hasEverRecorded: false,
+        ).statusText,
+        'server config error · saved as draft',
+      );
+    },
+  );
+
+  testWidgets(
+    'provider graph preserves a text draft and exposes generic api draft copy',
+    (tester) async {
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+
+      harness.transcriptionService.nextStopResult = const TranscriptionSuccess(
+        transcript: 'raw transcript',
+        detectedLanguage: 'en-US',
+      );
+      harness.cleanupCallbackHolder.callback =
+          ({required transcript, required language}) async {
+            return const backend.CleanupFailure(
+              reason: backend.BackendFailureReason.apiError,
+            );
+          };
+
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      harness.monotonicClock.advance(const Duration(seconds: 6));
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        harness.container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(
+          RecordingError.apiFailed,
+          preservedDraft: true,
+        ),
+      );
+      expect(
+        resolveMainScreenStatus(
+          controllerState: harness.container.read(
+            mainRecordingControllerProvider,
+          ),
+          hasEverRecorded: false,
+        ).statusText,
+        'saved as draft · will retry',
+      );
     },
   );
 

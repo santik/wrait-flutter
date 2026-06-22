@@ -68,10 +68,38 @@ MainScreenStatusPresentation resolveMainScreenStatus({
       buttonLabel: buttonLabel,
       statusText: 'deleted',
     ),
-    RecordingErrorState(preservedDraft: true) => MainScreenStatusPresentation(
-      buttonLabel: buttonLabel,
-      statusText: 'saved as draft',
-    ),
+    RecordingErrorState(
+      error: RecordingError.noInternet,
+      preservedDraft: true,
+    ) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: 'no connection · saved as draft',
+      ),
+    RecordingErrorState(
+      error: RecordingError.backendUnavailable,
+      preservedDraft: true,
+    ) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: 'service unavailable · saved as draft',
+      ),
+    RecordingErrorState(
+      error: RecordingError.proxyAuthFailed,
+      preservedDraft: true,
+    ) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: 'server config error · saved as draft',
+      ),
+    RecordingErrorState(
+      error: RecordingError.apiFailed,
+      preservedDraft: true,
+    ) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: 'saved as draft · will retry',
+      ),
     RecordingErrorState(error: RecordingError.tooShort) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,

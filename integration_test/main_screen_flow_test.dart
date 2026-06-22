@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
@@ -193,6 +194,101 @@ void main() {
 
     expect(find.text('mic blocked · tap settings'), findsOneWidget);
   });
+
+  testWidgets(
+    'draft-preserved network feedback is shown and auto-clears back to idle',
+    (tester) async {
+      final harness = await _createHarness(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(milliseconds: 50),
+        ),
+      );
+      addTearDown(harness.dispose);
+      final appTempDirectory = await getTemporaryDirectory();
+      final audioDraftFile = File(
+        '${appTempDirectory.path}/main-screen-retry-audio.m4a',
+      );
+      addTearDown(() async {
+        if (await audioDraftFile.exists()) {
+          await audioDraftFile.delete();
+        }
+      });
+      await audioDraftFile.writeAsBytes(const <int>[1, 2, 3]);
+      harness.transcriptionService.nextStopResult = TranscriptionFailure(
+        reason: TranscriptionFailureReason.network,
+        audioDraftPath: audioDraftFile.path,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+      await tester.pump();
+      harness.monotonicClock.advance(const Duration(seconds: 6));
+      await tester.tap(find.byKey(mainActionButtonKey));
+      await _pumpUntilFound(
+        tester,
+        find.text('no connection · saved as draft'),
+        timeout: const Duration(milliseconds: 120),
+      );
+
+      expect(find.text('no connection · saved as draft'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
+      expect(find.text('wrait'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'microphone-blocked feedback auto-clears and can be shown again by tapping',
+    (tester) async {
+      final harness = await _createHarness(
+        feedbackDelays: const RecordingFeedbackDelays(
+          errorAndDeletedAutoClear: Duration(milliseconds: 50),
+        ),
+      );
+      addTearDown(harness.dispose);
+      harness.transcriptionService.startFailure =
+          const MicBlockedTranscriptionServiceFailure(
+            MicrophoneAccessState.permanentlyDenied,
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+      await _pumpUntilFound(
+        tester,
+        find.text('mic blocked · tap settings'),
+        timeout: const Duration(milliseconds: 40),
+      );
+
+      expect(find.text('mic blocked · tap settings'), findsOneWidget);
+
+      await _pumpUntilGone(tester, find.text('mic blocked · tap settings'));
+      expect(find.text('mic blocked · tap settings'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 350));
+
+      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+      await _pumpUntilFound(
+        tester,
+        find.text('mic blocked · tap settings'),
+        timeout: const Duration(milliseconds: 40),
+      );
+      expect(find.text('mic blocked · tap settings'), findsOneWidget);
+    },
+  );
 }
 
 class _CleanupCallbackHolder {
@@ -244,6 +340,21 @@ Future<void> _pumpUntilFound(
   for (var index = 0; index < iterations; index += 1) {
     await tester.pump(step);
     if (finder.evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
+Future<void> _pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  Duration step = const Duration(milliseconds: 5),
+  Duration timeout = const Duration(milliseconds: 500),
+}) async {
+  final iterations = timeout.inMicroseconds ~/ step.inMicroseconds;
+  for (var index = 0; index < iterations; index += 1) {
+    await tester.pump(step);
+    if (finder.evaluate().isEmpty) {
       return;
     }
   }
