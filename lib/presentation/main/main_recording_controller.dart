@@ -76,6 +76,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
       ref.read(recordingResumePermissionTimeoutProvider);
 
   Timer? _autoClearTimer;
+  Timer? _hardCapStopTimer;
   int? _listeningStartedAtElapsedRealtime;
   bool _buttonActionInFlight = false;
   Future<void>? _resumePermissionCheckInFlight;
@@ -84,6 +85,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
   RecordingControllerState build() {
     ref.onDispose(() {
       _cancelAutoClearTimer();
+      _cancelHardCapStopTimer();
     });
     return const RecordingControllerState();
   }
@@ -128,6 +130,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
 
   void resetToIdle() {
     _cancelAutoClearTimer();
+    _cancelHardCapStopTimer();
     _listeningStartedAtElapsedRealtime = null;
     state = state.copyWith(recordingState: const RecordingIdle());
   }
@@ -138,6 +141,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     }
 
     _cancelAutoClearTimer();
+    _cancelHardCapStopTimer();
     _listeningStartedAtElapsedRealtime = null;
     final deletedState = RecordingDeleted(count);
     state = state.copyWith(recordingState: deletedState);
@@ -240,12 +244,17 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
   Future<void> _startListening() async {
     _buttonActionInFlight = true;
     _cancelAutoClearTimer();
+    _cancelHardCapStopTimer();
     _listeningStartedAtElapsedRealtime = null;
 
     try {
       await _transcriptionService.startLiveTranscription(
         onStatus: _handleTranscriptionStatus,
       );
+      final latest = state.recordingState;
+      if (latest is RecordingListening) {
+        _scheduleHardCapStop(latest);
+      }
     } on TranscriptionServiceFailure catch (error, stackTrace) {
       _handleStartFailure(error, stackTrace);
     } catch (error, stackTrace) {
@@ -261,6 +270,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
 
   Future<void> _stopListening() async {
     _buttonActionInFlight = true;
+    _cancelHardCapStopTimer();
     final isTooShortTap =
         _listeningStartedAtElapsedRealtime != null &&
         _monotonicClock.now() - _listeningStartedAtElapsedRealtime! <
@@ -305,6 +315,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         );
         return;
       case Uploading():
+        _cancelHardCapStopTimer();
         state = state.copyWith(recordingState: const RecordingUploading());
         return;
     }
@@ -478,6 +489,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
       return;
     }
 
+    _cancelHardCapStopTimer();
     _listeningStartedAtElapsedRealtime = null;
     _emitError(_mapMicrophoneAccessState(accessState));
   }
@@ -535,8 +547,42 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     });
   }
 
+  void _scheduleHardCapStop(RecordingListening targetState) {
+    _cancelHardCapStopTimer();
+
+    final remainingMs =
+        targetState.hardCapDeadlineElapsedRealtime - _monotonicClock.now();
+    final delay = Duration(milliseconds: remainingMs <= 0 ? 0 : remainingMs);
+    _hardCapStopTimer = Timer(
+      delay,
+      () => _handleHardCapStopTimer(targetState),
+    );
+  }
+
+  void _handleHardCapStopTimer(RecordingListening targetState) {
+    final current = state.recordingState;
+    if (current != targetState) {
+      return;
+    }
+
+    if (_buttonActionInFlight) {
+      _hardCapStopTimer = Timer(
+        const Duration(milliseconds: 10),
+        () => _handleHardCapStopTimer(targetState),
+      );
+      return;
+    }
+
+    unawaited(_stopListening());
+  }
+
   void _cancelAutoClearTimer() {
     _autoClearTimer?.cancel();
     _autoClearTimer = null;
+  }
+
+  void _cancelHardCapStopTimer() {
+    _hardCapStopTimer?.cancel();
+    _hardCapStopTimer = null;
   }
 }

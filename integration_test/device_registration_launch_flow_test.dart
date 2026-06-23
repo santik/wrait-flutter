@@ -8,6 +8,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
+import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/api/backend_client.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
@@ -61,6 +62,7 @@ void main() {
         ),
         sharedPreferences: sharedPreferences,
         overrides: [
+          appLockEnabledProvider.overrideWithValue(false),
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('platform-device-id'),
           ),
@@ -144,6 +146,7 @@ void main() {
         ),
         sharedPreferences: sharedPreferences,
         overrides: [
+          appLockEnabledProvider.overrideWithValue(false),
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('first-platform-device'),
           ),
@@ -188,6 +191,7 @@ void main() {
         ),
         sharedPreferences: sharedPreferences,
         overrides: [
+          appLockEnabledProvider.overrideWithValue(false),
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('second-platform-device'),
           ),
@@ -259,6 +263,7 @@ void main() {
         ),
         sharedPreferences: sharedPreferences,
         overrides: [
+          appLockEnabledProvider.overrideWithValue(false),
           platformDeviceIdProvider.overrideWithValue(
             const _FakePlatformDeviceIdProvider('platform-device-id'),
           ),

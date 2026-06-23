@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Wrait uses the microphone to capture voice recordings for your entries.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Wrait uses Face ID to keep your journal private when the app is locked.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Wrait uses speech recognition to support voice-to-text features in future recording flows.</string>
 	<key>UIApplicationSceneManifest</key>

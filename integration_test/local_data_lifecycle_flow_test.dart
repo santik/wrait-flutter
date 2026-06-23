@@ -18,6 +18,7 @@ import 'package:wrait/core/router/app_router.dart';
 import 'package:wrait/core/time/system_clock.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
+import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/draft_audio_path_codec.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
@@ -431,6 +432,7 @@ Future<_LifecycleRuntime> _createIsolatedRuntime({
     entryDatabase: database,
     sharedPreferences: sharedPreferences,
     overrides: [
+      appLockEnabledProvider.overrideWithValue(false),
       clockProvider.overrideWithValue(clock),
       appRouterProvider.overrideWithValue(
         buildAppRouter(initialLocation: initialLocation),
@@ -460,6 +462,7 @@ Future<_LifecycleRuntime> _createPlatformRuntime({
     entryDatabase: database,
     sharedPreferences: sharedPreferences,
     overrides: [
+      appLockEnabledProvider.overrideWithValue(false),
       clockProvider.overrideWithValue(clock),
       appRouterProvider.overrideWithValue(
         buildAppRouter(initialLocation: '/entries'),

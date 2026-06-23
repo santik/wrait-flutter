@@ -12,6 +12,7 @@ import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
 import 'package:wrait/core/router/app_router.dart';
 import 'package:wrait/core/time/system_clock.dart';
+import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
 import 'package:wrait/data/api/record_quota_state.dart';
@@ -391,6 +392,7 @@ Future<_Harness> _createHarness({
         ),
       ),
       appRouterProvider.overrideWithValue(buildAppRouter()),
+      appLockEnabledProvider.overrideWithValue(false),
       localEntryDatabaseProvider.overrideWithValue(database),
       sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       monotonicClockProvider.overrideWithValue(monotonicClock),

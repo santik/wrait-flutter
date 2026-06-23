@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
 import 'domain/model/supported_language.dart';
+import 'presentation/app_lock/app_lock_gate.dart';
 import 'presentation/theme/wrait_theme.dart';
 
 final appConfigProvider = Provider<AppConfig>(
@@ -31,6 +32,10 @@ class WraitApp extends ConsumerWidget {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: _buildSupportedLocales(),
       routerConfig: router,
+      builder: (context, child) {
+        final routerChild = child ?? const SizedBox.shrink();
+        return AppLockGate(child: routerChild);
+      },
     );
   }
 }
