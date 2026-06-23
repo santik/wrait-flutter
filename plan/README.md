@@ -22,7 +22,7 @@ Story IDs stay stable, but implementation order follows the sequence below.
 16. US-010 - spec is ready
 17. US-012 - done
 18. US-015 - done
-19. US-018
+19. US-018 - done
 20. US-019
 21. US-020
 22. US-021

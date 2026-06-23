@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/core/config/app_config.dart';
+import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
@@ -112,6 +113,7 @@ Future<AppBootstrapRuntime> _createRuntime() async {
       preferencesRepositoryProvider.overrideWithValue(
         const _TestPreferencesRepository(),
       ),
+      appLockEnabledProvider.overrideWithValue(false),
       entryRepositoryProvider.overrideWithValue(const _TestEntryRepository()),
       mainRecordingControllerProvider.overrideWith(_SmokeController.new),
     ],

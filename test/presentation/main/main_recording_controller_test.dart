@@ -267,6 +267,61 @@ void main() {
     },
   );
 
+  test('hard-cap timer stops recording and saves the result', () async {
+    transcriptionService.nextHardCapDeadlineElapsedRealtime = 20;
+    cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
+      entryId: 43,
+      cleanedText: 'Cleaned transcript',
+    );
+    transcriptionService.nextStopResult = const TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'en-US',
+    );
+
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+
+    expect(transcriptionService.stopCallCount, 1);
+    expect(transcriptionService.statusHistory, contains(const Uploading()));
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      RecordingSaved(entryId: 43, detectedLanguage: 'en-US'),
+    );
+  });
+
+  test('manual stop cancels the pending hard-cap timer', () async {
+    transcriptionService.nextHardCapDeadlineElapsedRealtime = 20;
+    cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
+      entryId: 44,
+      cleanedText: 'Cleaned transcript',
+    );
+    transcriptionService.nextStopResult = const TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'en-US',
+    );
+
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+
+    expect(transcriptionService.stopCallCount, 1);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      RecordingSaved(entryId: 44, detectedLanguage: 'en-US'),
+    );
+  });
+
   test('Uploading and Processing button taps are ignored', () async {
     final stopCompleter = Completer<TranscriptionResult>();
     transcriptionService.stopFutureFactory = () => stopCompleter.future;
@@ -1062,6 +1117,7 @@ class _FakeTranscriptionService implements TranscriptionService {
   Future<TranscriptionResult> Function()? stopFutureFactory;
   bool _isRecording = false;
   bool _isTranscribing = false;
+  int nextHardCapDeadlineElapsedRealtime = 120000;
   int? _hardCapDeadlineElapsedRealtime;
 
   @override
@@ -1083,7 +1139,7 @@ class _FakeTranscriptionService implements TranscriptionService {
       throw error;
     }
     _isRecording = true;
-    _hardCapDeadlineElapsedRealtime = 120000;
+    _hardCapDeadlineElapsedRealtime = nextHardCapDeadlineElapsedRealtime;
     final pendingStart = startFutureFactory?.call(onStatus);
     if (pendingStart != null) {
       await pendingStart;

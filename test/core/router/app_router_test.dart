@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
 import 'package:wrait/core/router/app_router.dart';
+import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
@@ -94,6 +95,7 @@ Widget _buildTestApp({String initialLocation = '/', GoRouter? router}) {
       appRouterProvider.overrideWithValue(
         router ?? buildAppRouter(initialLocation: initialLocation),
       ),
+      appLockEnabledProvider.overrideWithValue(false),
       preferencesRepositoryProvider.overrideWithValue(
         const _RouterPreferencesRepository(),
       ),

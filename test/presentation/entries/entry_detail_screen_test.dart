@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
 import 'package:wrait/core/router/app_router.dart';
+import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
@@ -271,6 +272,7 @@ Future<void> _pumpEntryDetailApp(
         appRouterProvider.overrideWithValue(
           buildAppRouter(initialLocation: initialLocation),
         ),
+        appLockEnabledProvider.overrideWithValue(false),
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
         preferencesRepositoryProvider.overrideWithValue(
           const _TestPreferencesRepository(),
