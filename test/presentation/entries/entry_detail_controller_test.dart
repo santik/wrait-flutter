@@ -87,13 +87,13 @@ void main() {
       final controller = container.read(
         entryDetailControllerProvider(1).notifier,
       );
-    controller.syncFromEntry('initial text');
-    controller.startEditing('initial text');
-    controller.updateDraftText('first edit');
+      controller.syncFromEntry('initial text');
+      controller.startEditing('initial text');
+      controller.updateDraftText('first edit');
 
-    final firstFlush = controller.flushPendingEdits();
-    controller.updateDraftText('second edit');
-    final secondFlush = controller.flushPendingEdits();
+      final firstFlush = controller.flushPendingEdits();
+      controller.updateDraftText('second edit');
+      final secondFlush = controller.flushPendingEdits();
 
       firstSaveBlocker.complete();
 
@@ -142,6 +142,35 @@ void main() {
     expect(didDelete, isTrue);
     expect(repository.deletedIds, [1]);
   });
+
+  test(
+    'disposing during an in-flight auto-save ignores completion safely',
+    () async {
+      final repository = _FakeEntryRepository();
+      final saveBlocker = Completer<void>();
+      repository.editBlockers.add(saveBlocker);
+      final container = ProviderContainer(
+        overrides: [
+          entryRepositoryProvider.overrideWithValue(repository),
+          entryShareServiceProvider.overrideWithValue(_FakeEntryShareService()),
+          entryDetailAutoSaveDelayProvider.overrideWithValue(Duration.zero),
+        ],
+      );
+
+      final controller = container.read(
+        entryDetailControllerProvider(1).notifier,
+      );
+      controller.syncFromEntry('initial text');
+      controller.startEditing('initial text');
+      controller.updateDraftText('final edit');
+
+      final flushFuture = controller.flushPendingEdits();
+      container.dispose();
+      saveBlocker.complete();
+
+      await flushFuture;
+    },
+  );
 }
 
 class _FakeEntryRepository implements EntryRepository {

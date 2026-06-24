@@ -3,6 +3,47 @@
 This document captures implementation findings from completed stories that are
 worth keeping in mind during future feature work.
 
+## US-034: Dependency Constraint Refresh
+
+### Current dependency exceptions worth revisiting
+
+- `record` is intentionally pinned to `7.0.0`.
+- The attempted `record 7.1.0` upgrade pulled `record_android 2.1.2`, which
+  failed Android Kotlin compilation in both debug/profile validation with
+  unresolved `AdtsContainer` references in
+  `android/src/main/kotlin/com/llfbandit/record/record/format/AacFormat.kt`.
+- Revisit that pin when either `record_android` ships a fix or a future
+  Flutter/Android toolchain update changes the plugin compatibility picture.
+
+- `drift_dev` intentionally stayed on `2.34.0`.
+- `drift_dev 2.34.1+1` requires `analyzer ^13.0.0`, which conflicted with the
+  analyzer/test-family pins bundled with Flutter `3.44.3`.
+- Revisit that gap after the next Flutter stable upgrade or when the Flutter
+  SDK updates its analyzer-related constraints.
+
+### Dependency-refresh validation guidance
+
+- For Flutter/dependency maintenance stories, validate the generated backend
+  package in `tool/openapi-generator/output/backend_api` with at least
+  `flutter pub get` and `flutter analyze`, even when the app code only imports
+  the bridge file under `lib/data/api/generated/`.
+- Record the exact pre/post `flutter --version` and `flutter pub outdated`
+  output in the story artifacts. Summaries are useful, but the full command
+  output makes later refreshes much easier to compare.
+
+### Android emulator recording caveat
+
+- On `emulator-5554`, `integration_test/main_recording_controller_flow_test.dart`
+  passed after the dependency refresh, so the broader recording orchestration
+  stayed healthy with the pinned `record` stack.
+- In the same environment,
+  `integration_test/audio_recording_service_flow_test.dart` reproducibly
+  stalled on `provider graph supports start and valid stop with a completed
+  file path` and only ended after manual interruption with `did not complete`.
+- Treat that result as a known emulator/test-runner limitation to document and
+  re-check in future maintenance stories, not as standalone proof of an app
+  regression.
+
 ## US-020: Screenshot and Screen Recording Prevention
 
 ### Android secure-window contract

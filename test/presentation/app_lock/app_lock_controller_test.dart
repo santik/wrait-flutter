@@ -202,6 +202,23 @@ void main() {
       const AppLockState.unlocked(),
     );
   });
+
+  test(
+    'disposing during a pending unlock ignores the auth completion',
+    () async {
+      final completer = Completer<AppLockAuthResult>();
+      authenticator.authenticateCompleter = completer;
+
+      final unlockFuture = container
+          .read(appLockControllerProvider.notifier)
+          .unlock();
+
+      container.dispose();
+      completer.complete(AppLockAuthResult.success);
+
+      await unlockFuture;
+    },
+  );
 }
 
 class _FakeAppLockAuthenticator implements AppLockAuthenticator {

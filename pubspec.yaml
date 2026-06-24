@@ -19,7 +19,8 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.12.1
+  sdk: ^3.12.2
+  flutter: ">=3.44.3 <3.45.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -33,22 +34,24 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  drift: ^2.33.0
-  flutter_riverpod: ^3.3.1
+  drift: ^2.34.0
+  flutter_riverpod: ^3.3.2
   go_router: ^17.3.0
   intl: ^0.20.2
   flutter_secure_storage: ^10.3.1
   shared_preferences: ^2.5.3
   path: ^1.9.1
-  sqlite3: ^3.3.1
+  sqlite3: ^3.3.3
   dio: ^5.9.2
   crypto: ^3.0.6
   permission_handler: ^12.0.3
   local_auth: ^3.0.1
-  record: ^7.0.0
+  # Pinned: record 7.1.0 pulls record_android 2.1.2, which fails Android
+  # debug/profile Kotlin compilation with unresolved AdtsContainer references.
+  record: 7.0.0
   speech_to_text: ^7.4.0
   share_plus: ^13.1.0
-  path_provider: ^2.1.5
+  path_provider: ^2.1.6
   connectivity_plus: ^7.1.1
   wakelock_plus: ^1.6.1
   wrait_backend_api:
@@ -61,7 +64,7 @@ dev_dependencies:
     sdk: flutter
 
   build_runner: ^2.7.1
-  drift_dev: ^2.33.0
+  drift_dev: ^2.34.0
   flutter_lints: ^6.0.0
 
 hooks:
