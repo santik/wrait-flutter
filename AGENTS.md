@@ -6,12 +6,6 @@ Act as a senior flutter engineer. You know everything around flutter
 development for android and ios. You have deep knowledge about software
 architecture, testing and software development best practices.
 
-## Functionality to implement
-We need to achive the following functionality:
-[`functionality.md`](plan/functionality.md). 
-It is the ultimate goal and we move towards it in the following order:
-[`order`](plan/README.md)
-
 ## Spec-driven development workflow
 
 This project follows a **specify → clarify → plan → tasks → analyze → implement → review → fix**

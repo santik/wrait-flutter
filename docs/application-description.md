@@ -232,10 +232,3 @@ Current runtime behavior on top of that generated client:
 - Android developers can also build the debug APK manually with
   `flutter build apk --debug --dart-define=PROXY_SECRET=...` and install
   `build/app/outputs/flutter-apk/app-debug.apk` directly through `adb`
-
-## Reference
-
-For the current story breakdown and broader functionality roadmap, see:
-
-- `plan/functionality.md`
-- `plan/us_001.md` through `plan/us_026.md`
