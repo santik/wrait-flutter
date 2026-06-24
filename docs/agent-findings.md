@@ -3,6 +3,61 @@
 This document captures implementation findings from completed stories that are
 worth keeping in mind during future feature work.
 
+## US-020: Screenshot and Screen Recording Prevention
+
+### Android secure-window contract
+
+- Android capture privacy is implemented at the activity window level through
+  `FLAG_SECURE` in
+  `android/app/src/main/kotlin/com/wrait/flutter/MainActivity.kt`.
+- Keep the protection unconditional across debug, profile, and release
+  identities.
+- Pre-`super.onCreate(...)` application is required for first-frame protection,
+  but validation also showed that this alone was not enough to preserve the
+  secure flag on the final live Flutter window.
+- The current validated contract therefore includes reasserting `FLAG_SECURE`
+  after `super.onCreate(...)`, on resume, and when focus returns.
+- Do not remove those reassertion points casually. Revalidate with runtime
+  window inspection first if a future story tries to simplify them.
+
+### Android validation guidance
+
+- For capture-privacy work, verify more than a single screenshot:
+  - launcher-style cold start
+  - `dumpsys window` secure-flag presence on the live activity window
+  - black foreground screenshot output
+  - black recents/task-preview output
+  - a decoded frame from an Android `screenrecord` artifact
+- Debug automation lockscreen mode remained compatible with `FLAG_SECURE`
+  during validation. Preserve that interaction and restore the automation
+  setting after temporary test changes.
+
+### iOS scene-cover contract
+
+- iOS capture privacy is implemented in `ios/Runner/SceneDelegate.swift` as a
+  native scene-level privacy cover.
+- Keep the iOS cover generic and non-sensitive. The current validated text is
+  `Private`.
+- The validated app-switch/background behavior is the inactive/background scene
+  path, not a Flutter route-specific overlay.
+
+### iOS simulator validation caveats
+
+- In this environment, normal simulator startup can still surface a system
+  passcode prompt for Wrait before ordinary Flutter UI appears, even when the
+  app-lock provider is disabled.
+- A compile-time `CAPTURE_VALIDATION_MODE=true` launch path in `lib/main.dart`
+  is acceptable for validation-only placeholder content because it exercises
+  the same native privacy-cover path without changing the production bootstrap
+  flow or exposing diary content.
+- `xcrun simctl io booted recordVideo` did not toggle
+  `UIScreen.main.isCaptured` here. Do not over-claim simulator proof for
+  active-capture hiding based on `recordVideo` alone.
+- When direct app-switcher UI automation is unavailable, inspect the stored
+  SplashBoard snapshot in the simulator app container. That gave direct runtime
+  proof that the native `Private` cover replaced the visible foreground content
+  during the background snapshot path.
+
 ## US-019: App Lock
 
 ### Root app-lock contract

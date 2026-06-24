@@ -93,6 +93,40 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   `android.permission.USE_BIOMETRIC`, and keeping the AppCompat-compatible
   launch/normal theme parents required by `local_auth_android`.
 
+### Capture privacy behavior
+
+- Android screenshot, screen-recording, and recent-app protection now lives in
+  `android/app/src/main/kotlin/com/wrait/flutter/MainActivity.kt` through
+  `FLAG_SECURE`.
+- Keep Android capture protection applied before `super.onCreate(...)` and also
+  keep the current reassertion points after `super.onCreate(...)`, on resume,
+  and on focus return unless a future approved story revalidates and removes
+  them. Emulator validation showed Flutter can retarget the live activity
+  window later in startup and lifecycle transitions.
+- Existing Android debug automation lockscreen mode must remain compatible with
+  `FLAG_SECURE`, and any temporary automation-setting changes still need to be
+  restored after validation or deploy flows.
+- iOS capture privacy now lives in `ios/Runner/SceneDelegate.swift` as a
+  scene-level native cover. Keep future privacy changes at that native scene
+  boundary rather than adding route-specific Flutter capture-hiding logic by
+  default.
+- The iOS privacy cover copy should stay generic and non-sensitive. Current
+  validated copy is `Private`.
+- For stronger Android validation, prefer a four-part evidence set: launcher
+  cold start, `dumpsys window` secure-flag inspection, black foreground/recents
+  screenshots, and a decoded frame from a `screenrecord` artifact.
+- For iOS simulator validation, `xcrun simctl io booted recordVideo` did not
+  toggle `UIScreen.main.isCaptured` in this environment. Do not treat simulator
+  recording alone as proof that active-capture hiding works.
+- When direct app-switcher automation is unavailable on iOS simulator, inspect
+  the app's stored SplashBoard snapshot under the simulator app container to
+  verify the background/app-switch privacy cover path.
+- Secure startup dependencies can still surface a system passcode prompt before
+  normal Wrait UI appears on iOS simulator. A compile-time
+  `CAPTURE_VALIDATION_MODE=true` launch path exists in `lib/main.dart` only for
+  native privacy-cover validation with non-sensitive placeholder content; keep
+  production launches on the normal bootstrap path.
+
 ### Android debug deployment guidance
 
 - Prefer `./deploy_debug.sh` for real-device Android debug deployment when the
@@ -197,6 +231,9 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - For Android startup or rendering work, verify a launcher-style cold start
   with `adb shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity`
   in addition to ordinary `flutter run` checks.
+- For Android capture-privacy work, also verify secure-flag persistence after
+  app-switch/resume with `dumpsys window` instead of relying only on a single
+  cold-launch screenshot.
 
 ### Android identity note
 

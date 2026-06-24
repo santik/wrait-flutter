@@ -6,15 +6,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app.dart';
+import '../../data/auth/app_lock_providers.dart';
 import '../../data/api/backend_providers.dart';
 import '../../data/audio/audio_recording_providers.dart';
+import '../../data/display/display_awake_service.dart';
 import '../../data/preferences/preferences_providers.dart';
+import '../app_lock/app_lock_controller.dart';
 import '../theme/design_tokens.dart';
 import 'button_area.dart';
 import 'main_recording_controller.dart';
 import 'main_screen_stats.dart';
 import 'main_screen_status.dart';
 import 'main_screen_test_keys.dart';
+import 'recording_display_awake_coordinator.dart';
 import 'recording_state.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -26,6 +30,7 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
+  late final RecordingDisplayAwakeCoordinator _displayAwakeCoordinator;
   Timer? _savedAutoClearTimer;
   Timer? _countdownTicker;
   final ValueNotifier<double?> _countdownProgress = ValueNotifier<double?>(
@@ -40,11 +45,19 @@ class _MainScreenState extends ConsumerState<MainScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _displayAwakeCoordinator = RecordingDisplayAwakeCoordinator(
+      service: ref.read(displayAwakeServiceProvider),
+      recordingState: ref.read(mainRecordingControllerProvider).recordingState,
+      lifecycleState:
+          WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.inactive,
+      appLockState: _readEffectiveAppLockState(),
+    );
     _loadHasEverRecorded();
   }
 
   @override
   void dispose() {
+    _displayAwakeCoordinator.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _savedAutoClearTimer?.cancel();
     _countdownTicker?.cancel();
@@ -54,6 +67,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _displayAwakeCoordinator.updateLifecycleState(state);
     if (state != AppLifecycleState.resumed) {
       return;
     }
@@ -96,10 +110,20 @@ class _MainScreenState extends ConsumerState<MainScreen>
       previous,
       next,
     ) {
+      _displayAwakeCoordinator.updateRecordingState(next.recordingState);
       _handleControllerTransition(
         previous?.recordingState,
         next.recordingState,
       );
+    });
+    ref.listen<bool>(appLockEnabledProvider, (previous, next) {
+      _displayAwakeCoordinator.updateAppLockState(_readEffectiveAppLockState());
+    });
+    ref.listen<AppLockState>(appLockControllerProvider, (previous, next) {
+      if (!ref.read(appLockEnabledProvider)) {
+        return;
+      }
+      _displayAwakeCoordinator.updateAppLockState(next);
     });
 
     final controllerState = ref.watch(mainRecordingControllerProvider);
@@ -254,6 +278,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
         ),
       ),
     );
+  }
+
+  AppLockState _readEffectiveAppLockState() {
+    if (!ref.read(appLockEnabledProvider)) {
+      return const AppLockState.unlocked();
+    }
+    return ref.read(appLockControllerProvider);
   }
 
   void _handleControllerTransition(
