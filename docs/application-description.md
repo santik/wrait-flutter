@@ -65,6 +65,11 @@ upcoming feature work:
   automatic foreground auth prompt scheduling, and retryable unavailable states
 - best-effort device-security settings recovery plus warning bypass when no
   supported device security is configured
+- always-on native Android capture protection for screenshots, screen
+  recordings, and recent-app previews through secure-window handling
+- native iOS privacy-cover protection for app-switch/background snapshots
+- generic non-sensitive protected output on iOS privacy-cover surfaces instead
+  of branded or diary-specific content
 - centralized backend API client for device registration, audio transcription,
   and transcript cleanup
 - OpenAPI-driven backend contract consumption from `api/wrait-backend.yaml`
@@ -167,12 +172,20 @@ presentation beyond the current session state, preferences persistence beyond
 the current basic flags and identifiers, settings UI, and broader
 entry-management UI still belongs to later user stories.
 
+Current platform limitation to keep in mind:
+
+- iOS simulator recording in this environment does not currently prove active
+  screen-capture hiding because `UIScreen.main.isCaptured` did not toggle
+  during `simctl recordVideo`; stronger evidence for that path still belongs to
+  future physical-device validation.
+
 ## Important product themes
 
 - Voice-first capture
 - Cross-platform mobile support on Android and iOS
 - Privacy-aware handling of sensitive journal content
 - App-level privacy lock with device-owner authentication
+- Native operating-system capture privacy for supported Android and iOS surfaces
 - Secure local storage
 - Backend-assisted voice journaling with durable local retry
 

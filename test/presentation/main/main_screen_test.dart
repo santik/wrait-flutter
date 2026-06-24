@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
 import 'package:wrait/core/router/app_router.dart';
+import 'package:wrait/data/display/display_awake_service.dart';
 import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
@@ -19,12 +20,17 @@ import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 import 'package:wrait/presentation/theme/design_tokens.dart';
+import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
+
+import '../../test_doubles/fake_display_awake_service.dart';
 
 void main() {
   late _TestMainRecordingController controller;
   late _TestEntryRepository entryRepository;
   late _TestPreferencesRepository preferencesRepository;
   late _TestQuotaNotifier quotaNotifier;
+  late FakeDisplayAwakeService displayAwakeService;
+  late _TestAppLockController appLockController;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
@@ -32,6 +38,8 @@ void main() {
     entryRepository = _TestEntryRepository();
     preferencesRepository = _TestPreferencesRepository(hasEverRecorded: true);
     quotaNotifier = _TestQuotaNotifier();
+    displayAwakeService = FakeDisplayAwakeService();
+    appLockController = _TestAppLockController();
   });
 
   testWidgets(
@@ -428,6 +436,214 @@ void main() {
 
     expect(controller.resumeCount, 1);
   });
+
+  testWidgets('listening enables keep-awake and uploading releases it', (
+    tester,
+  ) async {
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      displayAwakeService: displayAwakeService,
+      settle: false,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    controller.setTestState(
+      const RecordingControllerState(recordingState: RecordingUploading()),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(displayAwakeService.requests, <bool>[true, false]);
+  });
+
+  testWidgets('lifecycle exit releases keep-awake and resume reacquires it', (
+    tester,
+  ) async {
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      displayAwakeService: displayAwakeService,
+      settle: false,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(displayAwakeService.requests, <bool>[true, false, true]);
+  });
+
+  testWidgets('startup while inactive does not enable keep-awake until resume', (
+    tester,
+  ) async {
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      displayAwakeService: displayAwakeService,
+      settle: false,
+    );
+
+    expect(displayAwakeService.requests, isEmpty);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(displayAwakeService.requests, <bool>[true]);
+  });
+
+  testWidgets('disposing while listening releases keep-awake cleanly', (
+    tester,
+  ) async {
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      displayAwakeService: displayAwakeService,
+      settle: false,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pump();
+
+    expect(displayAwakeService.requests, <bool>[true, false]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('app lock release keep-awake while listening', (tester) async {
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      displayAwakeService: displayAwakeService,
+      appLockEnabled: true,
+      appLockController: appLockController,
+      settle: false,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    appLockController.lock();
+    await tester.pump();
+    await tester.pump();
+
+    expect(displayAwakeService.requests, <bool>[true, false]);
+  });
+
+  testWidgets('failed enable retries on later state changes without breaking UI', (
+    tester,
+  ) async {
+    displayAwakeService.enqueueResult(false);
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      displayAwakeService: displayAwakeService,
+      settle: false,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    controller.setTestState(
+      const RecordingControllerState(recordingState: RecordingUploading()),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(displayAwakeService.requests, <bool>[true, true, false]);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpTestApp(
@@ -436,29 +652,39 @@ Future<void> _pumpTestApp(
   required _TestEntryRepository entryRepository,
   required _TestPreferencesRepository preferencesRepository,
   required _TestQuotaNotifier quotaNotifier,
+  FakeDisplayAwakeService? displayAwakeService,
   AppConfig appConfig = const AppConfig(
     backendUrl: 'https://wrait-backend.vercel.app',
     proxySecret: '',
     recordingHardCapMs: 120000,
   ),
   RecordingFeedbackDelays feedbackDelays = const RecordingFeedbackDelays(),
+  bool appLockEnabled = false,
+  _TestAppLockController? appLockController,
   bool settle = true,
 }) async {
   final router = buildAppRouter();
   final sharedPreferences = await SharedPreferences.getInstance();
+  final resolvedDisplayAwakeService =
+      displayAwakeService ?? FakeDisplayAwakeService();
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         appConfigProvider.overrideWithValue(appConfig),
         appRouterProvider.overrideWithValue(router),
-        appLockEnabledProvider.overrideWithValue(false),
+        appLockEnabledProvider.overrideWithValue(appLockEnabled),
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
         preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
         entryRepositoryProvider.overrideWithValue(entryRepository),
         mainRecordingControllerProvider.overrideWith(() => controller),
         sessionRecordQuotaStateProvider.overrideWith(() => quotaNotifier),
         recordingFeedbackDelaysProvider.overrideWithValue(feedbackDelays),
+        displayAwakeServiceProvider.overrideWithValue(
+          resolvedDisplayAwakeService,
+        ),
+        if (appLockController != null)
+          appLockControllerProvider.overrideWith(() => appLockController),
       ],
       child: const WraitApp(),
     ),
@@ -535,6 +761,20 @@ class _TestQuotaNotifier extends SessionRecordQuotaStateNotifier {
     _currentQuota = null;
     try {
       state = null;
+    } catch (_) {}
+  }
+}
+
+class _TestAppLockController extends AppLockController {
+  AppLockState _currentState = const AppLockState.unlocked();
+
+  @override
+  AppLockState build() => _currentState;
+
+  void lock() {
+    _currentState = const AppLockState.locked();
+    try {
+      state = _currentState;
     } catch (_) {}
   }
 }
