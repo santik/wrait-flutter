@@ -131,6 +131,9 @@ class AppLockController extends Notifier<AppLockState> {
     final result = await _authenticator.authenticate(
       localizedReason: 'Unlock Wrait to continue.',
     );
+    if (!ref.mounted) {
+      return;
+    }
     if (attemptId != _authAttemptId) {
       return;
     }

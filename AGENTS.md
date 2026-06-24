@@ -234,6 +234,18 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - For Android capture-privacy work, also verify secure-flag persistence after
   app-switch/resume with `dumpsys window` instead of relying only on a single
   cold-launch screenshot.
+- When a story refreshes Flutter or dependency versions, also validate the
+  generated backend package in `tool/openapi-generator/output/backend_api`
+  with at least `flutter pub get` and `flutter analyze` so resolver or
+  generated-client compatibility drift is caught explicitly.
+- Current Android emulator validation has a known split for recording flows:
+  `integration_test/main_recording_controller_flow_test.dart` passes on
+  `emulator-5554`, while
+  `integration_test/audio_recording_service_flow_test.dart` can stall on
+  `provider graph supports start and valid stop with a completed file path`
+  and later report `did not complete`. Treat that as an emulator/test-runner
+  limitation to document and re-check, not as automatic proof of an app-side
+  regression.
 
 ### Android identity note
 
@@ -262,3 +274,20 @@ backend client.
   `lib/data/api/generated/backend_api_generated.dart`, which acts as the stable
   compatibility bridge over the generated package, rather than importing the
   generated package surface directly in feature code.
+
+## Dependency maintenance guidance
+
+US-034 refreshed the Flutter/dependency baseline and left two intentional
+exceptions that should be re-evaluated on future maintenance passes:
+
+- `record` is pinned to `7.0.0` because `record 7.1.0` pulls
+  `record_android 2.1.2`, which failed Android debug/profile Kotlin
+  compilation with unresolved `AdtsContainer` references in
+  `AacFormat.kt`.
+- `drift_dev` stays on `2.34.0` because `2.34.1+1` requires
+  `analyzer ^13.0.0`, which conflicts with the Flutter `3.44.3`
+  `flutter_test` dependency family.
+
+Future dependency-refresh stories should treat those as explicit checkpoints:
+retry them after a Flutter stable upgrade or when upstream plugin/analyzer
+constraints change, and record the result in the story artifacts.

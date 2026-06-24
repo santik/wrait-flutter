@@ -181,6 +181,9 @@ class EntryDetailController extends Notifier<EntryDetailControllerState> {
       }
 
       await _saveLatestRequestedRevision();
+      if (!ref.mounted) {
+        return false;
+      }
       if (state.saveFailed && _lastPersistedRevision < targetRevision) {
         return _markRevisionSavedWithoutWrite(targetRevision);
       }
@@ -219,11 +222,17 @@ class EntryDetailController extends Notifier<EntryDetailControllerState> {
 
     try {
       await _entryRepository.updateEditedCleanedText(_entryId, textToPersist);
+      if (!ref.mounted) {
+        return;
+      }
       _latestPersistedText = textToPersist;
       _lastPersistedRevision = revisionToPersist;
       didSave = true;
       state = state.copyWith(isSaving: false, saveFailed: false);
     } catch (error, stackTrace) {
+      if (!ref.mounted) {
+        return;
+      }
       _logWarning(
         'Failed to auto-save entry detail edits.',
         error: error,
@@ -231,7 +240,9 @@ class EntryDetailController extends Notifier<EntryDetailControllerState> {
       );
       state = state.copyWith(isSaving: false, saveFailed: true);
     } finally {
-      state = state.copyWith(isSaving: false);
+      if (ref.mounted) {
+        state = state.copyWith(isSaving: false);
+      }
       if (!completer.isCompleted) {
         completer.complete(didSave);
       }
