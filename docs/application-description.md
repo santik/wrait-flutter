@@ -59,6 +59,12 @@ upcoming feature work:
 - persisted recording-state preference
 - persisted stable app device identifier with native lookup/fallback
   resolution and backend-compatible anonymous hashing for newly resolved IDs
+- app-wide privacy lock that starts locked on cold launch and relocks on
+  return from true foreground exit states
+- whole-app lock overlay with blur/scrim obscuring, explicit unlock action,
+  automatic foreground auth prompt scheduling, and retryable unavailable states
+- best-effort device-security settings recovery plus warning bypass when no
+  supported device security is configured
 - centralized backend API client for device registration, audio transcription,
   and transcript cleanup
 - OpenAPI-driven backend contract consumption from `api/wrait-backend.yaml`
@@ -166,6 +172,7 @@ entry-management UI still belongs to later user stories.
 - Voice-first capture
 - Cross-platform mobile support on Android and iOS
 - Privacy-aware handling of sensitive journal content
+- App-level privacy lock with device-owner authentication
 - Secure local storage
 - Backend-assisted voice journaling with durable local retry
 
