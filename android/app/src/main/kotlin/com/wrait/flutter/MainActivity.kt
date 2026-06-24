@@ -13,6 +13,8 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableCaptureProtection()
+
         if (shouldEnableAutomationLockscreenMode()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                 setShowWhenLocked(true)
@@ -28,6 +30,23 @@ class MainActivity : FlutterFragmentActivity() {
         }
 
         super.onCreate(savedInstanceState)
+        // Flutter can retarget the live activity window during attach/startup,
+        // so reassert secure capture protection once the Flutter activity is ready.
+        enableCaptureProtection()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Reassert protection when Android brings the activity back to foreground.
+        enableCaptureProtection()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            // Some lifecycle/app-switch flows restore focus after the live window changes.
+            enableCaptureProtection()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -115,5 +134,9 @@ class MainActivity : FlutterFragmentActivity() {
         } catch (_: SecurityException) {
             false
         }
+    }
+
+    private fun enableCaptureProtection() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 }

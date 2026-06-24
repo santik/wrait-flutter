@@ -76,6 +76,23 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   bootstrap path unless a future approved story explicitly changes that
   startup tradeoff.
 
+### App lock behavior
+
+- The root privacy lock now lives above the router content through
+  `AppLockGate` in `lib/app.dart`; future sensitive screens should stay covered
+  by that shared gate instead of adding screen-specific lock logic.
+- Treat only true foreground exits as relock triggers. Do not re-lock on
+  `AppLifecycleState.inactive`; native `local_auth` UI can emit transient
+  `inactive` transitions, and treating those as background exits can cause the
+  biometric prompt to cancel and restart in a loop on real devices.
+- Keep app-lock authentication and device-security settings opening
+  single-flight. Future changes should preserve the current timeout-based auth
+  recovery and the controller's guard against repeated settings launches.
+- Android app-lock production wiring depends on keeping
+  `MainActivity` as `FlutterFragmentActivity`, preserving
+  `android.permission.USE_BIOMETRIC`, and keeping the AppCompat-compatible
+  launch/normal theme parents required by `local_auth_android`.
+
 ### Android debug deployment guidance
 
 - Prefer `./deploy_debug.sh` for real-device Android debug deployment when the
@@ -157,6 +174,10 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - For main-screen integration and widget tests, prefer stable selectors from
   `lib/presentation/main/main_screen_test_keys.dart` instead of visible-text
   lookups wherever practical.
+- Widget and integration tests that pump `WraitApp` but are not explicitly
+  about app lock should override `appLockEnabledProvider` to `false` so they
+  stay focused on the behavior under test instead of booting behind the root
+  privacy gate.
 - Reuse existing bootstrap and recording-controller tests before adding new
   startup-specific harnesses.
 - For local-data lifecycle work, treat same-identity update validation and

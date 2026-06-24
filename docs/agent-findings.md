@@ -3,6 +3,75 @@
 This document captures implementation findings from completed stories that are
 worth keeping in mind during future feature work.
 
+## US-019: App Lock
+
+### Root app-lock contract
+
+- The privacy lock should stay implemented as a root app gate above the router
+  content rather than as screen-specific logic.
+- Current production wiring uses:
+  - `lib/presentation/app_lock/app_lock_gate.dart`
+  - `lib/presentation/app_lock/app_lock_controller.dart`
+  - `lib/data/auth/app_lock_authenticator.dart`
+  - `lib/data/auth/device_security_settings_opener.dart`
+- Cold launch starts locked.
+- Returning from a true foreground exit re-locks the app until authentication
+  succeeds or the approved no-security bypass is used.
+
+### Lifecycle caveat worth preserving
+
+- Do not treat `AppLifecycleState.inactive` as a relock trigger for app lock.
+- Real-device validation showed that native biometric UI can emit transient
+  `inactive` transitions while the authentication sheet is on screen.
+- If app lock re-locks on `inactive`, the biometric prompt can slide up and
+  down continuously because auth is canceled and immediately restarted on the
+  next `resumed`.
+- The current contract is:
+  - ignore `inactive`
+  - relock only on true foreground exit states such as `paused`, `hidden`, and
+    `detached`
+
+### Native auth robustness
+
+- App-lock auth now uses an explicit timeout with best-effort cancellation so a
+  hung native prompt returns a retryable unavailable state instead of leaving
+  the session permanently stuck in `authenticating`.
+- Non-success auth and availability outcomes are logged through the shared
+  app-lock warning logger.
+- Device-security settings opening is single-flight to avoid repeated settings
+  launches from rapid taps.
+
+### Android platform contract
+
+- Android app-lock production wiring depends on:
+  - `MainActivity` remaining a `FlutterFragmentActivity`
+  - `android.permission.USE_BIOMETRIC`
+  - AppCompat-compatible launch/normal theme parents for `local_auth_android`
+- The Android security-settings path should verify that the intent resolves
+  before launching it.
+
+### Testing guidance
+
+- Tests that pump `WraitApp` but are not specifically validating app lock
+  should override `appLockEnabledProvider` to `false`.
+- Dedicated app-lock coverage should keep validating:
+  - cold launch unlock
+  - relock on foreground return
+  - `inactive -> resumed` churn during an in-flight auth prompt
+  - cancel/retry
+  - no-security settings + bypass
+  - temporary unavailable retry
+
+### Validation note
+
+- On the connected Android phone, the post-fix app-lock integration flow passed
+  after iOS simulator and Android emulator validation were both green.
+- A plain `adb shell am start -W` cold launch of the reinstalled debug build
+  later reported `Status: timeout` while `dumpsys activity` still showed
+  `com.wrait.flutter.dev/.MainActivity` as the resumed activity. Treat
+  `dumpsys` as a useful secondary check when launcher-style timing output is
+  ambiguous on this device.
+
 ## US-032: iOS Draft Audio Update Path Stability
 
 ### Shared retained-audio path contract

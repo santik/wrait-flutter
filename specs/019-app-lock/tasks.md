@@ -237,23 +237,23 @@ Handle the external review loop without changing files before approval.
 - [x] Implement approved review fixes and update `spec.md`, `plan.md`,
       `tasks.md`, `implementation.md`, code, and tests when review changes
       scope, approach, or validation
-- [ ] Repeat the review/fix loop if the same `review.md` file is updated for
+- [x] Repeat the review/fix loop if the same `review.md` file is updated for
       another pass
 
 ### Group 10: Finalization
 
 Close the feature only after durable documentation follow-up is handled.
 
-- [ ] Decide whether US-019 produced durable learnings or long-lived
+- [x] Decide whether US-019 produced durable learnings or long-lived
       product/architecture changes worth preserving
-- [ ] Propose updates to `AGENTS.md`, `docs/application-description.md`, and
+- [x] Propose updates to `AGENTS.md`, `docs/application-description.md`, and
       `docs/agent-findings.md` if app-lock behavior or platform setup should be
       long-lived guidance
-- [ ] Wait for explicit approval before editing those long-lived guidance
+- [x] Wait for explicit approval before editing those long-lived guidance
       documents
-- [ ] Apply approved long-lived documentation updates, or record the explicit
+- [x] Apply approved long-lived documentation updates, or record the explicit
       no-update decision
-- [ ] Mark `spec.md` status `Complete` only after implementation, validation,
+- [x] Mark `spec.md` status `Complete` only after implementation, validation,
       review handling, and final knowledge-capture gates are done
 
 ## Completion criteria

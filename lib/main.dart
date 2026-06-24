@@ -13,8 +13,18 @@ import 'data/entries/local_entry_database.dart';
 import 'data/preferences/preferences_providers.dart';
 import 'presentation/theme/wrait_theme.dart';
 
+const _captureValidationMode = bool.fromEnvironment(
+  'CAPTURE_VALIDATION_MODE',
+  defaultValue: false,
+);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (_captureValidationMode) {
+    runApp(const _CaptureValidationApp());
+    return;
+  }
 
   runApp(
     BootstrapApp(
@@ -308,4 +318,49 @@ ProviderContainer createAppContainer({
 
 void startAppLaunchWork(ProviderContainer appContainer) {
   unawaited(appContainer.read(appLaunchWorkUseCaseProvider).call());
+}
+
+class _CaptureValidationApp extends StatelessWidget {
+  const _CaptureValidationApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: wraitLightTheme,
+      darkTheme: wraitDarkTheme,
+      themeMode: ThemeMode.system,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.shield_moon_outlined,
+                size: 56,
+                color: Colors.white.withValues(alpha: 0.92),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'capture validation',
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineMedium?.copyWith(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'visible placeholder content for native privacy-cover checks',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
