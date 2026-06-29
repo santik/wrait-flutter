@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +32,7 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
   late final RecordingDisplayAwakeCoordinator _displayAwakeCoordinator;
+  final GlobalKey _buttonAreaKey = GlobalKey();
   Timer? _savedAutoClearTimer;
   Timer? _countdownTicker;
   final ValueNotifier<double?> _countdownProgress = ValueNotifier<double?>(
@@ -40,6 +42,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
   bool _hasRecordedThisSession = false;
   int _statusLineGeneration = 0;
   int _savedAutoClearGeneration = 0;
+  bool _pulseMeasurementPending = false;
+  double? _measuredPulseDiameter;
+  Size? _lastPulseViewportSize;
+  EdgeInsets? _lastPulseViewPadding;
 
   @override
   void initState() {
@@ -158,6 +164,15 @@ class _MainScreenState extends ConsumerState<MainScreen>
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final mediaQuery = MediaQuery.of(context);
+              _schedulePulseMeasurement(
+                viewportSize: mediaQuery.size,
+                viewPadding: mediaQuery.padding,
+              );
+              final pulseDiameter =
+                  _measuredPulseDiameter ??
+                  _fallbackPulseDiameter(constraints.biggest);
+
               return SingleChildScrollView(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -198,11 +213,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
                               valueListenable: _countdownProgress,
                               builder: (context, countdownProgress, _) {
                                 return ButtonArea(
+                                  key: _buttonAreaKey,
                                   recordingState:
                                       controllerState.recordingState,
                                   shakeErrorKey: controllerState.shakeErrorKey,
                                   buttonLabel: status.buttonLabel,
                                   countdownProgress: countdownProgress,
+                                  pulseDiameter: pulseDiameter,
                                   onPressed: () {
                                     ref
                                         .read(
@@ -278,6 +295,71 @@ class _MainScreenState extends ConsumerState<MainScreen>
         ),
       ),
     );
+  }
+
+  double _fallbackPulseDiameter(Size viewportSize) {
+    return math.max(viewportSize.width, viewportSize.height) +
+        (WraitButtonTokens.pulseViewportOverscan * 2);
+  }
+
+  void _schedulePulseMeasurement({
+    required Size viewportSize,
+    required EdgeInsets viewPadding,
+  }) {
+    final needsMeasurement =
+        _measuredPulseDiameter == null ||
+        _lastPulseViewportSize != viewportSize ||
+        _lastPulseViewPadding != viewPadding;
+    if (!needsMeasurement || _pulseMeasurementPending) {
+      return;
+    }
+
+    _pulseMeasurementPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pulseMeasurementPending = false;
+      if (!mounted) {
+        return;
+      }
+
+      final buttonContext = _buttonAreaKey.currentContext;
+      final renderObject = buttonContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) {
+        return;
+      }
+
+      final buttonCenter = renderObject.localToGlobal(
+        renderObject.size.center(Offset.zero),
+      );
+      final visibleRect = Rect.fromLTRB(
+        viewPadding.left,
+        viewPadding.top,
+        viewportSize.width - viewPadding.right,
+        viewportSize.height - viewPadding.bottom,
+      );
+      final furthestCornerDistance = <double>[
+        (buttonCenter - visibleRect.topLeft).distance,
+        (buttonCenter - visibleRect.topRight).distance,
+        (buttonCenter - visibleRect.bottomLeft).distance,
+        (buttonCenter - visibleRect.bottomRight).distance,
+      ].reduce(math.max);
+      final measuredPulseDiameter =
+          (furthestCornerDistance * 2) +
+          (WraitButtonTokens.pulseViewportOverscan * 2);
+
+      if (!measuredPulseDiameter.isFinite || measuredPulseDiameter <= 0) {
+        return;
+      }
+
+      _lastPulseViewportSize = viewportSize;
+      _lastPulseViewPadding = viewPadding;
+      if ((_measuredPulseDiameter ?? 0) == measuredPulseDiameter) {
+        return;
+      }
+
+      setState(() {
+        _measuredPulseDiameter = measuredPulseDiameter;
+      });
+    });
   }
 
   AppLockState _readEffectiveAppLockState() {

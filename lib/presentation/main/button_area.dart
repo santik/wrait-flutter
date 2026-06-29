@@ -16,6 +16,7 @@ class ButtonArea extends StatefulWidget {
     required this.buttonLabel,
     required this.onPressed,
     this.countdownProgress,
+    this.pulseDiameter,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class ButtonArea extends StatefulWidget {
   final String buttonLabel;
   final VoidCallback onPressed;
   final double? countdownProgress;
+  final double? pulseDiameter;
 
   @override
   State<ButtonArea> createState() => _ButtonAreaState();
@@ -62,7 +64,8 @@ class _ButtonAreaState extends State<ButtonArea>
     return LayoutBuilder(
       builder: (context, constraints) {
         final buttonSize = AdaptiveButtonSize.forWidth(constraints.maxWidth);
-        final pulseSize = buttonSize * WraitButtonTokens.pulseScaleMax;
+        final pulseEndDiameter = _resolvePulseEndDiameter(buttonSize);
+        final layoutSize = buttonSize + WraitButtonTokens.countdownSizeOffset;
 
         return AnimatedBuilder(
           animation: _shakeController,
@@ -77,16 +80,18 @@ class _ButtonAreaState extends State<ButtonArea>
             return Transform.translate(offset: Offset(offset, 0), child: child);
           },
           child: SizedBox(
-            width: pulseSize,
-            height: pulseSize,
+            width: layoutSize,
+            height: layoutSize,
             child: Stack(
               alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
                 if (isListening)
                   PulseRing(
                     key: const ValueKey('pulseRing'),
-                    size: buttonSize,
-                    color: colorScheme.primary.withValues(alpha: 0.4),
+                    startDiameter: buttonSize,
+                    endDiameter: pulseEndDiameter,
+                    color: colorScheme.primary.withValues(alpha: 0.78),
                   ),
                 if (isListening && widget.countdownProgress != null)
                   CountdownRing(
@@ -141,5 +146,17 @@ class _ButtonAreaState extends State<ButtonArea>
         );
       },
     );
+  }
+
+  double _resolvePulseEndDiameter(double buttonSize) {
+    final minimumPulseDiameter = buttonSize * WraitButtonTokens.pulseScaleMax;
+    final requestedPulseDiameter = widget.pulseDiameter;
+    if (requestedPulseDiameter == null || !requestedPulseDiameter.isFinite) {
+      return minimumPulseDiameter;
+    }
+
+    return requestedPulseDiameter
+        .clamp(minimumPulseDiameter, WraitButtonTokens.pulseDiameterMax)
+        .toDouble();
   }
 }

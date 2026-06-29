@@ -16,6 +16,7 @@ import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/entries/entry_detail_controller.dart';
+import 'package:wrait/presentation/entries/entry_detail_formatters.dart';
 import 'package:wrait/presentation/entries/entry_share_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
@@ -156,6 +157,57 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Could not share this entry.'), findsOneWidget);
+  });
+
+  testWidgets('share includes the entry timestamp and displayed body text', (
+    tester,
+  ) async {
+    entryRepository.seedEntries([
+      _entry(id: 1, rawTranscript: 'raw text', cleanedText: 'clean text'),
+    ]);
+
+    await _pumpEntryDetailApp(
+      tester,
+      entryRepository: entryRepository,
+      shareService: shareService,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
+    await tester.pumpAndSettle();
+
+    expect(shareService.sharedTexts, [_expectedShareText('clean text')]);
+  });
+
+  testWidgets('system back flushes edits and returns to the entry list', (
+    tester,
+  ) async {
+    entryRepository.seedEntries([
+      _entry(id: 1, rawTranscript: 'raw text', cleanedText: 'clean text'),
+    ]);
+
+    await _pumpEntryDetailApp(
+      tester,
+      entryRepository: entryRepository,
+      shareService: shareService,
+      autoSaveDelay: Duration.zero,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entryDetailEditButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entryDetailEditor')),
+      'edited via system back',
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+    final updatedEntry = await entryRepository.getEntryById(1);
+    expect(updatedEntry, isNotNull);
+    expect(updatedEntry!.cleanedText, 'edited via system back');
   });
 
   testWidgets('delete cancel keeps the user on detail', (tester) async {
@@ -433,13 +485,23 @@ class _TestEntryRepository implements EntryRepository {
 
 class _TestEntryShareService implements EntryShareService {
   bool throwOnShare = false;
+  final List<String> sharedTexts = <String>[];
 
   @override
   Future<void> shareText(String text) async {
     if (throwOnShare) {
       throw StateError('share failed');
     }
+    sharedTexts.add(text);
   }
+}
+
+String _expectedShareText(String body) {
+  final shareTimestamp = formatEntryDetailShareTimestamp(
+    createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+    locale: const Locale('en', 'US'),
+  );
+  return '$shareTimestamp$entryDetailShareSectionSeparator$body';
 }
 
 class _TestPreferencesRepository implements PreferencesRepository {

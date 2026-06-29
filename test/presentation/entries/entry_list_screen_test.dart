@@ -99,6 +99,45 @@ void main() {
     expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
   });
 
+  testWidgets('system back returns to the main screen', (tester) async {
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+  });
+
+  testWidgets(
+    'system back dismisses the delete dialog before leaving the list',
+    (tester) async {
+      entryRepository.emitEntries([_entry(id: 8)]);
+
+      await _pumpEntryListApp(tester, entryRepository: entryRepository);
+
+      await tester.drag(
+        find.byKey(const ValueKey('entryCard-8')),
+        const Offset(120, 0),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('entryDeleteConfirmButton')),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('entryDeleteConfirmButton')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+      expect(find.byKey(const ValueKey('actionButton')), findsNothing);
+    },
+  );
+
   testWidgets('exposes back, row, and delete semantics actions', (
     tester,
   ) async {

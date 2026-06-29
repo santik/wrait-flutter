@@ -7,6 +7,7 @@ import '../../data/entries/entry_providers.dart';
 import '../../domain/model/entry.dart';
 import '../../domain/repository/entry_repository.dart';
 import 'entry_deletion_controller.dart';
+import 'entry_detail_formatters.dart';
 import 'entry_share_service.dart';
 
 typedef EntryDetailWarningLogger =
@@ -144,9 +145,13 @@ class EntryDetailController extends Notifier<EntryDetailControllerState> {
     return _ensureRevisionSaved(_latestRequestedRevision);
   }
 
-  Future<bool> shareDisplayedText(String text) async {
+  Future<bool> shareDisplayedText({
+    required String text,
+    required String shareTimestamp,
+  }) async {
+    final shareText = '$shareTimestamp$entryDetailShareSectionSeparator$text';
     try {
-      await _entryShareService.shareText(text);
+      await _entryShareService.shareText(shareText);
       return true;
     } catch (error, stackTrace) {
       _logWarning(

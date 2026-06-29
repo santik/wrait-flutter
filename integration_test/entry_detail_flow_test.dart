@@ -19,6 +19,7 @@ import 'package:wrait/data/entries/local_entry_database.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/entries/entry_detail_controller.dart';
+import 'package:wrait/presentation/entries/entry_detail_formatters.dart';
 import 'package:wrait/presentation/entries/entry_share_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
@@ -74,9 +75,16 @@ void main() {
         .getTopLeft(find.byKey(const ValueKey('entryDetailReadText')))
         .dy;
     expect(afterScroll, lessThan(beforeScroll));
+
+    await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
+    await tester.pumpAndSettle();
+
+    expect(harness.shareService.sharedTexts, [_expectedShareText(_longText())]);
   });
 
-  testWidgets('opens detail from an entry-list row', (tester) async {
+  testWidgets('opens detail from an entry-list row and shares short text', (
+    tester,
+  ) async {
     final harness = await _createHarness(initialLocation: '/entries');
     addTearDown(harness.dispose);
 
@@ -104,6 +112,13 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
+    await tester.pumpAndSettle();
+
+    expect(harness.shareService.sharedTexts, [
+      _expectedShareText('entry from list'),
+    ]);
   });
 
   testWidgets(
@@ -135,6 +150,13 @@ void main() {
         ),
         findsOneWidget,
       );
+
+      await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
+      await tester.pumpAndSettle();
+
+      expect(harness.shareService.sharedTexts, [
+        _expectedShareText('raw fallback text'),
+      ]);
     },
   );
 
@@ -203,7 +225,7 @@ void main() {
   });
 
   testWidgets(
-    'edits auto-save, preserve raw transcript, update word count, share, and flush on back',
+    'edits auto-save, preserve raw transcript, share with timestamp, and flush on system back',
     (tester) async {
       final harness = await _createHarness(autoSaveDelay: Duration.zero);
       addTearDown(harness.dispose);
@@ -235,10 +257,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
       await tester.pumpAndSettle();
       expect(harness.shareService.sharedTexts, [
-        'edited cleaned text for sharing',
+        _expectedShareText('edited cleaned text for sharing'),
       ]);
 
-      await tester.tap(find.byKey(const ValueKey('entryDetailBackButton')));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await binding.takeScreenshot('entry-detail-edited-back-to-list');
 
@@ -299,6 +321,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entryListEmptyState')), findsOneWidget);
   });
+}
+
+String _expectedShareText(String body) {
+  final shareTimestamp = formatEntryDetailShareTimestamp(
+    createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+    locale: const Locale('en', 'US'),
+  );
+  return '$shareTimestamp$entryDetailShareSectionSeparator$body';
 }
 
 Future<void> _prepareScreenshots(

@@ -232,6 +232,24 @@ void main() {
 
     expect(find.byKey(mainActionButtonKey), findsOneWidget);
   });
+
+  testWidgets('system back returns to the main screen', (tester) async {
+    final harness = await _createHarness();
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(mainActionButtonKey), findsOneWidget);
+  });
 }
 
 Future<void> _prepareScreenshots(

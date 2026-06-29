@@ -14,62 +14,82 @@ class EntryListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = ref.watch(entryListEntriesProvider).value ?? const [];
     final theme = Theme.of(context);
+    final canPopRoute = Navigator.of(context).canPop();
 
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: WraitDesignTokens.screenPadding,
-              child: entries.isEmpty
-                  ? Center(
-                      child: Text(
-                        'no entries yet',
-                        key: const ValueKey('entryListEmptyState'),
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.secondary,
+    return PopScope<void>(
+      canPop: canPopRoute,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        _navigateBack(context);
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Padding(
+                padding: WraitDesignTokens.screenPadding,
+                child: entries.isEmpty
+                    ? Center(
+                        child: Text(
+                          'no entries yet',
+                          key: const ValueKey('entryListEmptyState'),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.secondary,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
+                      )
+                    : ListView.separated(
+                        key: const ValueKey('entryListView'),
+                        padding: const EdgeInsets.only(
+                          top: WraitSpacingTokens.xxl + WraitSpacingTokens.md,
+                        ),
+                        itemCount: entries.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: WraitSpacingTokens.sm),
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          return EntryListRow(
+                            key: ValueKey('entryRow-${entry.id}'),
+                            entry: entry,
+                            onTap: (entryId) => context.go('/entry/$entryId'),
+                            onDeleteRequested: (entryId) =>
+                                _confirmDelete(context, ref, entryId),
+                          );
+                        },
                       ),
-                    )
-                  : ListView.separated(
-                      key: const ValueKey('entryListView'),
-                      padding: const EdgeInsets.only(
-                        top: WraitSpacingTokens.xxl + WraitSpacingTokens.md,
-                      ),
-                      itemCount: entries.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: WraitSpacingTokens.sm),
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        return EntryListRow(
-                          key: ValueKey('entryRow-${entry.id}'),
-                          entry: entry,
-                          onTap: (entryId) => context.go('/entry/$entryId'),
-                          onDeleteRequested: (entryId) =>
-                              _confirmDelete(context, ref, entryId),
-                        );
-                      },
-                    ),
-            ),
-            Positioned(
-              top: WraitSpacingTokens.sm,
-              left: WraitSpacingTokens.sm,
-              child: Semantics(
-                button: true,
-                label: 'Back to main screen',
-                child: IconButton(
-                  key: const ValueKey('entryListBackButton'),
-                  onPressed: () => context.go('/'),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  tooltip: 'Back',
+              ),
+              Positioned(
+                top: WraitSpacingTokens.sm,
+                left: WraitSpacingTokens.sm,
+                child: Semantics(
+                  button: true,
+                  label: 'Back to main screen',
+                  child: IconButton(
+                    key: const ValueKey('entryListBackButton'),
+                    onPressed: () => _navigateBack(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    tooltip: 'Back',
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _navigateBack(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    context.go('/');
   }
 
   Future<void> _confirmDelete(

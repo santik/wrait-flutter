@@ -140,6 +140,9 @@ upcoming feature work:
   icon or a silent no-op path
 - listening-state pulse/countdown presentation driven by the configured
   recording hard cap
+- listening-state pulse now starts at the main action button, expands to the
+  visible safe-area edges and slightly beyond them, and stays behind the
+  action button, countdown, quota, and status UI
 - main-screen navigation from saved feedback to `/entry/:id` and from entry
   stats to `/entries`
 - active entry stats using fixed `{count} entries - {days} days` wording,
@@ -161,10 +164,14 @@ upcoming feature work:
 - automatic entry-detail edit persistence to `cleanedText` and `wordCount`
   without mutating the original `rawTranscript`
 - entry-detail share action through the platform share surface
+- shared entry text now includes the localized entry date and time before the
+  shared body text
 - shared entry deletion confirmation behavior between entry list and entry
   detail
 - safe redirect from invalid, missing, deleted, or unreadable detail routes
   back to `/entries`
+- Android system back now matches the visible in-app back behavior on the
+  entry list and entry detail routes
 - platform setup for Android and iOS
 
 Feature behavior such as network-preflight handling, richer retry UX, quota

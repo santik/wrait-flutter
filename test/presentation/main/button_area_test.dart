@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/presentation/main/button_area.dart';
+import 'package:wrait/presentation/main/pulse_ring.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 import 'package:wrait/presentation/theme/design_tokens.dart';
 import 'package:wrait/presentation/theme/wrait_theme.dart';
@@ -78,6 +79,112 @@ void main() {
     expect(find.byKey(const ValueKey('countdownRing')), findsOneWidget);
   });
 
+  testWidgets(
+    'uses the provided viewport pulse diameter without resizing the button',
+    (tester) async {
+      await _pumpButtonArea(
+        tester,
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+        buttonLabel: 'stop',
+        countdownProgress: 0.5,
+        pulseDiameter: 700,
+      );
+
+      final pulseRing = tester.widget<PulseRing>(
+        find.byKey(const ValueKey('pulseRing')),
+      );
+
+      expect(pulseRing.endDiameter, 700);
+      expect(pulseRing.startDiameter, closeTo(220.08, 0.01));
+      expect(
+        tester.getSize(find.byKey(const ValueKey('actionButton'))).width,
+        closeTo(220.08, 0.01),
+      );
+    },
+  );
+
+  testWidgets('falls back to the minimum pulse diameter for missing inputs', (
+    tester,
+  ) async {
+    await _pumpButtonArea(
+      tester,
+      recordingState: RecordingListening(
+        hardCapDeadlineElapsedRealtime: 120000,
+      ),
+      buttonLabel: 'stop',
+      countdownProgress: 0.5,
+    );
+
+    final pulseRing = tester.widget<PulseRing>(
+      find.byKey(const ValueKey('pulseRing')),
+    );
+
+    expect(
+      pulseRing.endDiameter,
+      closeTo(pulseRing.startDiameter * WraitButtonTokens.pulseScaleMax, 0.01),
+    );
+  });
+
+  testWidgets('rejects undersized and invalid pulse diameters', (tester) async {
+    await _pumpButtonArea(
+      tester,
+      recordingState: RecordingListening(
+        hardCapDeadlineElapsedRealtime: 120000,
+      ),
+      buttonLabel: 'stop',
+      countdownProgress: 0.5,
+      pulseDiameter: 100,
+    );
+
+    var pulseRing = tester.widget<PulseRing>(
+      find.byKey(const ValueKey('pulseRing')),
+    );
+    expect(
+      pulseRing.endDiameter,
+      closeTo(pulseRing.startDiameter * WraitButtonTokens.pulseScaleMax, 0.01),
+    );
+
+    await _pumpButtonArea(
+      tester,
+      recordingState: RecordingListening(
+        hardCapDeadlineElapsedRealtime: 120000,
+      ),
+      buttonLabel: 'stop',
+      countdownProgress: 0.5,
+      pulseDiameter: double.nan,
+    );
+
+    pulseRing = tester.widget<PulseRing>(
+      find.byKey(const ValueKey('pulseRing')),
+    );
+    expect(
+      pulseRing.endDiameter,
+      closeTo(pulseRing.startDiameter * WraitButtonTokens.pulseScaleMax, 0.01),
+    );
+  });
+
+  testWidgets('clamps oversized pulse diameters to the supported maximum', (
+    tester,
+  ) async {
+    await _pumpButtonArea(
+      tester,
+      recordingState: RecordingListening(
+        hardCapDeadlineElapsedRealtime: 120000,
+      ),
+      buttonLabel: 'stop',
+      countdownProgress: 0.5,
+      pulseDiameter: 5000,
+    );
+
+    final pulseRing = tester.widget<PulseRing>(
+      find.byKey(const ValueKey('pulseRing')),
+    );
+
+    expect(pulseRing.endDiameter, WraitButtonTokens.pulseDiameterMax);
+  });
+
   testWidgets('restarts the shake animation when the shake key changes', (
     tester,
   ) async {
@@ -142,6 +249,7 @@ Future<void> _pumpButtonArea(
   int shakeErrorKey = 0,
   String buttonLabel = 'wrait',
   double? countdownProgress,
+  double? pulseDiameter,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -155,6 +263,7 @@ Future<void> _pumpButtonArea(
               shakeErrorKey: shakeErrorKey,
               buttonLabel: buttonLabel,
               countdownProgress: countdownProgress,
+              pulseDiameter: pulseDiameter,
               onPressed: () {},
             ),
           ),

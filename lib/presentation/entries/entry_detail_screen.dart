@@ -79,6 +79,10 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                 createdAt: entry.createdAt,
                 locale: Localizations.localeOf(context),
               );
+              final shareTimestamp = formatEntryDetailShareTimestamp(
+                createdAt: entry.createdAt,
+                locale: Localizations.localeOf(context),
+              );
               final saveMessage = detailState.isSaving
                   ? 'Saving changes...'
                   : detailState.saveFailed
@@ -107,6 +111,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                           detailController,
                           detailState,
                           displayText,
+                          shareTimestamp,
                         );
                       },
                       onDeletePressed: () async {
@@ -321,11 +326,15 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
     EntryDetailController detailController,
     EntryDetailControllerState detailState,
     String displayText,
+    String shareTimestamp,
   ) async {
     final textToShare = detailState.isEditing
         ? detailState.draftText
         : displayText;
-    final didShare = await detailController.shareDisplayedText(textToShare);
+    final didShare = await detailController.shareDisplayedText(
+      text: textToShare,
+      shareTimestamp: shareTimestamp,
+    );
     if (!mounted || didShare) {
       return;
     }

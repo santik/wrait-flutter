@@ -210,6 +210,12 @@ this file as supporting implementation memory.
   `lib/presentation/main/main_screen_stats.dart`.
 - Countdown progress is localized through a `ValueNotifier<double?>` and
   `ValueListenableBuilder`; avoid whole-screen ticking rebuilds.
+- Main-screen recording pulse sizing is now derived from the measured action
+  button center to the furthest visible safe-area corner, with a temporary
+  max-dimension fallback before the first layout measurement completes.
+- Keep pulse-diameter guardrails in `ButtonArea`; invalid, undersized, or
+  extreme caller-provided values should clamp or fall back instead of driving
+  rendering directly.
 - Use stable main-screen selectors from
   `lib/presentation/main/main_screen_test_keys.dart` in widget and integration
   tests wherever practical.
@@ -227,6 +233,11 @@ this file as supporting implementation memory.
   `rawTranscript`.
 - Entry-detail auto-save is revision-based and single-flight. Preserve that
   shape when expanding editing.
+- Shared entry text now uses the entry-detail screen's localized full weekday
+  and long-date presentation plus localized time, then a blank line, then the
+  shared body text.
+- Entry-list back handling should prefer a real navigator pop when route
+  history exists and only fall back to `/` when no prior route can be popped.
 
 ## Testing and Validation Gotchas
 
@@ -258,6 +269,12 @@ this file as supporting implementation memory.
   `emulator-5554`, while
   `integration_test/audio_recording_service_flow_test.dart` can stall on a
   provider-graph start/stop case and report `did not complete`.
+- iOS simulator validation for the recording pulse currently has a known
+  combined-run flake: `integration_test/main_screen_flow_test.dart` can fail
+  intermittently when run in the same command as the touched entry integration
+  flows, while the isolated main-screen run and the shared entry-detail plus
+  entry-list run both pass. Treat that as a simulator/test-runner limitation
+  to document and re-check, not automatic proof of an app-side regression.
 - Screenshot-heavy integration coverage works well on emulator/simulator, but
   physical Android verification may need screenshot-free smoke tests for
   timing-sensitive entry detail flows.
