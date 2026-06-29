@@ -12,7 +12,6 @@ import 'package:wrait/data/transcription/transcription_service.dart';
 void main() {
   late Directory tempDirectory;
   late _FakeAudioRecordingService audioRecordingService;
-  late RecordQuotaState? currentQuota;
   late List<String> logMessages;
   late List<Object?> logErrors;
   late String livePath;
@@ -25,7 +24,6 @@ void main() {
       'wrait-cloud-transcription-test',
     );
     audioRecordingService = _FakeAudioRecordingService();
-    currentQuota = null;
     logMessages = <String>[];
     logErrors = <Object?>[];
     livePath = '${tempDirectory.path}/live.m4a';
@@ -41,7 +39,6 @@ void main() {
         return transcribe(audioFile);
       },
       createLiveRecordingPath: () async => livePath,
-      setSessionQuota: (quota) => currentQuota = quota,
       logWarning: (message, {error, stackTrace}) {
         logMessages.add(message);
         logErrors.add(error);
@@ -145,7 +142,7 @@ void main() {
   );
 
   test(
-    'successful live transcription uploads and deletes the temp file',
+    'successful live transcription uploads and deletes the temp file without publishing quota directly',
     () async {
       final quota = RecordQuotaState(
         limit: 5,
@@ -180,7 +177,6 @@ void main() {
             )
             .having((value) => value.quota?.remaining, 'quotaRemaining', 3),
       );
-      expect(currentQuota?.remaining, 3);
       expect(await File(livePath).exists(), isFalse);
       expect(service.isRecording, isFalse);
       expect(service.isTranscribing, isFalse);
@@ -254,7 +250,6 @@ void main() {
             .having((value) => value.audioDraftPath, 'audioDraftPath', livePath)
             .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
       );
-      expect(currentQuota?.remaining, 0);
       expect(await File(livePath).exists(), isTrue);
       expect(logMessages.single, contains('noInternet'));
     },
@@ -338,11 +333,18 @@ void main() {
   );
 
   test(
-    'blank live transcript success becomes nothingCaught and keeps retryable audio',
+    'blank live transcript success becomes nothingCaught, deletes live audio, and leaves quota publication to the caller',
     () async {
-      transcribe = (_) async => const backend.TranscriptionSuccess(
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      transcribe = (_) async => backend.TranscriptionSuccess(
         transcript: '   ',
         detectedLanguage: 'en-US',
+        quota: quota,
       );
 
       await service.startLiveTranscription(onStatus: (_) {});
@@ -356,13 +358,10 @@ void main() {
               'reason',
               TranscriptionFailureReason.nothingCaught,
             )
-            .having(
-              (value) => value.audioDraftPath,
-              'audioDraftPath',
-              livePath,
-            ),
+            .having((value) => value.audioDraftPath, 'audioDraftPath', isNull)
+            .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
       );
-      expect(await File(livePath).exists(), isTrue);
+      expect(await File(livePath).exists(), isFalse);
     },
   );
 
@@ -408,7 +407,6 @@ void main() {
           return transcribe(audioFile);
         },
         createLiveRecordingPath: () => livePathCompleter.future,
-        setSessionQuota: (quota) => currentQuota = quota,
         logWarning: (message, {error, stackTrace}) {
           logMessages.add(message);
           logErrors.add(error);
@@ -489,7 +487,7 @@ void main() {
   );
 
   test(
-    'blank transcript success payload becomes nothingCaught without updating quota',
+    'blank transcript success payload becomes nothingCaught without publishing quota directly',
     () async {
       final draftPath = '${tempDirectory.path}/draft.m4a';
       await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
@@ -517,7 +515,6 @@ void main() {
             )
             .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
       );
-      expect(currentQuota, isNull);
       expect(logMessages.single, contains('blank transcript'));
     },
   );

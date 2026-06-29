@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
+import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/audio/audio_recording_providers.dart';
 import 'package:wrait/data/audio/microphone_permission_service.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
@@ -649,6 +650,33 @@ void main() {
   );
 
   test(
+    'nothingCaught with audioDraftPath keeps no-match feedback and skips draft persistence',
+    () async {
+      final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
+      await audioDraftFile.writeAsString('audio');
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      transcriptionService.nextStopResult = TranscriptionFailure(
+        reason: TranscriptionFailureReason.nothingCaught,
+        audioDraftPath: audioDraftFile.path,
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(entryRepository.savedAudioDrafts, isEmpty);
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.noMatch),
+      );
+    },
+  );
+
+  test(
     'transcription failure with audioDraftPath persistence failure keeps fallback error copy without preservedDraft',
     () async {
       final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
@@ -745,6 +773,37 @@ void main() {
         ),
       );
       expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+    },
+  );
+
+  test(
+    'cleanup receives transcription quota as a fallback when cleanup quota is absent',
+    () async {
+      final fallbackQuota = RecordQuotaState(
+        limit: 5,
+        count: 3,
+        remaining: 2,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      cleanupUseCase.nextResult = const CleanupTranscriptFailure(
+        entryId: 41,
+        reason: backend.BackendFailureReason.backendUnavailable,
+      );
+      transcriptionService.nextStopResult = TranscriptionSuccess(
+        transcript: 'raw transcript',
+        detectedLanguage: 'en-US',
+        quota: fallbackQuota,
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(cleanupUseCase.calls.single.fallbackQuota, fallbackQuota);
     },
   );
 
@@ -1096,11 +1155,13 @@ class _CleanupCall {
     required this.rawTranscript,
     required this.language,
     required this.entryId,
+    required this.fallbackQuota,
   });
 
   final String rawTranscript;
   final String? language;
   final int? entryId;
+  final RecordQuotaState? fallbackQuota;
 }
 
 class _FakeTranscriptionService implements TranscriptionService {
@@ -1244,12 +1305,14 @@ class _FakeCleanupTranscriptUseCase extends CleanupTranscriptUseCase {
     required String rawTranscript,
     String? language,
     int? entryId,
+    RecordQuotaState? fallbackQuota,
   }) async {
     calls.add(
       _CleanupCall(
         rawTranscript: rawTranscript,
         language: language,
         entryId: entryId,
+        fallbackQuota: fallbackQuota,
       ),
     );
     return nextResult;

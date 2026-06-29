@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/data/api/backend_results.dart' as backend;
+import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
@@ -15,6 +16,7 @@ void main() {
   late _FakeTranscriptionService transcriptionService;
   late List<String> logMessages;
   late List<Object?> logErrors;
+  late RecordQuotaState? currentQuota;
   late int currentTimeMs;
   late Future<backend.CleanupResult> Function({
     required String transcript,
@@ -69,6 +71,7 @@ void main() {
     transcriptionService = _FakeTranscriptionService();
     logMessages = <String>[];
     logErrors = <Object?>[];
+    currentQuota = null;
     cleanupCallback = ({required transcript, required language}) async {
       return const backend.CleanupSuccess(cleanedText: 'Cleaned transcript.');
     };
@@ -90,6 +93,7 @@ void main() {
       cleanupTranscriptUseCase: cleanupUseCase,
       validateDraftAudioPath: validateAudioPath,
       deleteRetainedAudio: deleteRetainedAudio,
+      setRecordQuota: (quota) => currentQuota = quota,
       logWarning: (message, {error, stackTrace}) {
         logMessages.add(message);
         logErrors.add(error);
@@ -148,7 +152,7 @@ void main() {
   );
 
   test(
-    'audio transcription failure preserves the audio draft and retained file',
+    'audio transcription failure preserves the audio draft, retained file, and returned quota',
     () async {
       final audioFile = await _writeAudioFile(
         tempDirectory,
@@ -164,8 +168,15 @@ void main() {
           audioPath: audioFile.path,
         ),
       );
-      transcriptionService.nextDraftResult = const TranscriptionFailure(
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      transcriptionService.nextDraftResult = TranscriptionFailure(
         reason: TranscriptionFailureReason.network,
+        quota: quota,
       );
 
       await useCase();
@@ -175,6 +186,7 @@ void main() {
       expect(entry!.isDraft, isTrue);
       expect(entry.audioPath, audioFile.path);
       expect(await audioFile.exists(), isTrue);
+      expect(currentQuota, quota);
       expect(logMessages.last, contains('preserved audio draft'));
     },
   );

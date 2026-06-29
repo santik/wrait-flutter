@@ -89,10 +89,17 @@ void main() {
       final audioDraftFile = await harness.writeManagedAudioFile(
         'retry-audio.m4a',
       );
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
 
       harness.transcriptionService.nextStopResult = TranscriptionFailure(
         reason: TranscriptionFailureReason.network,
         audioDraftPath: audioDraftFile.path,
+        quota: quota,
       );
 
       await harness.container
@@ -126,6 +133,50 @@ void main() {
       expect(drafts, hasLength(1));
       expect(drafts.single.audioPath, audioDraftFile.path);
       expect(drafts.single.isDraft, isTrue);
+      expect(harness.container.read(sessionRecordQuotaStateProvider), quota);
+    },
+  );
+
+  testWidgets(
+    'provider graph keeps no-word failures terminal and leaves no pending draft even if an audio path is present',
+    (tester) async {
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+      final audioDraftFile = await harness.writeManagedAudioFile(
+        'nothing-caught.m4a',
+      );
+
+      harness.transcriptionService.nextStopResult = TranscriptionFailure(
+        reason: TranscriptionFailureReason.nothingCaught,
+        audioDraftPath: audioDraftFile.path,
+      );
+
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      harness.monotonicClock.advance(const Duration(seconds: 6));
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        harness.container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.noMatch),
+      );
+      expect(
+        resolveMainScreenStatus(
+          controllerState: harness.container.read(
+            mainRecordingControllerProvider,
+          ),
+          hasEverRecorded: false,
+        ).statusText,
+        'nothing caught · too quiet?',
+      );
+
+      final drafts = await harness.container
+          .read(entryRepositoryProvider)
+          .getPendingDrafts();
+      expect(drafts, isEmpty);
     },
   );
 
@@ -264,6 +315,46 @@ void main() {
         ).statusText,
         'saved as draft · will retry',
       );
+    },
+  );
+
+  testWidgets(
+    'provider graph keeps the transcription quota when cleanup saves a draft without its own quota',
+    (tester) async {
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+      final fallbackQuota = RecordQuotaState(
+        limit: 5,
+        count: 4,
+        remaining: 1,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+
+      harness.transcriptionService.nextStopResult = TranscriptionSuccess(
+        transcript: 'raw transcript',
+        detectedLanguage: 'en-US',
+        quota: fallbackQuota,
+      );
+      harness.cleanupCallbackHolder.callback =
+          ({required transcript, required language}) async {
+            return const backend.CleanupFailure(
+              reason: backend.BackendFailureReason.backendUnavailable,
+            );
+          };
+
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      harness.monotonicClock.advance(const Duration(seconds: 6));
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        harness.container.read(sessionRecordQuotaStateProvider)?.remaining,
+        1,
+      );
+      expect(harness.container.read(sessionRecordQuotaStateProvider)?.count, 4);
     },
   );
 
