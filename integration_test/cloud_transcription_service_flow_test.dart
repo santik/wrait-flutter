@@ -16,7 +16,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'provider graph supports the live success flow with status ordering, language normalization, and quota updates',
+    'provider graph supports the live success flow with status ordering and language normalization without publishing quota directly',
     (tester) async {
       final tempDirectory = await Directory.systemTemp.createTemp(
         'wrait-cloud-transcription-int-success',
@@ -71,11 +71,69 @@ void main() {
             )
             .having((value) => value.quota?.remaining, 'quotaRemaining', 3),
       );
-      expect(container.read(sessionRecordQuotaStateProvider)?.remaining, 3);
+      expect(container.read(sessionRecordQuotaStateProvider), isNull);
       expect(
         await File('${tempDirectory.path}/live-success.m4a').exists(),
         isFalse,
       );
+    },
+  );
+
+  testWidgets(
+    'blank live transcript success becomes terminal nothingCaught, deletes live audio, and leaves quota publication to the caller',
+    (tester) async {
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'wrait-cloud-transcription-int-blank-live',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      final livePath = '${tempDirectory.path}/live-blank.m4a';
+      final container = ProviderContainer(
+        overrides: [
+          audioRecordingServiceProvider.overrideWithValue(
+            _FakeAudioRecordingService(),
+          ),
+          liveRecordingPathFactoryProvider.overrideWithValue(
+            () async => livePath,
+          ),
+          transcribeAudioCallbackProvider.overrideWithValue(
+            (_) async => backend.TranscriptionSuccess(
+              transcript: '   ',
+              detectedLanguage: 'en-US',
+              quota: quota,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final service = container.read(transcriptionServiceProvider);
+      await service.startLiveTranscription(onStatus: (_) {});
+      final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+      expect(
+        result,
+        isA<TranscriptionFailure>()
+            .having(
+              (value) => value.reason,
+              'reason',
+              TranscriptionFailureReason.nothingCaught,
+            )
+            .having((value) => value.audioDraftPath, 'audioDraftPath', isNull)
+            .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
+      );
+      expect(container.read(sessionRecordQuotaStateProvider), isNull);
+      expect(await File(livePath).exists(), isFalse);
     },
   );
 
@@ -177,7 +235,62 @@ void main() {
   );
 
   testWidgets(
-    'draft transcription keeps caller-owned audio and surfaces quota-bearing failures',
+    'blank draft transcription success returns terminal nothingCaught without publishing quota directly',
+    (tester) async {
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'wrait-cloud-transcription-int-draft-blank',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final draftPath = '${tempDirectory.path}/draft-blank.m4a';
+      await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioRecordingServiceProvider.overrideWithValue(
+            _FakeAudioRecordingService(),
+          ),
+          transcribeAudioCallbackProvider.overrideWithValue(
+            (_) async => backend.TranscriptionSuccess(
+              transcript: '   ',
+              detectedLanguage: 'en-US',
+              quota: quota,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final service = container.read(transcriptionServiceProvider);
+      final result = await service.transcribeAudioDraft(draftPath);
+
+      expect(
+        result,
+        isA<TranscriptionFailure>()
+            .having(
+              (value) => value.reason,
+              'reason',
+              TranscriptionFailureReason.nothingCaught,
+            )
+            .having((value) => value.audioDraftPath, 'audioDraftPath', isNull)
+            .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
+      );
+      expect(await File(draftPath).exists(), isTrue);
+      expect(container.read(sessionRecordQuotaStateProvider), isNull);
+    },
+  );
+
+  testWidgets(
+    'draft transcription keeps caller-owned audio and surfaces quota-bearing failures without publishing quota directly',
     (tester) async {
       final tempDirectory = await Directory.systemTemp.createTemp(
         'wrait-cloud-transcription-int-draft',
@@ -225,7 +338,7 @@ void main() {
             .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
       );
       expect(await File(draftPath).exists(), isTrue);
-      expect(container.read(sessionRecordQuotaStateProvider)?.remaining, 0);
+      expect(container.read(sessionRecordQuotaStateProvider), isNull);
     },
   );
 

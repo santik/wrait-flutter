@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/time/monotonic_clock.dart';
 import '../../data/api/backend_providers.dart';
 import '../../data/api/backend_results.dart' as backend;
+import '../../data/api/record_quota_state.dart';
 import '../../data/audio/audio_recording_providers.dart';
 import '../../data/audio/audio_recording_service.dart';
 import '../../data/audio/microphone_permission_service.dart';
@@ -70,6 +71,8 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
   MonotonicClock get _monotonicClock => ref.read(monotonicClockProvider);
   RecordingControllerWarningLogger get _logWarning =>
       ref.read(recordingControllerWarningLoggerProvider);
+  SessionRecordQuotaStateNotifier get _sessionQuotaNotifier =>
+      ref.read(sessionRecordQuotaStateProvider.notifier);
   RecordingFeedbackDelays get _feedbackDelays =>
       ref.read(recordingFeedbackDelaysProvider);
   Duration get _resumePermissionTimeout =>
@@ -346,9 +349,14 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         await _handleCleanup(result);
         return;
       case TranscriptionFailure():
-        final preservedDraft = await _persistAudioDraftIfNeeded(
-          result.audioDraftPath,
-        );
+        _publishQuota(result.quota);
+        // Ignore any audio draft path on no-match failures so a service
+        // mistake cannot turn terminal no-word feedback into a retryable draft.
+        final audioDraftPath =
+            result.reason == TranscriptionFailureReason.nothingCaught
+            ? null
+            : result.audioDraftPath;
+        final preservedDraft = await _persistAudioDraftIfNeeded(audioDraftPath);
         _emitError(
           _mapTranscriptionFailure(result.reason),
           preservedDraft: preservedDraft,
@@ -361,6 +369,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     final cleanupResult = await _cleanupTranscriptUseCase(
       rawTranscript: result.transcript,
       language: result.detectedLanguage,
+      fallbackQuota: result.quota,
     );
 
     switch (cleanupResult) {
@@ -436,6 +445,12 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         stackTrace: stackTrace,
       );
       return false;
+    }
+  }
+
+  void _publishQuota(RecordQuotaState? quota) {
+    if (quota != null) {
+      _sessionQuotaNotifier.setQuota(quota);
     }
   }
 

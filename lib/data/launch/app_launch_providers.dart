@@ -92,6 +92,9 @@ final retryPendingDraftsUseCaseProvider = Provider<RetryPendingDraftsUseCase>((
     cleanupTranscriptUseCase: ref.watch(cleanupTranscriptUseCaseProvider),
     validateDraftAudioPath: ref.watch(validateDraftAudioPathProvider),
     deleteRetainedAudio: ref.watch(deleteRetainedAudioProvider),
+    setRecordQuota: (quota) {
+      ref.read(sessionRecordQuotaStateProvider.notifier).setQuota(quota);
+    },
     logWarning: ref.watch(retryPendingDraftsWarningLoggerProvider),
   );
 });

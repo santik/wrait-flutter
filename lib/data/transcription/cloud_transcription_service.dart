@@ -5,7 +5,6 @@ import 'dart:io';
 import '../../domain/model/supported_language.dart';
 import '../audio/audio_recording_service.dart';
 import '../api/backend_results.dart' as backend;
-import '../api/record_quota_state.dart';
 import 'transcription_service.dart';
 
 typedef TranscribeAudioCallback =
@@ -19,14 +18,12 @@ class CloudTranscriptionService implements TranscriptionService {
     required this.audioRecordingService,
     required this.transcribeAudio,
     required this.createLiveRecordingPath,
-    required this.setSessionQuota,
     TranscriptionWarningLogger? logWarning,
   }) : _logWarning = logWarning ?? _defaultLogWarning;
 
   final AudioRecordingService audioRecordingService;
   final TranscribeAudioCallback transcribeAudio;
   final LiveRecordingPathFactory createLiveRecordingPath;
-  final void Function(RecordQuotaState quota) setSessionQuota;
   final TranscriptionWarningLogger _logWarning;
 
   _CloudTranscriptionState _state = _CloudTranscriptionState.idle;
@@ -243,17 +240,18 @@ class CloudTranscriptionService implements TranscriptionService {
   }) async {
     final transcript = result.transcript.trim();
     if (transcript.isEmpty) {
+      if (deleteAudioOnSuccess) {
+        await _deleteFileIfPresent(audioPath);
+      }
       _logWarning(
         'Cloud transcription returned a blank transcript in a success payload.',
       );
       return TranscriptionFailure(
         reason: TranscriptionFailureReason.nothingCaught,
-        audioDraftPath: deleteAudioOnSuccess ? audioPath : null,
         quota: result.quota,
       );
     }
 
-    _propagateQuota(result.quota);
     final normalizedLanguage = resolveSupportedLanguageCode(
       result.detectedLanguage,
     );
@@ -274,7 +272,6 @@ class CloudTranscriptionService implements TranscriptionService {
     required String audioPath,
     required bool preserveAudioOnFailure,
   }) {
-    _propagateQuota(result.quota);
     _logWarning('Cloud transcription failed with ${result.reason.name}.');
 
     return TranscriptionFailure(
@@ -282,12 +279,6 @@ class CloudTranscriptionService implements TranscriptionService {
       audioDraftPath: preserveAudioOnFailure ? audioPath : null,
       quota: result.quota,
     );
-  }
-
-  void _propagateQuota(RecordQuotaState? quota) {
-    if (quota != null) {
-      setSessionQuota(quota);
-    }
   }
 
   TranscriptionFailureReason _mapFailureReason(

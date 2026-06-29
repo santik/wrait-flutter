@@ -35,12 +35,18 @@ class CleanupTranscriptUseCase {
     required String rawTranscript,
     String? language,
     int? entryId,
+
+    /// Used only when cleanup does not return its own quota.
+    /// Cleanup quota takes precedence when both are available.
+    RecordQuotaState? fallbackQuota,
   }) async {
     final existingEntryResult = await _loadExistingEntry(entryId);
     if (existingEntryResult case _ResolvedDraftFailure()) {
+      _propagateQuota(fallbackQuota);
       return CleanupTranscriptFailure(
         entryId: existingEntryResult.entryId,
         reason: backend.BackendFailureReason.apiError,
+        quota: fallbackQuota,
       );
     }
     final existingEntry = (existingEntryResult as _ResolvedDraftSuccess).entry;
@@ -55,20 +61,24 @@ class CleanupTranscriptUseCase {
       language: selectedLanguage,
     );
     if (persistedEntryId == null) {
+      _propagateQuota(fallbackQuota);
       return CleanupTranscriptFailure(
         entryId: entryId,
         reason: backend.BackendFailureReason.apiError,
+        quota: fallbackQuota,
       );
     }
 
     final boundedTranscript = _prepareTranscriptForCleanup(rawTranscript);
     if (boundedTranscript == null) {
+      _propagateQuota(fallbackQuota);
       logWarning(
         'Cleanup transcript skipped backend cleanup because the raw transcript was blank.',
       );
       return CleanupTranscriptFailure(
         entryId: persistedEntryId,
         reason: backend.BackendFailureReason.apiError,
+        quota: fallbackQuota,
       );
     }
 
@@ -81,10 +91,12 @@ class CleanupTranscriptUseCase {
       backend.CleanupSuccess() => _handleCleanupSuccess(
         cleanupResult,
         entryId: persistedEntryId,
+        fallbackQuota: fallbackQuota,
       ),
       backend.CleanupFailure() => _handleCleanupFailure(
         cleanupResult,
         entryId: persistedEntryId,
+        fallbackQuota: fallbackQuota,
       ),
     };
   }
@@ -192,8 +204,10 @@ class CleanupTranscriptUseCase {
   Future<CleanupTranscriptResult> _handleCleanupSuccess(
     backend.CleanupSuccess result, {
     required int entryId,
+    RecordQuotaState? fallbackQuota,
   }) async {
-    _propagateQuota(result.quota);
+    final resolvedQuota = result.quota ?? fallbackQuota;
+    _propagateQuota(resolvedQuota);
     try {
       await entryRepository.updateWithCleanedText(
         entryId,
@@ -204,7 +218,7 @@ class CleanupTranscriptUseCase {
       return CleanupTranscriptSuccess(
         entryId: entryId,
         cleanedText: result.cleanedText,
-        quota: result.quota,
+        quota: resolvedQuota,
       );
     } catch (error, stackTrace) {
       logWarning(
@@ -215,7 +229,7 @@ class CleanupTranscriptUseCase {
       return CleanupTranscriptFailure(
         entryId: entryId,
         reason: backend.BackendFailureReason.apiError,
-        quota: result.quota,
+        quota: resolvedQuota,
       );
     }
   }
@@ -223,12 +237,14 @@ class CleanupTranscriptUseCase {
   CleanupTranscriptResult _handleCleanupFailure(
     backend.CleanupFailure result, {
     required int entryId,
+    RecordQuotaState? fallbackQuota,
   }) {
-    _propagateQuota(result.quota);
+    final resolvedQuota = result.quota ?? fallbackQuota;
+    _propagateQuota(resolvedQuota);
     return CleanupTranscriptFailure(
       entryId: entryId,
       reason: result.reason,
-      quota: result.quota,
+      quota: resolvedQuota,
     );
   }
 

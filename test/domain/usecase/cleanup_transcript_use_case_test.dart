@@ -233,6 +233,81 @@ void main() {
   );
 
   test(
+    'cleanup failure falls back to transcription quota when cleanup returns no quota',
+    () async {
+      final fallbackQuota = RecordQuotaState(
+        limit: 5,
+        count: 4,
+        remaining: 1,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      cleanupTranscript = ({required transcript, required language}) async {
+        cleanupCallCount += 1;
+        return const backend.CleanupFailure(
+          reason: backend.BackendFailureReason.backendUnavailable,
+        );
+      };
+
+      final result = await useCase(
+        rawTranscript: 'raw transcript',
+        language: 'en-US',
+        fallbackQuota: fallbackQuota,
+      );
+
+      expect(
+        result,
+        isA<CleanupTranscriptFailure>()
+            .having((value) => value.entryId, 'entryId', 1)
+            .having(
+              (value) => value.reason,
+              'reason',
+              backend.BackendFailureReason.backendUnavailable,
+            )
+            .having((value) => value.quota?.remaining, 'quotaRemaining', 1),
+      );
+      expect(currentQuota?.remaining, 1);
+    },
+  );
+
+  test(
+    'cleanup failure keeps quota unchanged when both cleanup and fallback quotas are null',
+    () async {
+      currentQuota = RecordQuotaState(
+        limit: 5,
+        count: 2,
+        remaining: 3,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+      cleanupTranscript = ({required transcript, required language}) async {
+        cleanupCallCount += 1;
+        return const backend.CleanupFailure(
+          reason: backend.BackendFailureReason.backendUnavailable,
+        );
+      };
+
+      final result = await useCase(
+        rawTranscript: 'raw transcript',
+        language: 'en-US',
+      );
+
+      expect(
+        result,
+        isA<CleanupTranscriptFailure>()
+            .having((value) => value.entryId, 'entryId', 1)
+            .having((value) => value.quota, 'quota', isNull)
+            .having(
+              (value) => value.reason,
+              'reason',
+              backend.BackendFailureReason.backendUnavailable,
+            ),
+      );
+      expect(cleanupCallCount, 1);
+      expect(currentQuota?.remaining, 3);
+      expect(currentQuota?.count, 2);
+    },
+  );
+
+  test(
     'missing draft entry id returns typed failure instead of throwing',
     () async {
       final result = await useCase(
@@ -283,7 +358,16 @@ void main() {
   test('saveDraft failure returns typed failure instead of throwing', () async {
     entryRepository.failSaveDraft = true;
 
-    final result = await useCase(rawTranscript: 'raw transcript');
+    final fallbackQuota = RecordQuotaState(
+      limit: 5,
+      count: 3,
+      remaining: 2,
+      resetAt: DateTime.utc(2026, 6, 12),
+    );
+    final result = await useCase(
+      rawTranscript: 'raw transcript',
+      fallbackQuota: fallbackQuota,
+    );
 
     expect(
       result,
@@ -293,9 +377,11 @@ void main() {
             (value) => value.reason,
             'reason',
             backend.BackendFailureReason.apiError,
-          ),
+          )
+          .having((value) => value.quota?.remaining, 'quotaRemaining', 2),
     );
     expect(cleanupCallCount, 0);
+    expect(currentQuota?.remaining, 2);
     expect(logErrors.single, isA<StateError>());
   });
 
@@ -458,7 +544,11 @@ class _FakeEntryRepository implements EntryRepository {
     final existing = _requireEntry(id);
     _entries[id] = existing.copyWith(
       cleanedText: cleanedText,
-      wordCount: cleanedText.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).length,
+      wordCount: cleanedText
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((part) => part.isNotEmpty)
+          .length,
     );
   }
 

@@ -1,10 +1,12 @@
 import '../../data/transcription/transcription_service.dart';
+import '../../data/api/record_quota_state.dart';
 import '../model/entry.dart';
 import '../repository/entry_repository.dart';
 import 'cleanup_transcript_use_case.dart';
 
 typedef ValidateDraftAudioPathCallback = Future<String?> Function(String path);
 typedef DeleteRetainedAudioCallback = Future<void> Function(String path);
+typedef SetRetryQuotaCallback = void Function(RecordQuotaState quota);
 typedef RetryPendingDraftsWarningLogger =
     void Function(String message, {Object? error, StackTrace? stackTrace});
 
@@ -17,6 +19,7 @@ class RetryPendingDraftsUseCase {
     required this.cleanupTranscriptUseCase,
     required this.validateDraftAudioPath,
     required this.deleteRetainedAudio,
+    required this.setRecordQuota,
     required this.logWarning,
   });
 
@@ -25,6 +28,7 @@ class RetryPendingDraftsUseCase {
   final CleanupTranscriptUseCase cleanupTranscriptUseCase;
   final ValidateDraftAudioPathCallback validateDraftAudioPath;
   final DeleteRetainedAudioCallback deleteRetainedAudio;
+  final SetRetryQuotaCallback setRecordQuota;
   final RetryPendingDraftsWarningLogger logWarning;
 
   Future<void>? _inFlight;
@@ -140,6 +144,7 @@ class RetryPendingDraftsUseCase {
         );
         return;
       case TranscriptionFailure():
+        _publishQuota(transcriptionResult.quota);
         logWarning(
           'Launch retry preserved audio draft ${draft.id} after transcription failure: '
           '${transcriptionResult.reason.name}.',
@@ -157,6 +162,7 @@ class RetryPendingDraftsUseCase {
       entryId: draftId,
       rawTranscript: transcriptionResult.transcript,
       language: transcriptionResult.detectedLanguage,
+      fallbackQuota: transcriptionResult.quota,
     );
 
     switch (cleanupResult) {
@@ -236,6 +242,12 @@ class RetryPendingDraftsUseCase {
         error: error,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  void _publishQuota(RecordQuotaState? quota) {
+    if (quota != null) {
+      setRecordQuota(quota);
     }
   }
 }

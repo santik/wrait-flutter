@@ -47,9 +47,6 @@ final transcriptionServiceProvider = Provider<TranscriptionService>((ref) {
     audioRecordingService: ref.watch(audioRecordingServiceProvider),
     transcribeAudio: ref.watch(transcribeAudioCallbackProvider),
     createLiveRecordingPath: ref.watch(liveRecordingPathFactoryProvider),
-    setSessionQuota: (quota) {
-      ref.read(sessionRecordQuotaStateProvider.notifier).setQuota(quota);
-    },
     logWarning: ref.watch(transcriptionWarningLoggerProvider),
   );
 });
