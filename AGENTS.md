@@ -202,6 +202,12 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - For main-screen integration and widget tests, prefer stable selectors from
   `lib/presentation/main/main_screen_test_keys.dart` instead of visible-text
   lookups wherever practical.
+- Main-screen pulse validation is currently more stable on split iOS simulator
+  runs than on a single combined command with the other touched entry flows.
+  When a story changes recording-pulse behavior, prefer validating
+  `integration_test/main_screen_flow_test.dart` separately on iOS simulator and
+  record any combined-run flake explicitly instead of treating it as automatic
+  app regression.
 - Widget and integration tests that pump `WraitApp` but are not explicitly
   about app lock should override `appLockEnabledProvider` to `false` so they
   stay focused on the behavior under test instead of booting behind the root

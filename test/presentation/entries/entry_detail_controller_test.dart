@@ -6,6 +6,7 @@ import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/presentation/entries/entry_detail_controller.dart';
+import 'package:wrait/presentation/entries/entry_detail_formatters.dart';
 import 'package:wrait/presentation/entries/entry_share_service.dart';
 
 void main() {
@@ -107,7 +108,7 @@ void main() {
     },
   );
 
-  test('delegates sharing through the share service', () async {
+  test('delegates timestamped sharing through the share service', () async {
     final shareService = _FakeEntryShareService();
     final container = ProviderContainer(
       overrides: [
@@ -119,10 +120,15 @@ void main() {
 
     final didShare = await container
         .read(entryDetailControllerProvider(1).notifier)
-        .shareDisplayedText('share me');
+        .shareDisplayedText(
+          text: 'share me',
+          shareTimestamp: 'share timestamp',
+        );
 
     expect(didShare, isTrue);
-    expect(shareService.sharedTexts, ['share me']);
+    expect(shareService.sharedTexts, [
+      'share timestamp${entryDetailShareSectionSeparator}share me',
+    ]);
   });
 
   test('delegates deletion through the shared deletion controller', () async {

@@ -25,7 +25,9 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/pulse_ring.dart';
 import 'package:wrait/presentation/main/main_screen_test_keys.dart';
+import 'package:wrait/presentation/theme/design_tokens.dart';
 
 import '../test/test_doubles/fake_monotonic_clock.dart';
 import '../test/test_doubles/fake_secure_storage.dart';
@@ -61,8 +63,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('tap button to write'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
-      await tester.pump();
+      await tester.tap(_statusLineButtonFinder());
+      await _pumpUntilFound(
+        tester,
+        find.text('listening...'),
+        timeout: const Duration(seconds: 5),
+      );
       expect(find.text('listening...'), findsOneWidget);
 
       harness.monotonicClock.advance(const Duration(seconds: 6));
@@ -100,13 +106,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('statusLineButton')));
-    await tester.pump();
+    await tester.tap(_statusLineButtonFinder());
+    await _pumpUntilFound(
+      tester,
+      find.text('listening...'),
+      timeout: const Duration(seconds: 5),
+    );
     harness.monotonicClock.advance(const Duration(seconds: 6));
     await tester.tap(find.byKey(mainActionButtonKey));
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(
+      tester,
+      find.text('saved, tap to read'),
+      timeout: const Duration(seconds: 5),
+    );
 
-    await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+    await tester.tap(_statusLineButtonFinder());
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
@@ -166,11 +180,143 @@ void main() {
 
     expect(find.text('9 total / 6 left'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('statusLineButton')));
-    await tester.pump();
+    await tester.tap(_statusLineButtonFinder());
+    await _pumpUntilFound(
+      tester,
+      find.text('listening...'),
+      timeout: const Duration(seconds: 5),
+    );
     expect(find.text('listening...'), findsOneWidget);
     expect(find.text('9 total / 6 left'), findsOneWidget);
   });
+
+  testWidgets(
+    'listening pulse grows beyond the viewport while controls stay visible',
+    (tester) async {
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+
+      harness.container
+          .read(sessionRecordQuotaStateProvider.notifier)
+          .setQuota(
+            RecordQuotaState(
+              limit: 9,
+              count: 3,
+              remaining: 6,
+              resetAt: DateTime.utc(2026, 6, 13),
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(_statusLineButtonFinder());
+      await _pumpUntilFound(
+        tester,
+        find.text('listening...'),
+        timeout: const Duration(seconds: 5),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('pulseRing')),
+        timeout: const Duration(seconds: 5),
+      );
+
+      final pulseRing = tester.widget<PulseRing>(
+        find.byKey(const ValueKey('pulseRing')),
+      );
+      final scaffoldRect = tester.getRect(find.byType(Scaffold));
+      final scaffoldSize = scaffoldRect.size;
+      final buttonCenter = tester.getCenter(find.byKey(mainActionButtonKey));
+      final furthestCornerDistance = max(
+        max(
+          (buttonCenter - scaffoldRect.topLeft).distance,
+          (buttonCenter - scaffoldRect.topRight).distance,
+        ),
+        max(
+          (buttonCenter - scaffoldRect.bottomLeft).distance,
+          (buttonCenter - scaffoldRect.bottomRight).distance,
+        ),
+      );
+
+      expect(pulseRing.endDiameter, greaterThan(scaffoldSize.width));
+      expect(pulseRing.endDiameter, greaterThan(scaffoldSize.height));
+      expect(
+        pulseRing.endDiameter,
+        greaterThan(
+          (furthestCornerDistance * 2) +
+              WraitButtonTokens.pulseViewportOverscan,
+        ),
+      );
+      expect(find.byKey(mainActionButtonKey), findsOneWidget);
+      expect(find.text('9 total / 6 left'), findsOneWidget);
+      expect(find.byKey(mainStatusLineSlotKey), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'listening pulse still reaches the furthest corner in a landscape viewport',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1280, 720);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(_statusLineButtonFinder());
+      await _pumpUntilFound(
+        tester,
+        find.text('listening...'),
+        timeout: const Duration(seconds: 5),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('pulseRing')),
+        timeout: const Duration(seconds: 5),
+      );
+
+      final pulseRing = tester.widget<PulseRing>(
+        find.byKey(const ValueKey('pulseRing')),
+      );
+      final scaffoldRect = tester.getRect(find.byType(Scaffold));
+      final buttonCenter = tester.getCenter(find.byKey(mainActionButtonKey));
+      final furthestCornerDistance = max(
+        max(
+          (buttonCenter - scaffoldRect.topLeft).distance,
+          (buttonCenter - scaffoldRect.topRight).distance,
+        ),
+        max(
+          (buttonCenter - scaffoldRect.bottomLeft).distance,
+          (buttonCenter - scaffoldRect.bottomRight).distance,
+        ),
+      );
+
+      expect(pulseRing.endDiameter, greaterThan(scaffoldRect.width));
+      expect(pulseRing.endDiameter, greaterThan(scaffoldRect.height));
+      expect(
+        pulseRing.endDiameter,
+        greaterThan(
+          (furthestCornerDistance * 2) +
+              WraitButtonTokens.pulseViewportOverscan,
+        ),
+      );
+    },
+  );
 
   testWidgets('microphone-blocked start failure shows mic blocked status', (
     tester,
@@ -190,7 +336,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+    await tester.tap(_statusLineButtonFinder());
     await tester.pumpAndSettle();
 
     expect(find.text('mic blocked · tap settings'), findsOneWidget);
@@ -228,8 +374,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
-      await tester.pump();
+      await tester.tap(_statusLineButtonFinder());
+      await _pumpUntilFound(
+        tester,
+        find.text('listening...'),
+        timeout: const Duration(seconds: 5),
+      );
       harness.monotonicClock.advance(const Duration(seconds: 6));
       await tester.tap(find.byKey(mainActionButtonKey));
       await _pumpUntilFound(
@@ -268,7 +418,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+      await tester.tap(_statusLineButtonFinder());
       await _pumpUntilFound(
         tester,
         find.text('mic blocked · tap settings'),
@@ -281,7 +431,7 @@ void main() {
       expect(find.text('mic blocked · tap settings'), findsNothing);
       await tester.pump(const Duration(milliseconds: 350));
 
-      await tester.tap(find.byKey(const ValueKey('statusLineButton')));
+      await tester.tap(_statusLineButtonFinder());
       await _pumpUntilFound(
         tester,
         find.text('mic blocked · tap settings'),
@@ -291,6 +441,9 @@ void main() {
     },
   );
 }
+
+Finder _statusLineButtonFinder() =>
+    find.byKey(const ValueKey('statusLineButton')).last;
 
 class _CleanupCallbackHolder {
   Future<backend.CleanupResult> Function({
@@ -344,6 +497,8 @@ Future<void> _pumpUntilFound(
       return;
     }
   }
+
+  throw TestFailure('Did not find $finder within $timeout.');
 }
 
 Future<void> _pumpUntilGone(

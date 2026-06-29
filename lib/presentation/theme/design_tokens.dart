@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 abstract final class WraitAnimationTokens {
   static const Duration fade = Duration(milliseconds: 300);
-  static const Duration pulse = Duration(milliseconds: 1800);
+  // Keep the pulse slower than the countdown refresh so it reads as a broad
+  // ambient sweep instead of a tight flicker at the button edge.
+  static const Duration pulse = Duration(milliseconds: 2400);
   static const Duration buttonAlpha = Duration(milliseconds: 200);
   static const Duration buttonShake = Duration(milliseconds: 420);
   static const Duration countdownRefresh = Duration(milliseconds: 250);
@@ -34,7 +36,17 @@ abstract final class WraitButtonTokens {
   static const double sizeMin = 160;
   static const double sizeMax = 280;
   static const double pulseScaleMax = 1.6;
+  static const double pulseViewportOverscan = 48;
+  // These starting values keep the first frame legible around the button
+  // before the ring expands out to the viewport edges.
   static const double pulseAlphaStart = 0.6;
+  static const double pulseStrokeWidthStart = 6;
+  static const double pulseStrokeWidthEnd = 2;
+  static const double pulseGlowBlurStart = 20;
+  static const double pulseGlowBlurEnd = 6;
+  static const double pulseGlowSpreadStart = 3;
+  static const double pulseGlowSpreadEnd = 0;
+  static const double pulseDiameterMax = 2400;
   static const double alphaDisabled = 0.3;
   static const double alphaReduced = 0.5;
   static const double alphaFull = 1.0;

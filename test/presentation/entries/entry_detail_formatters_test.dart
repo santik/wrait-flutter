@@ -32,6 +32,16 @@ void main() {
     expect(label.date, contains('June'));
   });
 
+  test('formats the share timestamp using the in-app date and time style', () {
+    final label = formatEntryDetailShareTimestamp(
+      createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+      locale: const Locale('en', 'US'),
+    );
+
+    expect(label, startsWith('Tuesday, June 16, 2026 · 9:00'));
+    expect(label, contains('AM'));
+  });
+
   test('falls back safely for unsupported locales', () {
     final label = formatEntryDetailDate(
       createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
@@ -40,6 +50,15 @@ void main() {
 
     expect(label.weekday, isNotEmpty);
     expect(label.date, isNotEmpty);
+  });
+
+  test('share timestamp falls back safely for unsupported locales', () {
+    final label = formatEntryDetailShareTimestamp(
+      createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
+      locale: const Locale('zz', 'ZZ'),
+    );
+
+    expect(label, isNotEmpty);
   });
 
   test('formats singular and plural word counts', () {
