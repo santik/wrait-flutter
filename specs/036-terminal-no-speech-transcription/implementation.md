@@ -65,6 +65,43 @@ cleanup step fails.
 | `test/presentation/main/main_recording_controller_test.dart` | Added no-word draft-suppression coverage and verified the controller passes fallback quota into cleanup. |
 | `integration_test/cloud_transcription_service_flow_test.dart` | Added provider-graph coverage for terminal blank live and blank draft transcripts while keeping quota publication caller-owned. |
 | `integration_test/main_recording_controller_flow_test.dart` | Added provider-graph coverage for no-word terminal behavior, failed-transcription quota publication, and cleanup fallback quota preservation. |
+| `lib/data/api/backend_client.dart` | Preserved blank backend success payloads so app-facing no-speech classification can happen in the transcription layer instead of becoming retryable `apiError` failures. |
+| `test/data/api/backend_client_test.dart` | Added regression coverage that blank backend transcription success payloads stay successful for caller-side no-speech classification. |
+
+## Reopened regression remediation
+
+On 2026-06-30 the story was reopened after a user-reported regression: a live
+recording with no speech could still upload, enter cleanup, and persist as a
+draft. The root cause had two parts:
+
+- `WraitBackendClient` rewrote blank backend success payloads to
+  `BackendFailureReason.apiError`, which turned true no-speech results into
+  retryable failures before the cloud transcription layer could classify them.
+- `CloudTranscriptionService` only treated whitespace-empty success payloads as
+  `nothingCaught`, so punctuation-only or otherwise non-usable success payloads
+  could still reach cleanup.
+
+The remediation keeps backend success payloads intact for caller
+classification, classifies no usable transcript content as terminal
+`nothingCaught`, and adds a defensive controller guard so punctuation-only
+success payloads still cannot enter cleanup or create drafts.
+
+### Reopened regression validation
+
+```text
+flutter test test/data/api/backend_client_test.dart test/data/transcription/cloud_transcription_service_test.dart test/presentation/main/main_recording_controller_test.dart
+Result: passed
+
+flutter analyze
+Result: No issues found.
+
+flutter test -d 4A181FDJH0030G integration_test/main_recording_controller_flow_test.dart
+Result: passed on connected Pixel 8 device (Android 16)
+Note: the planned emulator target `emulator-5554` was unavailable in this session.
+
+flutter test -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156 integration_test/main_recording_controller_flow_test.dart
+Result: passed on iPhone 17 simulator (iOS 26.5) after booting the simulator with `xcrun simctl boot 491CD949-D3C0-4C4C-A6B9-15BAB1859156`
+```
 
 ## Validation
 

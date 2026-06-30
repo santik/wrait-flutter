@@ -158,6 +158,9 @@ Handle external review after implementation.
 - [x] Implement approved review fixes and update `spec.md`, `plan.md`,
       `tasks.md`, `implementation.md`, code, and tests when review changes
       scope, approach, or validation
+- [x] Implement approved reopened-regression fixes for backend blank-success
+      and punctuation-only no-speech payloads, and update story artifacts and
+      validation evidence
 - [ ] Repeat the review/fix loop if the same `review.md` file is updated for
       another pass
 
@@ -224,6 +227,25 @@ flutter analyze
 Result: No issues found.
 
 iOS simulator remediation verification on iPhone 17 simulator (491CD949-D3C0-4C4C-A6B9-15BAB1859156):
+flutter test -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156 integration_test/main_recording_controller_flow_test.dart
+Result: passed
+
+2026-06-30 reopened regression rerun:
+
+Focused unit tests:
+flutter test test/data/api/backend_client_test.dart test/data/transcription/cloud_transcription_service_test.dart test/presentation/main/main_recording_controller_test.dart
+Result: passed
+
+Static analysis:
+flutter analyze
+Result: No issues found.
+
+Android runtime verification on connected Pixel 8 device (4A181FDJH0030G):
+flutter test -d 4A181FDJH0030G integration_test/main_recording_controller_flow_test.dart
+Result: passed
+Note: the planned Android emulator target `emulator-5554` was unavailable in this session; prior emulator validation from 2026-06-29 remains recorded above.
+
+iOS simulator reopened-regression verification on iPhone 17 simulator (491CD949-D3C0-4C4C-A6B9-15BAB1859156):
 flutter test -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156 integration_test/main_recording_controller_flow_test.dart
 Result: passed
 ```

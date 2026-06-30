@@ -421,30 +421,35 @@ void main() {
       expect((result as TranscriptionFailure).quota?.remaining, 0);
     });
 
-    test('blank transcript is treated as api error failure', () async {
-      generatedClient.transcribeResponses.add(
-        const GeneratedApiSuccess<TranscribeResponse>(
-          statusCode: 200,
-          data: TranscribeResponse(
-            transcript: '   ',
-            detectedLanguage: 'en-US',
+    test(
+      'blank transcript is preserved as a success payload for caller classification',
+      () async {
+        generatedClient.transcribeResponses.add(
+          const GeneratedApiSuccess<TranscribeResponse>(
+            statusCode: 200,
+            data: TranscribeResponse(
+              transcript: '   ',
+              detectedLanguage: 'en-US',
+            ),
           ),
-        ),
-      );
+        );
 
-      final result = await backendClient.transcribeAudio(
-        await _createTempAudioFile('blank-transcript'),
-      );
+        final result = await backendClient.transcribeAudio(
+          await _createTempAudioFile('blank-transcript'),
+        );
 
-      expect(
-        result,
-        isA<TranscriptionFailure>().having(
-          (value) => value.reason,
-          'reason',
-          BackendFailureReason.apiError,
-        ),
-      );
-    });
+        expect(
+          result,
+          isA<TranscriptionSuccess>()
+              .having((value) => value.transcript, 'transcript', '')
+              .having(
+                (value) => value.detectedLanguage,
+                'detectedLanguage',
+                'en-US',
+              ),
+        );
+      },
+    );
 
     test('blank detected language is allowed as nullable success', () async {
       generatedClient.transcribeResponses.add(

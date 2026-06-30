@@ -677,6 +677,40 @@ void main() {
   );
 
   test(
+    'transcription success without usable words keeps no-match feedback, skips cleanup, and publishes quota',
+    () async {
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      monotonicClock.advance(const Duration(seconds: 6));
+      transcriptionService.nextStopResult = TranscriptionSuccess(
+        transcript: ' ... ',
+        detectedLanguage: 'en-US',
+        quota: quota,
+      );
+
+      await container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(cleanupUseCase.calls, isEmpty);
+      expect(entryRepository.savedAudioDrafts, isEmpty);
+      expect(
+        container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.noMatch),
+      );
+      expect(container.read(sessionRecordQuotaStateProvider), quota);
+    },
+  );
+
+  test(
     'transcription failure with audioDraftPath persistence failure keeps fallback error copy without preservedDraft',
     () async {
       final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');

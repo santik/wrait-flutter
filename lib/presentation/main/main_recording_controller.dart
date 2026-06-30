@@ -345,6 +345,13 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
 
     switch (result) {
       case TranscriptionSuccess():
+        if (!hasUsableTranscriptContent(result.transcript)) {
+          _publishQuota(result.quota);
+          // Defend against punctuation-only or other non-usable success
+          // payloads so they never enter cleanup or draft persistence.
+          _emitError(RecordingError.noMatch);
+          return;
+        }
         state = state.copyWith(recordingState: const RecordingProcessing());
         await _handleCleanup(result);
         return;

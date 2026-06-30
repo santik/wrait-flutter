@@ -239,12 +239,12 @@ class CloudTranscriptionService implements TranscriptionService {
     required bool deleteAudioOnSuccess,
   }) async {
     final transcript = result.transcript.trim();
-    if (transcript.isEmpty) {
+    if (!hasUsableTranscriptContent(transcript)) {
       if (deleteAudioOnSuccess) {
         await _deleteFileIfPresent(audioPath);
       }
       _logWarning(
-        'Cloud transcription returned a blank transcript in a success payload.',
+        'Cloud transcription returned a non-usable transcript in a success payload.',
       );
       return TranscriptionFailure(
         reason: TranscriptionFailureReason.nothingCaught,

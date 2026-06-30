@@ -365,6 +365,30 @@ void main() {
     },
   );
 
+  test(
+    'punctuation-only live transcript success becomes nothingCaught and deletes live audio',
+    () async {
+      transcribe = (_) async => const backend.TranscriptionSuccess(
+        transcript: ' ... ',
+        detectedLanguage: 'en-US',
+      );
+
+      await service.startLiveTranscription(onStatus: (_) {});
+      final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+      expect(
+        result,
+        isA<TranscriptionFailure>().having(
+          (value) => value.reason,
+          'reason',
+          TranscriptionFailureReason.nothingCaught,
+        ),
+      );
+      expect(await File(livePath).exists(), isFalse);
+      expect(logMessages.single, contains('non-usable transcript'));
+    },
+  );
+
   test('rejects new work while another transcription is in progress', () async {
     final startedCompleter = Completer<void>();
     final resultCompleter = Completer<backend.TranscriptionResult>();
@@ -515,7 +539,32 @@ void main() {
             )
             .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
       );
-      expect(logMessages.single, contains('blank transcript'));
+      expect(logMessages.single, contains('non-usable transcript'));
+    },
+  );
+
+  test(
+    'punctuation-only draft transcript success becomes nothingCaught without deleting caller-owned audio',
+    () async {
+      final draftPath = '${tempDirectory.path}/draft-punctuation.m4a';
+      await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
+      transcribe = (_) async => const backend.TranscriptionSuccess(
+        transcript: ' ... ',
+        detectedLanguage: 'en-US',
+      );
+
+      final result = await service.transcribeAudioDraft(draftPath);
+
+      expect(
+        result,
+        isA<TranscriptionFailure>().having(
+          (value) => value.reason,
+          'reason',
+          TranscriptionFailureReason.nothingCaught,
+        ),
+      );
+      expect(await File(draftPath).exists(), isTrue);
+      expect(logMessages.single, contains('non-usable transcript'));
     },
   );
 

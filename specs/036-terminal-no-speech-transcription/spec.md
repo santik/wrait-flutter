@@ -23,18 +23,20 @@
 | 2026-06-29 | Approved | Codex | User approved the analysis with no artifact corrections required |
 | 2026-06-29 | In Progress | Codex | Implementation completed with focused automated coverage, Android emulator verification, and iOS simulator verification; waiting for external `review.md` |
 | 2026-06-29 | In Progress | Codex | Review remediation approved and implemented; quota publication is now caller-owned for failed transcription paths and cleanup-owned for successful transcription paths, with focused validation rerun passing |
+| 2026-06-30 | In Progress | Codex | User-reported regression reopened US-036 because backend blank-success and punctuation-only success payloads could still reach cleanup and create drafts; remediation approved |
 
 ---
 
 ## Overview
 
-When a recording completes successfully but transcription does not detect any
-words, Wrait should treat that outcome as a terminal recording-quality failure
-rather than a recoverable service failure. The user should be told that nothing
-was caught and can record again, but the app should not save the audio as a
-draft that will retry on future launches.
+When a recording completes successfully but transcription does not produce any
+usable spoken content, Wrait should treat that outcome as a terminal
+recording-quality failure rather than a recoverable service failure. The user
+should be told that nothing was caught and can record again, but the app
+should not save the audio as a draft that will retry on future launches.
 
-This prevents no-word recordings from becoming draft entries that retry
+This prevents no-word or otherwise non-usable-transcript recordings from
+becoming draft entries that retry
 indefinitely until the user manually removes them. Retryable drafts should stay
 reserved for failures where a later attempt can reasonably recover the user's
 spoken entry, such as network or service availability problems.
@@ -64,16 +66,19 @@ processing attempts, not local draft-save side effects.
 
 ## Acceptance criteria
 
-- [ ] When a completed recording produces no detected words, the app shows the
-      existing no-match or nothing-caught recording feedback.
-- [ ] When a completed recording produces no detected words, no retryable audio
-      draft is created.
-- [ ] When a completed recording produces no detected words, the user-visible
-      feedback must not claim that the recording was saved as a draft.
-- [ ] When a completed recording produces no detected words, the captured audio
-      is not retained for future retry.
-- [ ] No-word transcription outcomes do not appear in the entry list, entry
-      detail, stats, or pending-draft retry set as saved draft entries.
+- [ ] When a completed recording produces no detected words or no other usable
+      spoken content, the app shows the existing no-match or nothing-caught
+      recording feedback.
+- [ ] When a completed recording produces no detected words or no other usable
+      spoken content, no retryable audio draft is created.
+- [ ] When a completed recording produces no detected words or no other usable
+      spoken content, the user-visible feedback must not claim that the
+      recording was saved as a draft.
+- [ ] When a completed recording produces no detected words or no other usable
+      spoken content, the captured audio is not retained for future retry.
+- [ ] No-word or otherwise non-usable-transcript outcomes do not appear in the
+      entry list, entry detail, stats, or pending-draft retry set as saved
+      draft entries.
 - [ ] Retryable failures caused by network, timeout, backend/service
       unavailability, proxy authentication, quota, or generic service/API
       errors continue to preserve draft data when usable local audio is

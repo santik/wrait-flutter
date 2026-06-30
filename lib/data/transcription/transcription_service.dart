@@ -65,7 +65,7 @@ sealed class TranscriptionResult {
   const TranscriptionResult();
 }
 
-/// Successful transcription result with usable transcript text.
+/// Successful transcription result with backend-supplied transcript text.
 final class TranscriptionSuccess extends TranscriptionResult {
   const TranscriptionSuccess({
     required this.transcript,
@@ -77,6 +77,18 @@ final class TranscriptionSuccess extends TranscriptionResult {
   final String? detectedLanguage;
   final RecordQuotaState? quota;
 }
+
+/// Whether a transcript contains at least one usable spoken-content character.
+///
+/// This intentionally treats whitespace-only and punctuation-only payloads as
+/// "nothing caught" so they do not become retryable drafts or cleanup input.
+bool hasUsableTranscriptContent(String transcript) {
+  return _usableTranscriptCharacterPattern.hasMatch(transcript.trim());
+}
+
+final _usableTranscriptCharacterPattern = RegExp(
+  r'[0-9A-Za-zÀ-ɏА-Яа-яЁёЇїІіЄєҐґ]',
+);
 
 /// Failed transcription result mapped to the app-facing failure surface.
 final class TranscriptionFailure extends TranscriptionResult {

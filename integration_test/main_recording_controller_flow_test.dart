@@ -182,6 +182,45 @@ void main() {
   );
 
   testWidgets(
+    'provider graph treats punctuation-only transcription success as terminal no-match without saving a draft',
+    (tester) async {
+      final harness = await _createHarness();
+      addTearDown(harness.dispose);
+      final quota = RecordQuotaState(
+        limit: 5,
+        count: 5,
+        remaining: 0,
+        resetAt: DateTime.utc(2026, 6, 12),
+      );
+
+      harness.transcriptionService.nextStopResult = TranscriptionSuccess(
+        transcript: ' ... ',
+        detectedLanguage: 'en-US',
+        quota: quota,
+      );
+
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+      harness.monotonicClock.advance(const Duration(seconds: 6));
+      await harness.container
+          .read(mainRecordingControllerProvider.notifier)
+          .onMainButtonTapped();
+
+      expect(
+        harness.container.read(mainRecordingControllerProvider).recordingState,
+        const RecordingErrorState(RecordingError.noMatch),
+      );
+      expect(harness.container.read(sessionRecordQuotaStateProvider), quota);
+
+      final drafts = await harness.container
+          .read(entryRepositoryProvider)
+          .getPendingDrafts();
+      expect(drafts, isEmpty);
+    },
+  );
+
+  testWidgets(
     'provider graph preserves a text draft and emits mapped Error when cleanup fails',
     (tester) async {
       final harness = await _createHarness();

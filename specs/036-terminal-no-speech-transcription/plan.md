@@ -11,7 +11,7 @@
 
 US-036 will keep the existing transcription, recording-controller, feedback,
 and draft-persistence architecture. The cloud transcription service will treat
-blank successful live transcription payloads as terminal no-word failures,
+blank or otherwise non-usable live transcription payloads as terminal no-word failures,
 delete the live temporary audio, and return no retryable audio-draft path. The
 main recording controller will also treat `nothingCaught` as non-retryable even
 if a service implementation accidentally supplies an audio path. Existing
@@ -28,7 +28,7 @@ appear consumed twice for a single failed recording outcome.
 
 | Decision | Choice | Rationale |
 | --- | --- | --- |
-| No-word ownership | Keep no-word classification in `CloudTranscriptionService` when it receives a blank success payload | This is where backend transcription outcomes are normalized into the app-facing transcription contract today, so it is the narrowest place to make blank success terminal. |
+| No-word ownership | Keep no-word classification in `CloudTranscriptionService` when it receives a blank or otherwise non-usable success payload, and keep a defensive controller guard for success payloads that still should not reach cleanup | The service is the narrowest place to normalize backend transcription outcomes, while the controller guard prevents future classifier drift from recreating retryable drafts. |
 | Live audio lifecycle | Delete live temporary audio for blank successful transcription payloads | The spec says captured audio is not retained for future retry. The service already owns live temp audio deletion after usable transcription success. |
 | Draft transcription lifecycle | Keep caller-owned draft audio untouched when draft transcription returns no words | Existing bad no-word drafts are out of scope, and draft transcription already treats caller-owned audio as not owned by the service. |
 | Controller retry guard | Skip audio-draft persistence for `TranscriptionFailureReason.nothingCaught` before checking `audioDraftPath` | This directly satisfies the "no retryable audio draft" requirement and prevents tests or future service changes from making no-word failures retryable through an accidental path. |
@@ -44,12 +44,14 @@ appear consumed twice for a single failed recording outcome.
 | `specs/036-terminal-no-speech-transcription/plan.md` | Modify | This implementation plan. |
 | `specs/036-terminal-no-speech-transcription/tasks.md` | Modify later | Replace the copied template with the approved task breakdown in the next phase. |
 | `specs/036-terminal-no-speech-transcription/implementation.md` | Create later | Record implementation details and validation evidence during implementation. |
-| `lib/data/transcription/cloud_transcription_service.dart` | Modify | Return terminal `nothingCaught` failures without a retryable audio path for blank success payloads and delete live temp audio when the service owns it. |
+| `lib/data/api/backend_client.dart` | Modify | Preserve backend success payloads even when the transcript trims to empty so the app-facing transcription layer can classify no-speech correctly instead of collapsing it to `apiError`. |
+| `lib/data/transcription/cloud_transcription_service.dart` | Modify | Return terminal `nothingCaught` failures without a retryable audio path for blank or otherwise non-usable success payloads and delete live temp audio when the service owns it. |
 | `lib/domain/usecase/cleanup_transcript_use_case.dart` | Modify | Let cleanup own quota publication for successful transcription paths by accepting fallback transcription quota when cleanup has no quota of its own. |
 | `lib/data/launch/app_launch_providers.dart` | Modify | Wire launch-retry quota publication through the shared session quota notifier. |
 | `lib/domain/usecase/retry_pending_drafts_use_case.dart` | Modify | Pass successful draft-transcription quota into cleanup retry as fallback quota and publish failed-transcription quota from launch retry. |
 | `lib/presentation/main/main_recording_controller.dart` | Modify | Treat no-word transcription failures as non-retryable before attempting audio-draft persistence. |
-| `test/data/transcription/cloud_transcription_service_test.dart` | Modify | Update blank-live-transcript coverage to expect no draft path and deleted live audio; keep retryable failure and draft-audio ownership coverage intact. |
+| `test/data/api/backend_client_test.dart` | Modify | Cover that blank backend transcription success payloads are preserved for caller classification rather than rewritten to `apiError`. |
+| `test/data/transcription/cloud_transcription_service_test.dart` | Modify | Update no-speech coverage to include blank and punctuation-only success payloads while keeping retryable failure and draft-audio ownership coverage intact. |
 | `test/domain/usecase/cleanup_transcript_use_case_test.dart` | Modify | Cover cleanup fallback quota behavior when cleanup returns no quota, exits locally after successful transcription, or both cleanup and fallback quota are absent. |
 | `test/domain/usecase/retry_pending_drafts_use_case_test.dart` | Modify | Cover launch-retry failed-transcription quota publication while preserving the draft audio. |
 | `test/presentation/main/main_recording_controller_test.dart` | Modify | Cover that `nothingCaught` with an audio path still emits no-match feedback without saving an audio draft or showing preserved-draft state; cover that local audio-draft persistence does not publish an extra quota update. |
@@ -119,18 +121,22 @@ feature are explicitly out of scope and will not be cleaned up by this story.
 
 | Test case | Type | File |
 | --- | --- | --- |
+| Blank backend transcription success payload is preserved for caller classification | Unit | `test/data/api/backend_client_test.dart` |
 | Blank live transcription success returns `nothingCaught` with no audio-draft path and deletes live temp audio | Unit | `test/data/transcription/cloud_transcription_service_test.dart` |
+| Punctuation-only transcription success is treated as `nothingCaught` instead of cleanup input | Unit | `test/data/transcription/cloud_transcription_service_test.dart` |
 | Blank draft transcription success remains a caller-owned draft attempt and does not delete caller-owned audio | Unit | `test/data/transcription/cloud_transcription_service_test.dart` |
 | Live network/backend failures still preserve retryable audio paths | Unit | `test/data/transcription/cloud_transcription_service_test.dart` |
 | Cleanup falls back to transcription quota when cleanup returns no quota after successful transcription | Unit | `test/domain/usecase/cleanup_transcript_use_case_test.dart` |
 | Cleanup failure leaves quota unchanged when both cleanup and fallback quota are absent | Unit | `test/domain/usecase/cleanup_transcript_use_case_test.dart` |
 | Launch retry publishes failed-transcription quota once while preserving the draft | Unit | `test/domain/usecase/retry_pending_drafts_use_case_test.dart` |
 | Controller maps no-word failure to no-match feedback without saving an audio draft, even if an audio path is present | Unit | `test/presentation/main/main_recording_controller_test.dart` |
+| Controller treats punctuation-only transcription success as terminal no-match without entering cleanup | Unit | `test/presentation/main/main_recording_controller_test.dart` |
 | Controller still persists audio drafts for retryable transcription failures with usable audio | Unit | `test/presentation/main/main_recording_controller_test.dart` |
 | Controller preserves backend quota after retryable failure draft saving without publishing a second quota update | Unit | `test/presentation/main/main_recording_controller_test.dart` |
 | Provider graph returns terminal no-word failure and deletes live temp audio for blank live transcription success | Integration | `integration_test/cloud_transcription_service_flow_test.dart` |
 | Provider graph returns terminal no-word failure for blank draft transcription success while keeping caller-owned audio and caller-owned quota publication | Integration | `integration_test/cloud_transcription_service_flow_test.dart` |
 | Provider graph shows no-word feedback and leaves no pending draft after a no-word recording result | Integration | `integration_test/main_recording_controller_flow_test.dart` |
+| Provider graph treats punctuation-only transcription success as terminal no-match without saving a draft | Integration | `integration_test/main_recording_controller_flow_test.dart` |
 | Provider graph still preserves pending audio draft and draft-preserved feedback for retryable live transcription failure | Integration | `integration_test/main_recording_controller_flow_test.dart` |
 | Provider graph shows quota remaining from the backend retryable-failure response after local draft save, with no second local quota change | Integration | `integration_test/main_recording_controller_flow_test.dart` |
 | Visible main screen shows existing no-match text for no-word recording without saved-draft copy, if not already covered by existing integration tests | Integration | `integration_test/main_screen_flow_test.dart` |

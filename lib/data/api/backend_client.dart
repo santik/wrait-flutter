@@ -87,12 +87,6 @@ class WraitBackendClient {
 
       if (response is GeneratedApiSuccess<TranscribeResponse>) {
         final transcript = response.data.transcript.trim();
-        if (transcript.isEmpty) {
-          return const TranscriptionFailure(
-            reason: BackendFailureReason.apiError,
-          );
-        }
-
         final detectedLanguage = response.data.detectedLanguage.trim();
         return TranscriptionSuccess(
           transcript: transcript,
