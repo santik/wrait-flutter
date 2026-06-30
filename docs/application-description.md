@@ -36,6 +36,9 @@ upcoming feature work:
 - split Android install identities for release/update validation
   (`com.wrait.flutter`) versus debug/profile validation
   (`com.wrait.flutter.dev`)
+- Wrait-only platform launcher/app-icon branding across Android and iOS, with
+  release using the app button-color background and debug/profile using a red
+  background, both showing the `wrait` wordmark and no Flutter logo
 - Android manifest-level Impeller disablement for reliable real-device cold
   launch instead of hanging behind the splash screen on the current validation
   phone
@@ -46,8 +49,13 @@ upcoming feature work:
 - centralized light/dark theme and design tokens
 - encrypted local entry database bootstrap through the app startup flow rather
   than a fully blocking pre-UI initialization step
-- encrypted local entry persistence and stale-draft cleanup
-- same-identity app-update preservation for the encrypted database, linked
+- encrypted local entry persistence and stale-draft cleanup through the current
+  type-based store in `wrait_entries_v2.sqlite`
+- fresh-install rollout for the current entry-type store; legacy pre-US-037
+  `wrait_entries.sqlite` entry data is not migrated or surfaced by the current
+  app
+- same-identity app-update preservation for the current encrypted database,
+  linked
   app-private retained files, persisted device id, pending drafts, and
   first-recording state
 - uninstall/reinstall and Android clear-data fresh-start behavior for local

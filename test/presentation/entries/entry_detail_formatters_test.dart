@@ -72,7 +72,7 @@ Entry _entry({required String? cleanedText, required String rawTranscript}) {
     id: 1,
     rawTranscript: rawTranscript,
     cleanedText: cleanedText,
-    isDraft: false,
+    type: EntryType.saved,
     language: 'en-US',
     createdAt: DateTime(2026, 6, 16, 9).millisecondsSinceEpoch,
     wordCount: 2,

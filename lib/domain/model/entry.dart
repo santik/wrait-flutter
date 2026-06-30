@@ -1,9 +1,24 @@
+enum EntryType {
+  draft,
+  saved;
+
+  static EntryType? tryParse(String rawValue) {
+    for (final value in values) {
+      if (value.name == rawValue) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+}
+
 class Entry {
   const Entry({
     this.id = 0,
     required this.rawTranscript,
     this.cleanedText,
-    required this.isDraft,
+    required this.type,
     required this.language,
     required this.createdAt,
     required this.wordCount,
@@ -13,7 +28,7 @@ class Entry {
   final int id;
   final String rawTranscript;
   final String? cleanedText;
-  final bool isDraft;
+  final EntryType type;
   final String language;
   final int createdAt;
   final int wordCount;
@@ -24,7 +39,7 @@ class Entry {
     String? rawTranscript,
     String? cleanedText,
     bool clearCleanedText = false,
-    bool? isDraft,
+    EntryType? type,
     String? language,
     int? createdAt,
     int? wordCount,
@@ -35,7 +50,7 @@ class Entry {
       id: id ?? this.id,
       rawTranscript: rawTranscript ?? this.rawTranscript,
       cleanedText: clearCleanedText ? null : cleanedText ?? this.cleanedText,
-      isDraft: isDraft ?? this.isDraft,
+      type: type ?? this.type,
       language: language ?? this.language,
       createdAt: createdAt ?? this.createdAt,
       wordCount: wordCount ?? this.wordCount,
@@ -50,7 +65,7 @@ class Entry {
             other.id == id &&
             other.rawTranscript == rawTranscript &&
             other.cleanedText == cleanedText &&
-            other.isDraft == isDraft &&
+            other.type == type &&
             other.language == language &&
             other.createdAt == createdAt &&
             other.wordCount == wordCount &&
@@ -62,7 +77,7 @@ class Entry {
     id,
     rawTranscript,
     cleanedText,
-    isDraft,
+    type,
     language,
     createdAt,
     wordCount,

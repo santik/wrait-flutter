@@ -44,19 +44,15 @@ class $EntryRecordsTable extends EntryRecords
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _isDraftMeta = const VerificationMeta(
-    'isDraft',
-  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
-  late final GeneratedColumn<bool> isDraft = GeneratedColumn<bool>(
-    'is_draft',
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
     aliasedName,
     false,
-    type: DriftSqlType.bool,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_draft" IN (0, 1))',
-    ),
+    $customConstraints: 'NOT NULL CHECK (type IN (\'draft\', \'saved\'))',
   );
   static const VerificationMeta _languageMeta = const VerificationMeta(
     'language',
@@ -108,7 +104,7 @@ class $EntryRecordsTable extends EntryRecords
     id,
     rawTranscript,
     cleanedText,
-    isDraft,
+    type,
     language,
     createdAt,
     wordCount,
@@ -149,13 +145,13 @@ class $EntryRecordsTable extends EntryRecords
         ),
       );
     }
-    if (data.containsKey('is_draft')) {
+    if (data.containsKey('type')) {
       context.handle(
-        _isDraftMeta,
-        isDraft.isAcceptableOrUnknown(data['is_draft']!, _isDraftMeta),
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
       );
     } else if (isInserting) {
-      context.missing(_isDraftMeta);
+      context.missing(_typeMeta);
     }
     if (data.containsKey('language')) {
       context.handle(
@@ -206,9 +202,9 @@ class $EntryRecordsTable extends EntryRecords
         DriftSqlType.string,
         data['${effectivePrefix}cleaned_text'],
       ),
-      isDraft: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_draft'],
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
       )!,
       language: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -239,7 +235,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
   final int id;
   final String rawTranscript;
   final String? cleanedText;
-  final bool isDraft;
+  final String type;
   final String language;
   final int createdAt;
   final int wordCount;
@@ -248,7 +244,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
     required this.id,
     required this.rawTranscript,
     this.cleanedText,
-    required this.isDraft,
+    required this.type,
     required this.language,
     required this.createdAt,
     required this.wordCount,
@@ -262,7 +258,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
     if (!nullToAbsent || cleanedText != null) {
       map['cleaned_text'] = Variable<String>(cleanedText);
     }
-    map['is_draft'] = Variable<bool>(isDraft);
+    map['type'] = Variable<String>(type);
     map['language'] = Variable<String>(language);
     map['created_at'] = Variable<int>(createdAt);
     map['word_count'] = Variable<int>(wordCount);
@@ -279,7 +275,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
       cleanedText: cleanedText == null && nullToAbsent
           ? const Value.absent()
           : Value(cleanedText),
-      isDraft: Value(isDraft),
+      type: Value(type),
       language: Value(language),
       createdAt: Value(createdAt),
       wordCount: Value(wordCount),
@@ -298,7 +294,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
       id: serializer.fromJson<int>(json['id']),
       rawTranscript: serializer.fromJson<String>(json['rawTranscript']),
       cleanedText: serializer.fromJson<String?>(json['cleanedText']),
-      isDraft: serializer.fromJson<bool>(json['isDraft']),
+      type: serializer.fromJson<String>(json['type']),
       language: serializer.fromJson<String>(json['language']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       wordCount: serializer.fromJson<int>(json['wordCount']),
@@ -312,7 +308,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
       'id': serializer.toJson<int>(id),
       'rawTranscript': serializer.toJson<String>(rawTranscript),
       'cleanedText': serializer.toJson<String?>(cleanedText),
-      'isDraft': serializer.toJson<bool>(isDraft),
+      'type': serializer.toJson<String>(type),
       'language': serializer.toJson<String>(language),
       'createdAt': serializer.toJson<int>(createdAt),
       'wordCount': serializer.toJson<int>(wordCount),
@@ -324,7 +320,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
     int? id,
     String? rawTranscript,
     Value<String?> cleanedText = const Value.absent(),
-    bool? isDraft,
+    String? type,
     String? language,
     int? createdAt,
     int? wordCount,
@@ -333,7 +329,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
     id: id ?? this.id,
     rawTranscript: rawTranscript ?? this.rawTranscript,
     cleanedText: cleanedText.present ? cleanedText.value : this.cleanedText,
-    isDraft: isDraft ?? this.isDraft,
+    type: type ?? this.type,
     language: language ?? this.language,
     createdAt: createdAt ?? this.createdAt,
     wordCount: wordCount ?? this.wordCount,
@@ -348,7 +344,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
       cleanedText: data.cleanedText.present
           ? data.cleanedText.value
           : this.cleanedText,
-      isDraft: data.isDraft.present ? data.isDraft.value : this.isDraft,
+      type: data.type.present ? data.type.value : this.type,
       language: data.language.present ? data.language.value : this.language,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       wordCount: data.wordCount.present ? data.wordCount.value : this.wordCount,
@@ -362,7 +358,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
           ..write('id: $id, ')
           ..write('rawTranscript: $rawTranscript, ')
           ..write('cleanedText: $cleanedText, ')
-          ..write('isDraft: $isDraft, ')
+          ..write('type: $type, ')
           ..write('language: $language, ')
           ..write('createdAt: $createdAt, ')
           ..write('wordCount: $wordCount, ')
@@ -376,7 +372,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
     id,
     rawTranscript,
     cleanedText,
-    isDraft,
+    type,
     language,
     createdAt,
     wordCount,
@@ -389,7 +385,7 @@ class EntryRecord extends DataClass implements Insertable<EntryRecord> {
           other.id == this.id &&
           other.rawTranscript == this.rawTranscript &&
           other.cleanedText == this.cleanedText &&
-          other.isDraft == this.isDraft &&
+          other.type == this.type &&
           other.language == this.language &&
           other.createdAt == this.createdAt &&
           other.wordCount == this.wordCount &&
@@ -400,7 +396,7 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
   final Value<int> id;
   final Value<String> rawTranscript;
   final Value<String?> cleanedText;
-  final Value<bool> isDraft;
+  final Value<String> type;
   final Value<String> language;
   final Value<int> createdAt;
   final Value<int> wordCount;
@@ -409,7 +405,7 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
     this.id = const Value.absent(),
     this.rawTranscript = const Value.absent(),
     this.cleanedText = const Value.absent(),
-    this.isDraft = const Value.absent(),
+    this.type = const Value.absent(),
     this.language = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.wordCount = const Value.absent(),
@@ -419,20 +415,20 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
     this.id = const Value.absent(),
     required String rawTranscript,
     this.cleanedText = const Value.absent(),
-    required bool isDraft,
+    required String type,
     required String language,
     required int createdAt,
     this.wordCount = const Value.absent(),
     this.audioPath = const Value.absent(),
   }) : rawTranscript = Value(rawTranscript),
-       isDraft = Value(isDraft),
+       type = Value(type),
        language = Value(language),
        createdAt = Value(createdAt);
   static Insertable<EntryRecord> custom({
     Expression<int>? id,
     Expression<String>? rawTranscript,
     Expression<String>? cleanedText,
-    Expression<bool>? isDraft,
+    Expression<String>? type,
     Expression<String>? language,
     Expression<int>? createdAt,
     Expression<int>? wordCount,
@@ -442,7 +438,7 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
       if (id != null) 'id': id,
       if (rawTranscript != null) 'raw_transcript': rawTranscript,
       if (cleanedText != null) 'cleaned_text': cleanedText,
-      if (isDraft != null) 'is_draft': isDraft,
+      if (type != null) 'type': type,
       if (language != null) 'language': language,
       if (createdAt != null) 'created_at': createdAt,
       if (wordCount != null) 'word_count': wordCount,
@@ -454,7 +450,7 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
     Value<int>? id,
     Value<String>? rawTranscript,
     Value<String?>? cleanedText,
-    Value<bool>? isDraft,
+    Value<String>? type,
     Value<String>? language,
     Value<int>? createdAt,
     Value<int>? wordCount,
@@ -464,7 +460,7 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
       id: id ?? this.id,
       rawTranscript: rawTranscript ?? this.rawTranscript,
       cleanedText: cleanedText ?? this.cleanedText,
-      isDraft: isDraft ?? this.isDraft,
+      type: type ?? this.type,
       language: language ?? this.language,
       createdAt: createdAt ?? this.createdAt,
       wordCount: wordCount ?? this.wordCount,
@@ -484,8 +480,8 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
     if (cleanedText.present) {
       map['cleaned_text'] = Variable<String>(cleanedText.value);
     }
-    if (isDraft.present) {
-      map['is_draft'] = Variable<bool>(isDraft.value);
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
     }
     if (language.present) {
       map['language'] = Variable<String>(language.value);
@@ -508,7 +504,7 @@ class EntryRecordsCompanion extends UpdateCompanion<EntryRecord> {
           ..write('id: $id, ')
           ..write('rawTranscript: $rawTranscript, ')
           ..write('cleanedText: $cleanedText, ')
-          ..write('isDraft: $isDraft, ')
+          ..write('type: $type, ')
           ..write('language: $language, ')
           ..write('createdAt: $createdAt, ')
           ..write('wordCount: $wordCount, ')
@@ -535,7 +531,7 @@ typedef $$EntryRecordsTableCreateCompanionBuilder =
       Value<int> id,
       required String rawTranscript,
       Value<String?> cleanedText,
-      required bool isDraft,
+      required String type,
       required String language,
       required int createdAt,
       Value<int> wordCount,
@@ -546,7 +542,7 @@ typedef $$EntryRecordsTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> rawTranscript,
       Value<String?> cleanedText,
-      Value<bool> isDraft,
+      Value<String> type,
       Value<String> language,
       Value<int> createdAt,
       Value<int> wordCount,
@@ -577,8 +573,8 @@ class $$EntryRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get isDraft => $composableBuilder(
-    column: $table.isDraft,
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -627,8 +623,8 @@ class $$EntryRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isDraft => $composableBuilder(
-    column: $table.isDraft,
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -675,8 +671,8 @@ class $$EntryRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get isDraft =>
-      $composableBuilder(column: $table.isDraft, builder: (column) => column);
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
 
   GeneratedColumn<String> get language =>
       $composableBuilder(column: $table.language, builder: (column) => column);
@@ -731,7 +727,7 @@ class $$EntryRecordsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> rawTranscript = const Value.absent(),
                 Value<String?> cleanedText = const Value.absent(),
-                Value<bool> isDraft = const Value.absent(),
+                Value<String> type = const Value.absent(),
                 Value<String> language = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
@@ -740,7 +736,7 @@ class $$EntryRecordsTableTableManager
                 id: id,
                 rawTranscript: rawTranscript,
                 cleanedText: cleanedText,
-                isDraft: isDraft,
+                type: type,
                 language: language,
                 createdAt: createdAt,
                 wordCount: wordCount,
@@ -751,7 +747,7 @@ class $$EntryRecordsTableTableManager
                 Value<int> id = const Value.absent(),
                 required String rawTranscript,
                 Value<String?> cleanedText = const Value.absent(),
-                required bool isDraft,
+                required String type,
                 required String language,
                 required int createdAt,
                 Value<int> wordCount = const Value.absent(),
@@ -760,7 +756,7 @@ class $$EntryRecordsTableTableManager
                 id: id,
                 rawTranscript: rawTranscript,
                 cleanedText: cleanedText,
-                isDraft: isDraft,
+                type: type,
                 language: language,
                 createdAt: createdAt,
                 wordCount: wordCount,

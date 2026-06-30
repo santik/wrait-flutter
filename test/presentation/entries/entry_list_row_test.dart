@@ -17,7 +17,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         EntryListRow(
-          entry: _entry(isDraft: true),
+          entry: _entry(type: EntryType.draft),
           onTap: (_) {},
           onDeleteRequested: (_) async {},
         ),
@@ -279,12 +279,12 @@ Widget _buildTestApp(Widget child) {
   );
 }
 
-Entry _entry({bool isDraft = false}) {
+Entry _entry({EntryType type = EntryType.saved}) {
   return Entry(
     id: 1,
     rawTranscript: 'raw line\nraw second line',
     cleanedText: 'clean line\nclean second line',
-    isDraft: isDraft,
+    type: type,
     language: 'en-US',
     createdAt: DateTime(2026, 6, 15, 21, 5).millisecondsSinceEpoch,
     wordCount: 4,
@@ -296,7 +296,7 @@ Entry _audioDraftEntry() {
     id: 1,
     rawTranscript: '',
     cleanedText: null,
-    isDraft: true,
+    type: EntryType.draft,
     language: 'en-US',
     createdAt: DateTime(2026, 6, 15, 21, 5).millisecondsSinceEpoch,
     wordCount: 0,

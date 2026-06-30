@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/entry_repository_impl.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
+import 'package:wrait/domain/model/entry.dart';
 
 import '../../test_doubles/fake_clock.dart';
 import '../../test_doubles/fake_secure_storage.dart';
@@ -60,7 +61,7 @@ void main() {
         'newer entry',
         'older entry',
       ]);
-      expect(entries.first.isDraft, isFalse);
+      expect(entries.first.type, EntryType.saved);
     },
   );
 
@@ -72,7 +73,7 @@ void main() {
     final draft = await repository!.getEntryById(id);
 
     expect(draft, isNotNull);
-    expect(draft!.isDraft, isTrue);
+    expect(draft!.type, EntryType.draft);
     expect(draft.rawTranscript, 'rough notes updated');
     expect(draft.wordCount, 3);
     expect(draft.audioPath, isNull);
@@ -97,7 +98,7 @@ void main() {
     expect(entry.wordCount, 2);
     expect(entry.language, 'fr-FR');
     expect(entry.audioPath, isNull);
-    expect(entry.isDraft, isTrue);
+    expect(entry.type, EntryType.draft);
   });
 
   test('canonicalizes supported language values before persistence', () async {
@@ -124,7 +125,7 @@ void main() {
     final entry = await repository!.getEntryById(id);
 
     expect(entry, isNotNull);
-    expect(entry!.isDraft, isFalse);
+    expect(entry!.type, EntryType.saved);
     expect(entry.rawTranscript, 'raw transcript');
     expect(entry.cleanedText, 'clean transcript');
     expect(entry.wordCount, 2);
@@ -148,7 +149,7 @@ void main() {
 
       expect(updatedEntry, isNotNull);
       expect(updatedEntry!.cleanedText, 'cleaned up');
-      expect(updatedEntry.isDraft, isFalse);
+      expect(updatedEntry.type, EntryType.saved);
       expect(updatedEntry.language, 'nl-NL');
       expect(updatedEntry.wordCount, 2);
     },

@@ -68,7 +68,8 @@ String entryListLanguageLabel(String languageCode) {
 
 bool entryListIsAudioOnlyDraft(Entry entry) {
   final audioPath = entry.audioPath;
-  return audioPath != null &&
+  return entry.type == EntryType.draft &&
+      audioPath != null &&
       audioPath.isNotEmpty &&
       (entry.cleanedText == null || entry.cleanedText!.trim().isEmpty) &&
       entry.rawTranscript.trim().isEmpty;

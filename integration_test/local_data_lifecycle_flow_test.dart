@@ -28,6 +28,7 @@ import 'package:wrait/data/preferences/platform_device_id_provider.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
+import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/domain/usecase/register_device_on_launch_use_case.dart';
@@ -291,7 +292,7 @@ void _registerPlatformUpdateRetryVerifyScenario() {
         );
 
         expect(finalizedEntry, isNotNull);
-        expect(finalizedEntry!.isDraft, isFalse);
+        expect(finalizedEntry!.type, EntryType.saved);
         expect(finalizedEntry.rawTranscript, _retriedRawTranscript);
         expect(finalizedEntry.cleanedText, _retriedCleanedText);
         expect(finalizedEntry.language, _retriedDetectedLanguage);
@@ -628,7 +629,7 @@ Future<void> _expectLifecycleState({
   );
 
   expect(entries, hasLength(2));
-  expect(savedEntry.isDraft, isFalse);
+  expect(savedEntry.type, EntryType.saved);
   expect(savedEntry.rawTranscript, expected.savedRawTranscript);
   expect(savedEntry.cleanedText, expected.savedCleanedText);
   expect(savedEntry.language, expected.savedLanguage);
@@ -636,7 +637,7 @@ Future<void> _expectLifecycleState({
   expect(savedEntry.wordCount, expected.savedWordCount);
   expect(savedEntry.audioPath, isNull);
 
-  expect(draftEntry.isDraft, isTrue);
+  expect(draftEntry.type, EntryType.draft);
   expect(draftEntry.rawTranscript, isEmpty);
   expect(draftEntry.cleanedText, isNull);
   expect(draftEntry.language, expected.draftLanguage);

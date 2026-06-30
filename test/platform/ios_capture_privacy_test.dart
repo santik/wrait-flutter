@@ -38,6 +38,8 @@ void main() {
 
     expect(contents, contains('private let privacyCoverText = "Private"'));
     expect(contents, contains('accessibilityElementsHidden = true'));
+    expect(contents, isNot(contains('FlutterLogo')));
+    expect(contents, isNot(contains('Flutter logo')));
     expect(
       contents,
       contains('isAccessibilityElement = shouldShowPrivacyCover'),

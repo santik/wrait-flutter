@@ -114,7 +114,7 @@ void main() {
   testWidgets('stats tap navigates to entries', (tester) async {
     entryRepository.emitEntries([
       _entry(id: 1, createdAt: DateTime(2026, 6, 13, 9)),
-      _entry(id: 2, createdAt: DateTime(2026, 6, 14, 9), isDraft: true),
+      _entry(id: 2, createdAt: DateTime(2026, 6, 14, 9), type: EntryType.draft),
     ]);
 
     await _pumpTestApp(
@@ -506,37 +506,38 @@ void main() {
     expect(displayAwakeService.requests, <bool>[true, false, true]);
   });
 
-  testWidgets('startup while inactive does not enable keep-awake until resume', (
-    tester,
-  ) async {
-    controller.setTestState(
-      RecordingControllerState(
-        recordingState: RecordingListening(
-          hardCapDeadlineElapsedRealtime: 120000,
+  testWidgets(
+    'startup while inactive does not enable keep-awake until resume',
+    (tester) async {
+      controller.setTestState(
+        RecordingControllerState(
+          recordingState: RecordingListening(
+            hardCapDeadlineElapsedRealtime: 120000,
+          ),
         ),
-      ),
-    );
+      );
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
 
-    await _pumpTestApp(
-      tester,
-      controller: controller,
-      entryRepository: entryRepository,
-      preferencesRepository: preferencesRepository,
-      quotaNotifier: quotaNotifier,
-      displayAwakeService: displayAwakeService,
-      settle: false,
-    );
+      await _pumpTestApp(
+        tester,
+        controller: controller,
+        entryRepository: entryRepository,
+        preferencesRepository: preferencesRepository,
+        quotaNotifier: quotaNotifier,
+        displayAwakeService: displayAwakeService,
+        settle: false,
+      );
 
-    expect(displayAwakeService.requests, isEmpty);
+      expect(displayAwakeService.requests, isEmpty);
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
 
-    expect(displayAwakeService.requests, <bool>[true]);
-  });
+      expect(displayAwakeService.requests, <bool>[true]);
+    },
+  );
 
   testWidgets('disposing while listening releases keep-awake cleanly', (
     tester,
@@ -601,49 +602,50 @@ void main() {
     expect(displayAwakeService.requests, <bool>[true, false]);
   });
 
-  testWidgets('failed enable retries on later state changes without breaking UI', (
-    tester,
-  ) async {
-    displayAwakeService.enqueueResult(false);
+  testWidgets(
+    'failed enable retries on later state changes without breaking UI',
+    (tester) async {
+      displayAwakeService.enqueueResult(false);
 
-    await _pumpTestApp(
-      tester,
-      controller: controller,
-      entryRepository: entryRepository,
-      preferencesRepository: preferencesRepository,
-      quotaNotifier: quotaNotifier,
-      displayAwakeService: displayAwakeService,
-      settle: false,
-    );
+      await _pumpTestApp(
+        tester,
+        controller: controller,
+        entryRepository: entryRepository,
+        preferencesRepository: preferencesRepository,
+        quotaNotifier: quotaNotifier,
+        displayAwakeService: displayAwakeService,
+        settle: false,
+      );
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    controller.setTestState(
-      RecordingControllerState(
-        recordingState: RecordingListening(
-          hardCapDeadlineElapsedRealtime: 120000,
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      controller.setTestState(
+        RecordingControllerState(
+          recordingState: RecordingListening(
+            hardCapDeadlineElapsedRealtime: 120000,
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.pump();
-    await tester.pump();
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
 
-    controller.setTestState(
-      const RecordingControllerState(recordingState: RecordingUploading()),
-    );
-    await tester.pump();
-    await tester.pump();
+      controller.setTestState(
+        const RecordingControllerState(recordingState: RecordingUploading()),
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(displayAwakeService.requests, <bool>[true, true, false]);
-    expect(tester.takeException(), isNull);
-  });
+      expect(displayAwakeService.requests, <bool>[true, true, false]);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _pumpTestApp(
@@ -889,12 +891,12 @@ class _TestPreferencesRepository implements PreferencesRepository {
 Entry _entry({
   required int id,
   required DateTime createdAt,
-  bool isDraft = false,
+  EntryType type = EntryType.saved,
 }) {
   return Entry(
     id: id,
     rawTranscript: 'entry $id',
-    isDraft: isDraft,
+    type: type,
     language: 'en-US',
     createdAt: createdAt.millisecondsSinceEpoch,
     wordCount: 2,

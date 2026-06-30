@@ -87,16 +87,50 @@ this file as supporting implementation memory.
 - `./deploy_release.sh` should validate the configured keystore with `keytool`
   before building and must preserve pre-existing debug/profile installs.
 
+## Branding Assets
+
+- Android launcher icons are adaptive-icon XML resources, not generated PNGs.
+- Reference structure for Android launcher branding is
+  `wrait-android/src/main/res`.
+- Main Android release launcher resources live under
+  `android/app/src/main/res/mipmap-anydpi/` and
+  `android/app/src/main/res/drawable/`.
+- Android debug/profile launcher overrides should stay limited to
+  `android/app/src/debug/res/drawable/` and
+  `android/app/src/profile/res/drawable/`.
+- Android launcher branding should remain background color plus the `wrait`
+  wordmark only; release uses the button-color background and debug/profile
+  use the red background.
+- iOS app icons remain raster assets in
+  `ios/Runner/Assets.xcassets/AppIcon.appiconset/` and
+  `ios/Runner/Assets.xcassets/AppIconDebug.appiconset/`, but their source rule
+  is full background plus `wrait`, with no inner circle.
+- `tool/branding/generate_assets.sh` now owns only the iOS app-icon and launch
+  image PNG generation; do not treat it as the Android launcher source of
+  truth.
+- If `FLAG_SECURE` causes Android recents screenshots to go black, verify
+  launcher packaging from the built APK with `aapt` and `unzip -l` instead of
+  relying on overview screenshots alone.
+
 ## Data, Drafts, and Persistence
 
 - The encrypted local entry store uses Drift plus the `sqlite3mc` runtime
   selected through `hooks.user_defines.sqlite3.source: sqlite3mc`.
+- Entry classification source of truth is `Entry.type` with
+  `EntryType.draft` and `EntryType.saved`; do not reintroduce `isDraft` as a
+  runtime classification field.
 - Database open must verify cipher availability with `PRAGMA cipher;` and fail
   startup explicitly if encryption support is missing.
 - Keep database opening behind the first-frame bootstrap shell. Do not move it
   back to a fully blocking pre-UI startup path without an approved story.
 - `LocalEntryDatabase.open()` should fail closed on corruption or open errors
   and leave database artifacts untouched.
+- The supported type-based entry store lives in `wrait_entries_v2.sqlite`.
+  Legacy `wrait_entries.sqlite` entry data is intentionally left untouched and
+  is not migrated or interpreted by the current app.
+- Keep the database-level `type` constraint limited to `draft` and `saved`,
+  and keep repository parsing validation as defense in depth for corrupted
+  current-shape databases.
 - `deleteDatabaseArtifacts()` is destructive and should stay reserved for
   explicit reset flows, not automatic bootstrap recovery.
 - Same-identity Android and iOS app updates should preserve the encrypted

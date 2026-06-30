@@ -21,7 +21,8 @@ class EntryRecords extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get rawTranscript => text().named('raw_transcript')();
   TextColumn get cleanedText => text().named('cleaned_text').nullable()();
-  BoolColumn get isDraft => boolean().named('is_draft')();
+  TextColumn get type =>
+      text().customConstraint("NOT NULL CHECK (type IN ('draft', 'saved'))")();
   TextColumn get language => text()();
   IntColumn get createdAt => integer().named('created_at')();
   IntColumn get wordCount =>
@@ -33,7 +34,9 @@ class EntryRecords extends Table {
 class LocalEntryDatabase extends _$LocalEntryDatabase {
   LocalEntryDatabase(super.e);
 
-  static const databaseFileName = 'wrait_entries.sqlite';
+  // US-037 intentionally rolls out the type-based entry store as a fresh local
+  // database instead of migrating the legacy is_draft-based file in place.
+  static const databaseFileName = 'wrait_entries_v2.sqlite';
 
   @override
   int get schemaVersion => 1;

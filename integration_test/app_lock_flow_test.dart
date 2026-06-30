@@ -34,6 +34,7 @@ void main() {
     expect(find.byKey(appLockOverlayKey), findsNothing);
     expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
     expect(harness.authenticator.authenticateCallCount, 1);
+    expect(find.byType(FlutterLogo), findsNothing);
   });
 
   testWidgets('background and resume re-locks then auto-prompts again', (
@@ -57,6 +58,7 @@ void main() {
     expect(harness.authenticator.authenticateCallCount, 2);
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
     expect(find.text('still locked'), findsOneWidget);
+    expect(find.byType(FlutterLogo), findsNothing);
   });
 
   testWidgets(
@@ -100,6 +102,7 @@ void main() {
 
     expect(find.text('still locked'), findsOneWidget);
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
+    expect(find.byType(FlutterLogo), findsNothing);
 
     await tester.tap(find.byKey(appLockUnlockButtonKey));
     await tester.pumpAndSettle();
@@ -120,6 +123,7 @@ void main() {
       find.text('set up device security to protect Wrait'),
       findsOneWidget,
     );
+    expect(find.byType(FlutterLogo), findsNothing);
 
     await tester.tap(find.byKey(appLockSettingsButtonKey));
     await tester.pump();
@@ -145,6 +149,7 @@ void main() {
 
     expect(find.text('unlock unavailable · try again'), findsOneWidget);
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
+    expect(find.byType(FlutterLogo), findsNothing);
 
     await tester.tap(find.byKey(appLockUnlockButtonKey));
     await tester.pumpAndSettle();
