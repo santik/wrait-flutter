@@ -13,12 +13,15 @@ import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/entries/entry_export_file_writer.dart';
 import 'package:wrait/data/entries/entry_export_providers.dart';
+import 'package:wrait/data/entries/entry_import_file_reader.dart';
+import 'package:wrait/data/entries/entry_import_providers.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/domain/service/entry_export_service.dart';
+import 'package:wrait/domain/service/entry_import_service.dart';
 import 'package:wrait/presentation/entries/entry_list_formatters.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
@@ -45,6 +48,7 @@ void main() {
     expect(find.text('no entries yet'), findsOneWidget);
     expect(find.byKey(const ValueKey('entryListView')), findsNothing);
     expect(find.byKey(const ValueKey('entryListExportButton')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryListImportButton')), findsOneWidget);
   });
 
   testWidgets('renders populated entries newest first with language labels', (
@@ -347,12 +351,148 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
     semanticsHandle.dispose();
   });
+
+  testWidgets(
+    'import success shows added-count feedback and renders new rows',
+    (tester) async {
+      await _pumpEntryListApp(
+        tester,
+        entryRepository: entryRepository,
+        importService: EntryImportService(
+          fileReader: _TestImportFileReader(
+            result: EntryImportFileReadResult(
+              fileName: 'import.csv',
+              contents: _validImportCsv(),
+            ),
+          ),
+          entryRepository: entryRepository,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Imported 2 records from import.csv.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+      expect(find.text('clean entry 21'), findsOneWidget);
+      expect(find.text('imported draft entry'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'import cancellation shows no snackbar and keeps the list unchanged',
+    (tester) async {
+      entryRepository.emitEntries([_entry(id: 8)]);
+
+      await _pumpEntryListApp(
+        tester,
+        entryRepository: entryRepository,
+        importService: EntryImportService(
+          fileReader: _TestImportFileReader(result: null),
+          entryRepository: entryRepository,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Imported '), findsNothing);
+      expect(find.text('Could not read the selected CSV file.'), findsNothing);
+      expect(find.byKey(const ValueKey('entryRow-8')), findsOneWidget);
+    },
+  );
+
+  testWidgets('import failure shows an error and keeps the list visible', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([_entry(id: 4)]);
+
+    await _pumpEntryListApp(
+      tester,
+      entryRepository: entryRepository,
+      importService: EntryImportService(
+        fileReader: const _ThrowingImportFileReader(),
+        entryRepository: entryRepository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not read the selected CSV file.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryRow-4')), findsOneWidget);
+  });
+
+  testWidgets('import works from a valid header-only csv', (tester) async {
+    await _pumpEntryListApp(
+      tester,
+      entryRepository: entryRepository,
+      importService: EntryImportService(
+        fileReader: _TestImportFileReader(
+          result: EntryImportFileReadResult(
+            fileName: 'empty.csv',
+            contents:
+                'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+          ),
+        ),
+        entryRepository: entryRepository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Imported 0 records from empty.csv.'), findsOneWidget);
+    expect(find.text('no entries yet'), findsOneWidget);
+  });
+
+  testWidgets('import button shows progress and prevents duplicate taps', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final importCompleter = Completer<EntryImportFileReadResult?>();
+    final delayedReader = _TestImportFileReader(completer: importCompleter);
+
+    await _pumpEntryListApp(
+      tester,
+      entryRepository: entryRepository,
+      importService: EntryImportService(
+        fileReader: delayedReader,
+        entryRepository: entryRepository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.bySemanticsLabel('Importing entries'), findsWidgets);
+    expect(delayedReader.callCount, 1);
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pump();
+
+    expect(delayedReader.callCount, 1);
+
+    importCompleter.complete(
+      EntryImportFileReadResult(
+        fileName: 'import.csv',
+        contents: _validImportCsv(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    semanticsHandle.dispose();
+  });
 }
 
 Future<void> _pumpEntryListApp(
   WidgetTester tester, {
   required _TestEntryRepository entryRepository,
   EntryExportService? exportService,
+  EntryImportService? importService,
 }) async {
   final sharedPreferences = await SharedPreferences.getInstance();
 
@@ -377,6 +517,8 @@ Future<void> _pumpEntryListApp(
         entryRepositoryProvider.overrideWithValue(entryRepository),
         if (exportService != null)
           entryExportServiceProvider.overrideWithValue(exportService),
+        if (importService != null)
+          entryImportServiceProvider.overrideWithValue(importService),
         mainRecordingControllerProvider.overrideWith(
           _TestMainRecordingController.new,
         ),
@@ -431,6 +573,19 @@ class _TestEntryRepository implements EntryRepository {
 
   @override
   Future<Entry?> getEntryById(int id) async => _findEntry(id);
+
+  @override
+  Future<void> importEntries(List<Entry> entries) async {
+    var nextId = _entries.fold<int>(
+      0,
+      (current, entry) => entry.id > current ? entry.id : current,
+    );
+    for (final entry in entries) {
+      nextId += 1;
+      _entries = [..._entries, entry.copyWith(id: nextId)];
+    }
+    _controller.add(_entries);
+  }
 
   @override
   Future<int> saveDraft(String transcript, String language) async => 1;
@@ -580,4 +735,37 @@ class _ThrowingExportFileWriter implements EntryExportFileWriter {
   }) async {
     throw StateError('export failed');
   }
+}
+
+class _TestImportFileReader implements EntryImportFileReader {
+  _TestImportFileReader({this.result, this.completer});
+
+  final EntryImportFileReadResult? result;
+  final Completer<EntryImportFileReadResult?>? completer;
+  int callCount = 0;
+
+  @override
+  Future<EntryImportFileReadResult?> pickCsvImport() async {
+    callCount += 1;
+    return completer?.future ?? result;
+  }
+}
+
+class _ThrowingImportFileReader implements EntryImportFileReader {
+  const _ThrowingImportFileReader();
+
+  @override
+  Future<EntryImportFileReadResult?> pickCsvImport() async {
+    throw const EntryImportFileReaderException('import failed');
+  }
+}
+
+String _validImportCsv() {
+  final createdAt = DateTime.utc(2026, 6, 30, 12).toIso8601String();
+  final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
+  return [
+    'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
+    '21,saved,$createdAt,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
+    '22,draft,$createdAt,$createdAtMs,fr-FR,3,imported draft entry,',
+  ].join('\n');
 }

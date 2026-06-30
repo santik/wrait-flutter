@@ -43,6 +43,14 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
     return into(entryRecords).insert(entry);
   }
 
+  Future<void> insertEntries(List<EntryRecordsCompanion> entries) async {
+    await transaction(() async {
+      await batch((batch) {
+        batch.insertAll(entryRecords, entries);
+      });
+    });
+  }
+
   Future<int> updateEditedCleanedText(
     int id,
     String cleanedText,

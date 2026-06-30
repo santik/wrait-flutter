@@ -810,6 +810,9 @@ class _TestEntryRepository implements EntryRepository {
       _entry(id: id, createdAt: DateTime(2026, 6, 16, 9));
 
   @override
+  Future<void> importEntries(List<Entry> entries) async {}
+
+  @override
   Future<int> saveDraft(String transcript, String language) async => 1;
 
   @override
