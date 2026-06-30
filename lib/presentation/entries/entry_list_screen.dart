@@ -6,6 +6,7 @@ import '../theme/design_tokens.dart';
 import 'entry_delete_confirmation.dart';
 import 'entry_list_controller.dart';
 import 'entry_list_row.dart';
+import '../../domain/model/entry.dart';
 
 class EntryListScreen extends ConsumerWidget {
   const EntryListScreen({super.key});
@@ -13,6 +14,7 @@ class EntryListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = ref.watch(entryListEntriesProvider).value ?? const [];
+    final controllerState = ref.watch(entryListControllerProvider);
     final theme = Theme.of(context);
     final canPopRoute = Navigator.of(context).canPop();
 
@@ -75,6 +77,37 @@ class EntryListScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              Positioned(
+                top: WraitSpacingTokens.sm,
+                right: WraitSpacingTokens.sm,
+                child: Semantics(
+                  button: !controllerState.isExporting,
+                  enabled: !controllerState.isExporting,
+                  label: controllerState.isExporting
+                      ? 'Exporting entries'
+                      : 'Export entries',
+                  liveRegion: controllerState.isExporting,
+                  child: IconButton(
+                    key: const ValueKey('entryListExportButton'),
+                    onPressed: controllerState.isExporting
+                        ? null
+                        : () => _exportEntries(context, ref, entries),
+                    icon: controllerState.isExporting
+                        ? Semantics(
+                            label: 'Exporting entries',
+                            child: const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : const Icon(Icons.file_download_outlined),
+                    tooltip: controllerState.isExporting
+                        ? 'Exporting CSV'
+                        : 'Export CSV',
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -102,6 +135,33 @@ class EntryListScreen extends ConsumerWidget {
       return;
     }
 
-    await ref.read(entryListControllerProvider).deleteEntry(entryId);
+    await ref.read(entryListControllerProvider.notifier).deleteEntry(entryId);
+  }
+
+  Future<void> _exportEntries(
+    BuildContext context,
+    WidgetRef ref,
+    List<Entry> entries,
+  ) async {
+    final result = await ref
+        .read(entryListControllerProvider.notifier)
+        .exportEntries(entries);
+    if (!context.mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    if (result.didExport) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Exported ${result.fileName} to ${result.pathLabel}.'),
+        ),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Could not export entries.')),
+    );
   }
 }

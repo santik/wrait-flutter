@@ -137,6 +137,11 @@ this file as supporting implementation memory.
   database and linked app-private retained files.
 - Uninstall/reinstall and Android `pm clear` should start from fresh local
   state. Android backup/restore is intentionally disabled for this lifecycle.
+- On iOS, keep the encrypted entry database in
+  `Library/Application Support/wrait_entries_v2.sqlite` and keep user-visible
+  CSV exports under `Documents/Wrait Exports`.
+- US-039 intentionally ships without an iOS database-location migration path
+  because there were no shipped iOS users to preserve for that rollout.
 - Retryable draft audio paths should be stored as
   `app-cache://<relative-path>` under the current app temporary directory, not
   absolute iOS container paths.
@@ -151,6 +156,16 @@ this file as supporting implementation memory.
 - Audio transcription failure preserves the audio draft and retained file.
 - Audio transcription success followed by cleanup failure should preserve a
   text draft at the same entry id and delete no-longer-needed retained audio.
+- Entry export is a manual CSV action on `/entries`. It includes saved and
+  draft entries, omits retained audio paths/files, and must not mutate entry
+  state.
+- Same-second export requests append `-1`, `-2`, and later suffixes to the
+  CSV filename to avoid collisions.
+- Android export prefers public `Downloads/Wrait` on API 29+ and falls back to
+  an app-specific downloads directory on older Android versions. Keep the path
+  label clear when the fallback is app-specific.
+- Export failures intentionally keep user-facing messages generic while
+  preserving richer internal diagnostic context in thrown/logged errors.
 
 ## Backend and Generation
 

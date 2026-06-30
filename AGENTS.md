@@ -226,6 +226,11 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   `wrait_entries.sqlite` entry file. Do not plan legacy entry-data
   preservation validation for entry-type work unless a future approved story
   explicitly changes that rollout decision.
+- On iOS, keep the encrypted entry database under
+  `Library/Application Support/wrait_entries_v2.sqlite`, not in
+  `Documents`.
+- US-039 intentionally does not add a legacy iOS database-location migration
+  path because there are no shipped iOS users to preserve for this rollout.
 - `./deploy_debug.sh` is not a reliable validator for same-identity
   update-preservation behavior on `com.wrait.flutter` because its
   `flutter test` phase can reinstall or reset app state on-device.
@@ -234,6 +239,15 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   instead of `flutter test -d ... integration_test/...`.
 - Keep destructive database cleanup explicit. Do not reintroduce automatic
   database-artifact deletion on open failure.
+- Entry export now lives on the `/entries` screen and writes CSV files only.
+  The export includes saved and draft entries, excludes retained audio files,
+  and should stay non-mutating.
+- iOS CSV exports live in `Documents/Wrait Exports`, while the encrypted
+  database stays in `Library/Application Support`.
+- Android export should prefer public `Downloads/Wrait` on API 29+ and may
+  fall back to an app-specific downloads directory on older Android versions.
+- Same-second export requests can produce `-1`, `-2`, and later filename
+  suffixes; treat that as expected collision avoidance, not a bug.
 - For Android startup or rendering work, verify a launcher-style cold start
   with `adb shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity`
   in addition to ordinary `flutter run` checks.

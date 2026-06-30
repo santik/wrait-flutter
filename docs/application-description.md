@@ -161,6 +161,9 @@ upcoming feature work:
   each entry row
 - entry-list previews derived from cleaned text first, then raw transcript,
   with audio-only drafts shown as `pending · will retry`
+- manual CSV export from the entries screen, covering saved and draft entries,
+  excluding retained audio files, and writing to an automatic local platform
+  destination
 - right-swipe row deletion on `/entries` with immediate confirmation, cancel
   reset, and stay-on-list behavior after confirmed deletion
 - real entry-detail screen at `/entry/:id` backed by the local entry
