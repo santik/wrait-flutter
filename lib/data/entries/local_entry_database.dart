@@ -13,6 +13,7 @@ part 'entry_dao.dart';
 part 'local_entry_database.g.dart';
 
 typedef CipherSupportVerifier = void Function(sqlite.Database rawDb);
+typedef DirectoryResolver = Future<Directory> Function();
 
 class EntryRecords extends Table {
   @override
@@ -84,9 +85,22 @@ class LocalEntryDatabase extends _$LocalEntryDatabase {
     }
   }
 
-  static Future<File> defaultDatabaseFile() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File(path.join(directory.path, databaseFileName));
+  static Future<File> defaultDatabaseFile({
+    DirectoryResolver? getDocumentsDirectory,
+    DirectoryResolver? getSupportDirectory,
+    bool? isIos,
+  }) async {
+    final resolveDocumentsDirectory =
+        getDocumentsDirectory ?? getApplicationDocumentsDirectory;
+    final documentsDirectory = await resolveDocumentsDirectory();
+    final useIosSupportPath = isIos ?? Platform.isIOS;
+    if (!useIosSupportPath) {
+      return File(path.join(documentsDirectory.path, databaseFileName));
+    }
+
+    final supportDirectory =
+        await (getSupportDirectory ?? getApplicationSupportDirectory)();
+    return File(path.join(supportDirectory.path, databaseFileName));
   }
 
   // Destructive utility for explicit reset flows only. Do not call this from

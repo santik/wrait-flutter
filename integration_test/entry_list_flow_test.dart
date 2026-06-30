@@ -14,10 +14,13 @@ import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
+import 'package:wrait/data/entries/entry_export_file_writer.dart';
+import 'package:wrait/data/entries/entry_export_providers.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
+import 'package:wrait/domain/service/entry_export_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
@@ -250,6 +253,61 @@ void main() {
 
     expect(find.byKey(mainActionButtonKey), findsOneWidget);
   });
+
+  testWidgets('export writes saved and draft entries through the test writer', (
+    tester,
+  ) async {
+    final exportWriter = _CapturingExportFileWriter();
+    final harness = await _createHarness(exportWriter: exportWriter);
+    addTearDown(harness.dispose);
+
+    final repository = harness.container.read(entryRepositoryProvider);
+    await repository.saveEntry('older final entry', 'en-US');
+    harness.entryClock.advance(const Duration(days: 1));
+    await repository.saveDraft('newer draft entry', 'en-US');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _prepareScreenshots(binding, tester);
+    await binding.takeScreenshot('entry-list-export-success');
+
+    await tester.tap(find.byKey(const ValueKey('entryListExportButton')));
+    await tester.pumpAndSettle();
+
+    expect(exportWriter.contents, contains('2,draft,'));
+    expect(exportWriter.contents, contains('1,saved,'));
+    expect(exportWriter.contents, isNot(contains('audioPath')));
+    expect(find.text('Could not export entries.'), findsNothing);
+  });
+
+  testWidgets('real export writer can complete on-device', (tester) async {
+    final harness = await _createHarness();
+    addTearDown(harness.dispose);
+
+    final repository = harness.container.read(entryRepositoryProvider);
+    await repository.saveEntry('older final entry', 'en-US');
+    harness.entryClock.advance(const Duration(days: 1));
+    await repository.saveDraft('newer draft entry', 'en-US');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entryListExportButton')));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+  });
 }
 
 Future<void> _prepareScreenshots(
@@ -291,7 +349,7 @@ class _Harness {
   }
 }
 
-Future<_Harness> _createHarness() async {
+Future<_Harness> _createHarness({EntryExportFileWriter? exportWriter}) async {
   final tempDirectory = await Directory.systemTemp.createTemp(
     'wrait-entry-list-int',
   );
@@ -318,6 +376,16 @@ Future<_Harness> _createHarness() async {
       appLockEnabledProvider.overrideWithValue(false),
       localEntryDatabaseProvider.overrideWithValue(database),
       clockProvider.overrideWithValue(entryClock),
+      if (exportWriter != null)
+        entryExportServiceProvider.overrideWithValue(
+          EntryExportService(
+            fileWriter: exportWriter,
+            now: () => DateTime.fromMillisecondsSinceEpoch(
+              entryClock.now(),
+              isUtc: true,
+            ),
+          ),
+        ),
       preferencesRepositoryProvider.overrideWithValue(
         const _EntryListPreferencesRepository(),
       ),
@@ -372,5 +440,21 @@ class _MutableClock implements Clock {
 
   void advance(Duration duration) {
     current = current.add(duration);
+  }
+}
+
+class _CapturingExportFileWriter implements EntryExportFileWriter {
+  String contents = '';
+
+  @override
+  Future<EntryExportFileWriteResult> writeCsvExport({
+    required String fileName,
+    required String contents,
+  }) async {
+    this.contents = contents;
+    return EntryExportFileWriteResult(
+      fileName: fileName,
+      pathLabel: 'Test Downloads/Wrait',
+    );
   }
 }
