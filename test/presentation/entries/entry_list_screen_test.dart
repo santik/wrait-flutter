@@ -46,7 +46,7 @@ void main() {
   ) async {
     entryRepository.emitEntries([
       _entry(id: 1, createdAt: DateTime(2026, 6, 14, 9)),
-      _entry(id: 2, createdAt: DateTime(2026, 6, 15, 9), isDraft: true),
+      _entry(id: 2, createdAt: DateTime(2026, 6, 15, 9), type: EntryType.draft),
     ]);
 
     await _pumpEntryListApp(tester, entryRepository: entryRepository);
@@ -382,12 +382,16 @@ class _TestPreferencesRepository implements PreferencesRepository {
   Future<void> setHasEverRecorded(bool value) async {}
 }
 
-Entry _entry({required int id, DateTime? createdAt, bool isDraft = false}) {
+Entry _entry({
+  required int id,
+  DateTime? createdAt,
+  EntryType type = EntryType.saved,
+}) {
   return Entry(
     id: id,
     rawTranscript: 'entry $id',
     cleanedText: 'clean entry $id',
-    isDraft: isDraft,
+    type: type,
     language: 'en-US',
     createdAt: (createdAt ?? DateTime(2026, 6, 15, 9)).millisecondsSinceEpoch,
     wordCount: 3,
@@ -399,7 +403,7 @@ Entry _audioDraftEntry({required int id}) {
     id: id,
     rawTranscript: '',
     cleanedText: null,
-    isDraft: true,
+    type: EntryType.draft,
     language: 'en-US',
     createdAt: DateTime(2026, 6, 15, 9).millisecondsSinceEpoch,
     wordCount: 0,

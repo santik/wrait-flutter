@@ -20,6 +20,7 @@ import 'package:wrait/data/entries/local_entry_database.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
+import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/domain/usecase/register_device_on_launch_use_case.dart';
 import 'package:wrait/main.dart';
@@ -145,10 +146,10 @@ void main() {
       final audioDraft = await repository.getEntryById(audioDraftId);
       final textDraft = await repository.getEntryById(textDraftId);
       expect(audioDraft, isNotNull);
-      expect(audioDraft!.isDraft, isTrue);
+      expect(audioDraft!.type, EntryType.draft);
       expect(audioDraft.audioPath, audioFile.path);
       expect(textDraft, isNotNull);
-      expect(textDraft!.isDraft, isTrue);
+      expect(textDraft!.type, EntryType.draft);
       expect(textDraft.cleanedText, isNull);
       expect(await audioFile.exists(), isTrue);
     },
@@ -189,7 +190,7 @@ void main() {
 
     final audioDraft = await repository.getEntryById(audioDraftId);
     expect(audioDraft, isNotNull);
-    expect(audioDraft!.isDraft, isTrue);
+    expect(audioDraft!.type, EntryType.draft);
     expect(harness.transcriptionService.transcribedAudioPaths, isEmpty);
     expect(harness.cleanupCallbackHolder.callCount, 0);
   });

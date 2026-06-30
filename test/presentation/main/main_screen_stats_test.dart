@@ -16,7 +16,7 @@ void main() {
       Entry(
         id: 1,
         rawTranscript: 'hello',
-        isDraft: false,
+        type: EntryType.saved,
         language: 'en-US',
         createdAt: DateTime(2026, 6, 13, 9).millisecondsSinceEpoch,
         wordCount: 1,
@@ -31,7 +31,7 @@ void main() {
       Entry(
         id: 1,
         rawTranscript: 'draft',
-        isDraft: true,
+        type: EntryType.draft,
         language: 'en-US',
         createdAt: DateTime(2026, 6, 13, 9).millisecondsSinceEpoch,
         wordCount: 1,
@@ -39,7 +39,7 @@ void main() {
       Entry(
         id: 2,
         rawTranscript: 'final',
-        isDraft: false,
+        type: EntryType.saved,
         language: 'en-US',
         createdAt: DateTime(2026, 6, 13, 10).millisecondsSinceEpoch,
         wordCount: 1,
@@ -55,7 +55,7 @@ void main() {
       Entry(
         id: 1,
         rawTranscript: 'one',
-        isDraft: false,
+        type: EntryType.saved,
         language: 'en-US',
         createdAt: DateTime(2026, 6, 13, 9).millisecondsSinceEpoch,
         wordCount: 1,
@@ -63,7 +63,7 @@ void main() {
       Entry(
         id: 2,
         rawTranscript: 'two',
-        isDraft: true,
+        type: EntryType.draft,
         language: 'en-US',
         createdAt: DateTime(2026, 6, 13, 22).millisecondsSinceEpoch,
         wordCount: 1,
@@ -71,7 +71,7 @@ void main() {
       Entry(
         id: 3,
         rawTranscript: 'three',
-        isDraft: false,
+        type: EntryType.saved,
         language: 'en-US',
         createdAt: DateTime(2026, 6, 14, 8).millisecondsSinceEpoch,
         wordCount: 1,

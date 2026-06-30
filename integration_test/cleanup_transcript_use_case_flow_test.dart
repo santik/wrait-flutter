@@ -10,6 +10,7 @@ import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
+import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/usecase/cleanup_transcript_use_case.dart';
 
 import '../test/test_doubles/fake_secure_storage.dart';
@@ -60,7 +61,7 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.rawTranscript, ' raw transcript ');
       expect(entry.cleanedText, 'Cleaned transcript.');
-      expect(entry.isDraft, isFalse);
+      expect(entry.type, EntryType.saved);
       expect(entry.wordCount, 2);
       expect(entry.language, 'fr-FR');
       expect(
@@ -110,7 +111,7 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.rawTranscript, 'raw transcript');
       expect(entry.cleanedText, isNull);
-      expect(entry.isDraft, isTrue);
+      expect(entry.type, EntryType.draft);
       expect(entry.language, cleanupTranscriptFallbackLanguage);
       expect(
         harness.container.read(sessionRecordQuotaStateProvider)?.remaining,
@@ -155,7 +156,7 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.rawTranscript, 'updated transcript');
       expect(entry.cleanedText, 'Opgeschoonde tekst');
-      expect(entry.isDraft, isFalse);
+      expect(entry.type, EntryType.saved);
       expect(entry.language, 'nl-NL');
     },
   );
@@ -238,7 +239,7 @@ void main() {
           .read(entryRepositoryProvider)
           .getEntryById(result.entryId!);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.cleanedText, isNull);
       expect(
         harness.container.read(sessionRecordQuotaStateProvider)?.remaining,

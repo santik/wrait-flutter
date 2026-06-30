@@ -25,7 +25,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
 
   Future<List<EntryRecord>> getPendingDrafts() {
     return (select(entryRecords)
-          ..where((table) => table.isDraft.equals(true))
+          ..where((table) => table.type.equals('draft'))
           ..orderBy([(table) => OrderingTerm.desc(table.createdAt)]))
         .get();
   }
@@ -33,7 +33,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
   Future<List<EntryRecord>> getStaleDraftsOlderThan(int cutoffTimestamp) {
     return (select(entryRecords)..where(
           (table) =>
-              table.isDraft.equals(true) &
+              table.type.equals('draft') &
               table.createdAt.isSmallerThanValue(cutoffTimestamp),
         ))
         .get();
@@ -61,7 +61,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
       EntryRecordsCompanion(
         cleanedText: Value(cleanedText),
         wordCount: Value(wordCount),
-        isDraft: const Value(false),
+        type: const Value('saved'),
         audioPath: const Value(null),
       ),
     );
@@ -76,6 +76,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
       EntryRecordsCompanion(
         rawTranscript: Value(rawTranscript),
         wordCount: Value(wordCount),
+        type: const Value('draft'),
         audioPath: const Value(null),
       ),
     );
@@ -91,6 +92,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
       EntryRecordsCompanion(
         rawTranscript: Value(rawTranscript),
         wordCount: Value(wordCount),
+        type: const Value('draft'),
         language: Value(language),
         audioPath: const Value(null),
       ),
@@ -108,7 +110,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
         rawTranscript: Value(rawTranscript),
         cleanedText: Value(cleanedText),
         wordCount: Value(wordCount),
-        isDraft: const Value(false),
+        type: const Value('saved'),
         audioPath: const Value(null),
       ),
     );
@@ -127,7 +129,7 @@ class EntryDao extends DatabaseAccessor<LocalEntryDatabase>
   Future<int> deleteStaleDraftsOlderThan(int cutoffTimestamp) {
     return (delete(entryRecords)..where(
           (table) =>
-              table.isDraft.equals(true) &
+              table.type.equals('draft') &
               table.createdAt.isSmallerThanValue(cutoffTimestamp),
         ))
         .go();

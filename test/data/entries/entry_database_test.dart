@@ -5,15 +5,19 @@ import 'dart:math';
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:wrait/core/time/system_clock.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/entries/entry_repository_impl.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
+import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 
 import '../../test_doubles/fake_clock.dart';
 import '../../test_doubles/fake_secure_storage.dart';
+
+const _legacyDatabaseFileName = 'wrait_entries.sqlite';
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -61,6 +65,197 @@ void main() {
       ),
     );
   });
+
+  test(
+    'fresh install ignores the legacy entry database file and starts clean',
+    () async {
+      final storage = FakeSecureKeyValueStore();
+      final keyStore = DatabaseKeyStore(storage, random: Random(10));
+      final legacyDatabaseFile = _legacyDatabaseFile(tempDirectory);
+      final key = await keyStore.readOrCreateKey();
+      await _seedLegacyVersion1Database(
+        databaseFile: legacyDatabaseFile,
+        key: key,
+        rows: const <Map<String, Object?>>[
+          <String, Object?>{
+            'id': 1,
+            'raw_transcript': 'saved raw',
+            'cleaned_text': 'saved clean',
+            'is_draft': 0,
+            'language': 'en-US',
+            'created_at': 1000,
+            'word_count': 2,
+            'audio_path': null,
+          },
+          <String, Object?>{
+            'id': 2,
+            'raw_transcript': '',
+            'cleaned_text': null,
+            'is_draft': 1,
+            'language': 'fr-FR',
+            'created_at': 2000,
+            'word_count': 0,
+            'audio_path': '/tmp/draft-audio.m4a',
+          },
+        ],
+      );
+
+      final database = await LocalEntryDatabase.open(
+        keyStore: keyStore,
+        databaseFile: _databaseFile(tempDirectory),
+      );
+      final repository = EntryRepositoryImpl(
+        entryDao: database.entryDao,
+        clock: FakeClock(_ts(2026, 6, 8)),
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
+      );
+
+      final entries = await repository.watchAllEntries().first;
+      final currentColumns = await database
+          .customSelect('PRAGMA table_info(entries);')
+          .get();
+      final currentColumnNames = currentColumns
+          .map((row) => row.data['name'] as String)
+          .toList(growable: false);
+
+      expect(entries, isEmpty);
+      expect(currentColumnNames, contains('type'));
+      expect(currentColumnNames, isNot(contains('is_draft')));
+      expect(await legacyDatabaseFile.exists(), isTrue);
+      expect(await _databaseFile(tempDirectory).exists(), isTrue);
+      await database.close();
+    },
+  );
+
+  test('entry schema rejects invalid persisted type values', () async {
+    final harness = await _createHarness(
+      directory: tempDirectory,
+      storage: FakeSecureKeyValueStore(),
+      clock: FakeClock(_ts(2026, 6, 8)),
+      random: Random(14),
+    );
+    addTearDown(harness.database.close);
+
+    await expectLater(
+      harness.database.customStatement('''
+        INSERT INTO entries (
+          raw_transcript,
+          cleaned_text,
+          type,
+          language,
+          created_at,
+          word_count,
+          audio_path
+        ) VALUES (
+          'bad entry',
+          NULL,
+          'mystery',
+          'en-US',
+          ${_ts(2026, 6, 8)},
+          2,
+          NULL
+        );
+      '''),
+      throwsA(
+        predicate(
+          (error) =>
+              error.toString().contains('CHECK constraint failed') ||
+              error.toString().contains('constraint failed'),
+          'constraint failure for invalid entry type',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'repository rejects corrupted current-shape rows with unsupported type values',
+    () async {
+      final storage = FakeSecureKeyValueStore();
+      final keyStore = DatabaseKeyStore(storage, random: Random(15));
+      final databaseFile = _databaseFile(tempDirectory);
+      final key = await keyStore.readOrCreateKey();
+      await _seedCorruptedCurrentSchemaDatabase(
+        databaseFile: databaseFile,
+        key: key,
+        rows: const <Map<String, Object?>>[
+          <String, Object?>{
+            'id': 1,
+            'raw_transcript': 'bad entry',
+            'cleaned_text': null,
+            'type': 'mystery',
+            'language': 'en-US',
+            'created_at': 1000,
+            'word_count': 2,
+            'audio_path': null,
+          },
+        ],
+      );
+
+      final database = await LocalEntryDatabase.open(
+        keyStore: keyStore,
+        databaseFile: databaseFile,
+      );
+      final repository = EntryRepositoryImpl(
+        entryDao: database.entryDao,
+        clock: FakeClock(_ts(2026, 6, 8)),
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
+      );
+
+      await expectLater(
+        repository.getEntryById(1),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('unsupported persisted type'),
+          ),
+        ),
+      );
+      await database.close();
+    },
+  );
+
+  test(
+    'repository fails explicitly when a corrupted current-shape row has a null type',
+    () async {
+      final storage = FakeSecureKeyValueStore();
+      final keyStore = DatabaseKeyStore(storage, random: Random(16));
+      final databaseFile = _databaseFile(tempDirectory);
+      final key = await keyStore.readOrCreateKey();
+      await _seedCorruptedCurrentSchemaDatabase(
+        databaseFile: databaseFile,
+        key: key,
+        rows: const <Map<String, Object?>>[
+          <String, Object?>{
+            'id': 1,
+            'raw_transcript': 'bad entry',
+            'cleaned_text': null,
+            'type': null,
+            'language': 'en-US',
+            'created_at': 1000,
+            'word_count': 2,
+            'audio_path': null,
+          },
+        ],
+      );
+
+      final database = await LocalEntryDatabase.open(
+        keyStore: keyStore,
+        databaseFile: databaseFile,
+      );
+      final repository = EntryRepositoryImpl(
+        entryDao: database.entryDao,
+        clock: FakeClock(_ts(2026, 6, 8)),
+        storeDraftAudioPath: (audioPath) async => audioPath,
+        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
+      );
+
+      await expectLater(repository.getEntryById(1), throwsA(isA<Object>()));
+      await database.close();
+    },
+  );
 
   test(
     'creates an encrypted database file whose plaintext transcript is absent',
@@ -287,7 +482,7 @@ void main() {
             1000,
             (index) => EntryRecordsCompanion.insert(
               rawTranscript: 'seeded entry $index',
-              isDraft: false,
+              type: EntryType.saved.name,
               language: 'en-US',
               createdAt: createdAt,
               cleanedText: const Value.absent(),
@@ -360,5 +555,120 @@ Future<_DatabaseHarness> _createHarness({
 File _databaseFile(Directory directory) =>
     File('${directory.path}/${LocalEntryDatabase.databaseFileName}');
 
+File _legacyDatabaseFile(Directory directory) =>
+    File('${directory.path}/$_legacyDatabaseFileName');
+
 int _ts(int year, int month, int day) =>
     DateTime(year, month, day).millisecondsSinceEpoch;
+
+Future<void> _seedLegacyVersion1Database({
+  required File databaseFile,
+  required String key,
+  required List<Map<String, Object?>> rows,
+}) async {
+  final rawDb = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    rawDb.execute("PRAGMA key = '${_escapePragmaValue(key)}';");
+    rawDb.execute('''
+      CREATE TABLE entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        raw_transcript TEXT NOT NULL,
+        cleaned_text TEXT NULL,
+        is_draft INTEGER NOT NULL CHECK (is_draft IN (0, 1)),
+        language TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        word_count INTEGER NOT NULL DEFAULT 0,
+        audio_path TEXT NULL
+      );
+    ''');
+    rawDb.execute('PRAGMA user_version = 1;');
+
+    final statement = rawDb.prepare('''
+      INSERT INTO entries (
+        id,
+        raw_transcript,
+        cleaned_text,
+        is_draft,
+        language,
+        created_at,
+        word_count,
+        audio_path
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    ''');
+    try {
+      for (final row in rows) {
+        statement.execute(<Object?>[
+          row['id'],
+          row['raw_transcript'],
+          row['cleaned_text'],
+          row['is_draft'],
+          row['language'],
+          row['created_at'],
+          row['word_count'],
+          row['audio_path'],
+        ]);
+      }
+    } finally {
+      statement.close();
+    }
+  } finally {
+    rawDb.close();
+  }
+}
+
+Future<void> _seedCorruptedCurrentSchemaDatabase({
+  required File databaseFile,
+  required String key,
+  required List<Map<String, Object?>> rows,
+}) async {
+  final rawDb = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    rawDb.execute("PRAGMA key = '${_escapePragmaValue(key)}';");
+    rawDb.execute('''
+      CREATE TABLE entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        raw_transcript TEXT NOT NULL,
+        cleaned_text TEXT NULL,
+        type TEXT NULL,
+        language TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        word_count INTEGER NOT NULL DEFAULT 0,
+        audio_path TEXT NULL
+      );
+    ''');
+    rawDb.execute('PRAGMA user_version = 1;');
+
+    final statement = rawDb.prepare('''
+      INSERT INTO entries (
+        id,
+        raw_transcript,
+        cleaned_text,
+        type,
+        language,
+        created_at,
+        word_count,
+        audio_path
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    ''');
+    try {
+      for (final row in rows) {
+        statement.execute(<Object?>[
+          row['id'],
+          row['raw_transcript'],
+          row['cleaned_text'],
+          row['type'],
+          row['language'],
+          row['created_at'],
+          row['word_count'],
+          row['audio_path'],
+        ]);
+      }
+    } finally {
+      statement.close();
+    }
+  } finally {
+    rawDb.close();
+  }
+}
+
+String _escapePragmaValue(String value) => value.replaceAll("'", "''");

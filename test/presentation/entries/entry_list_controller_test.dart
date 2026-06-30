@@ -12,7 +12,11 @@ void main() {
     final repository = _FakeEntryRepository(
       entries: [
         _entry(id: 1, createdAt: DateTime(2026, 6, 14, 9)),
-        _entry(id: 2, createdAt: DateTime(2026, 6, 15, 9), isDraft: true),
+        _entry(
+          id: 2,
+          createdAt: DateTime(2026, 6, 15, 9),
+          type: EntryType.draft,
+        ),
       ],
     );
     final container = ProviderContainer(
@@ -36,7 +40,7 @@ void main() {
     final entries = await entriesCompleter.future;
 
     expect(entries.map((entry) => entry.id), [2, 1]);
-    expect(entries.first.isDraft, isTrue);
+    expect(entries.first.type, EntryType.draft);
   });
 
   test('delete success calls the repository', () async {
@@ -147,12 +151,16 @@ class _FakeEntryRepository implements EntryRepository {
   Future<void> deleteStaleDrafts({int daysOld = 7}) async {}
 }
 
-Entry _entry({required int id, DateTime? createdAt, bool isDraft = false}) {
+Entry _entry({
+  required int id,
+  DateTime? createdAt,
+  EntryType type = EntryType.saved,
+}) {
   return Entry(
     id: id,
     rawTranscript: 'entry $id',
     cleanedText: null,
-    isDraft: isDraft,
+    type: type,
     language: 'en-US',
     createdAt: (createdAt ?? DateTime(2026, 6, 15)).millisecondsSinceEpoch,
     wordCount: 2,

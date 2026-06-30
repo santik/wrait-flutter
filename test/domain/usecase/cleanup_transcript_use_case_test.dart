@@ -98,7 +98,7 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.rawTranscript, rawTranscript);
       expect(entry.cleanedText, 'Cleaned transcript.');
-      expect(entry.isDraft, isFalse);
+      expect(entry.type, EntryType.saved);
       expect(entry.language, 'fr-FR');
       expect(entry.wordCount, 2);
       expect(logMessages, isEmpty);
@@ -127,7 +127,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(1);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.rawTranscript, '   ');
       expect(entry.cleanedText, isNull);
       expect(entry.language, cleanupTranscriptFallbackLanguage);
@@ -182,7 +182,7 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.rawTranscript, 'updated raw transcript');
       expect(entry.cleanedText, isNull);
-      expect(entry.isDraft, isTrue);
+      expect(entry.type, EntryType.draft);
       expect(entry.audioPath, isNull);
       expect(entry.wordCount, 3);
     },
@@ -226,7 +226,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(1);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.cleanedText, isNull);
       expect(entry.wordCount, 2);
     },
@@ -502,7 +502,7 @@ class _FakeEntryRepository implements EntryRepository {
     _entries[id] = Entry(
       id: id,
       rawTranscript: transcript,
-      isDraft: true,
+      type: EntryType.draft,
       language: language,
       createdAt: clock.now(),
       wordCount: countWords(transcript),
@@ -516,7 +516,7 @@ class _FakeEntryRepository implements EntryRepository {
     _entries[id] = Entry(
       id: id,
       rawTranscript: transcript,
-      isDraft: false,
+      type: EntryType.saved,
       language: language,
       createdAt: clock.now(),
       wordCount: countWords(transcript),
@@ -530,7 +530,7 @@ class _FakeEntryRepository implements EntryRepository {
     _entries[id] = Entry(
       id: id,
       rawTranscript: '',
-      isDraft: true,
+      type: EntryType.draft,
       language: language,
       createdAt: clock.now(),
       wordCount: 0,
@@ -598,7 +598,7 @@ class _FakeEntryRepository implements EntryRepository {
     _entries[id] = existing.copyWith(
       cleanedText: cleanedText,
       wordCount: wordCount,
-      isDraft: false,
+      type: EntryType.saved,
       clearAudioPath: true,
     );
   }

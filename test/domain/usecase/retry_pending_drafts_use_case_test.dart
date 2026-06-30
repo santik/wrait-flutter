@@ -118,7 +118,7 @@ void main() {
         Entry(
           id: 0,
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs,
           wordCount: 0,
@@ -141,7 +141,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(draftId);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isFalse);
+      expect(entry!.type, EntryType.saved);
       expect(entry.rawTranscript, 'bonjour monde');
       expect(entry.cleanedText, 'Bonjour monde nettoye');
       expect(entry.language, 'fr-FR');
@@ -161,7 +161,7 @@ void main() {
       final draftId = entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs,
           wordCount: 0,
@@ -183,7 +183,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(draftId);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.audioPath, audioFile.path);
       expect(await audioFile.exists(), isTrue);
       expect(currentQuota, quota);
@@ -201,7 +201,7 @@ void main() {
       final draftId = entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs,
           wordCount: 0,
@@ -215,7 +215,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(draftId);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.audioPath, audioFile.path);
       expect(await audioFile.exists(), isTrue);
       expect(
@@ -238,7 +238,7 @@ void main() {
       final draftId = entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs,
           wordCount: 0,
@@ -254,7 +254,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(draftId);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.rawTranscript, '');
       expect(entry.audioPath, audioFile.path);
       expect(await audioFile.exists(), isTrue);
@@ -275,7 +275,7 @@ void main() {
       final draftId = entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs,
           wordCount: 0,
@@ -296,7 +296,7 @@ void main() {
 
       final entry = await entryRepository.getEntryById(draftId);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.rawTranscript, 'retry transcript');
       expect(entry.language, 'nl-NL');
       expect(entry.audioPath, isNull);
@@ -308,7 +308,7 @@ void main() {
     final draftId = entryRepository.seedEntry(
       Entry(
         rawTranscript: '',
-        isDraft: true,
+        type: EntryType.draft,
         language: 'en-US',
         createdAt: currentTimeMs,
         wordCount: 0,
@@ -335,7 +335,7 @@ void main() {
       entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs - const Duration(days: 8).inMilliseconds,
           wordCount: 0,
@@ -345,7 +345,7 @@ void main() {
       entryRepository.seedEntry(
         Entry(
           rawTranscript: 'older text draft',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs - 2000,
           wordCount: 3,
@@ -354,7 +354,7 @@ void main() {
       entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs - 1000,
           wordCount: 0,
@@ -374,14 +374,16 @@ void main() {
       expect(await staleAudio.exists(), isFalse);
       expect(transcriptionService.transcribedAudioPaths, [failedAudio.path]);
       expect(
-        entryRepository.entries.values.where((entry) => entry.isDraft),
+        entryRepository.entries.values.where(
+          (entry) => entry.type == EntryType.draft,
+        ),
         hasLength(1),
       );
       expect(
         entryRepository.entries.values.any(
           (entry) =>
               entry.rawTranscript == 'older text draft' &&
-              entry.isDraft == false,
+              entry.type == EntryType.saved,
         ),
         isTrue,
       );
@@ -395,7 +397,7 @@ void main() {
       final audioDraftId = entryRepository.seedEntry(
         Entry(
           rawTranscript: '',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs,
           wordCount: 0,
@@ -405,7 +407,7 @@ void main() {
       final textDraftId = entryRepository.seedEntry(
         Entry(
           rawTranscript: 'raw transcript',
-          isDraft: true,
+          type: EntryType.draft,
           language: 'en-US',
           createdAt: currentTimeMs - 1,
           wordCount: 2,
@@ -429,10 +431,10 @@ void main() {
       final audioEntry = await entryRepository.getEntryById(audioDraftId);
       final textEntry = await entryRepository.getEntryById(textDraftId);
       expect(audioEntry, isNotNull);
-      expect(audioEntry!.isDraft, isTrue);
+      expect(audioEntry!.type, EntryType.draft);
       expect(audioEntry.audioPath, audioFile.path);
       expect(textEntry, isNotNull);
-      expect(textEntry!.isDraft, isTrue);
+      expect(textEntry!.type, EntryType.draft);
       expect(transcriptionService.transcribedAudioPaths, [audioFile.path]);
     },
   );
@@ -515,7 +517,9 @@ class _FakeEntryRepository implements EntryRepository {
     deleteStaleCalls += 1;
     final cutoff = _nowMs() - Duration(days: daysOld).inMilliseconds;
     final staleIds = entries.values
-        .where((entry) => entry.isDraft && entry.createdAt < cutoff)
+        .where(
+          (entry) => entry.type == EntryType.draft && entry.createdAt < cutoff,
+        )
         .map((entry) => entry.id)
         .toList(growable: false);
     for (final id in staleIds) {
@@ -542,7 +546,7 @@ class _FakeEntryRepository implements EntryRepository {
       rawTranscript: rawTranscript,
       cleanedText: cleanedText,
       wordCount: wordCount,
-      isDraft: false,
+      type: EntryType.saved,
       clearAudioPath: true,
     );
   }
@@ -552,7 +556,9 @@ class _FakeEntryRepository implements EntryRepository {
 
   @override
   Future<List<Entry>> getPendingDrafts() async {
-    final pending = entries.values.where((entry) => entry.isDraft).toList();
+    final pending = entries.values
+        .where((entry) => entry.type == EntryType.draft)
+        .toList();
     pending.sort((left, right) => right.createdAt.compareTo(left.createdAt));
     return pending;
   }
@@ -562,7 +568,7 @@ class _FakeEntryRepository implements EntryRepository {
     return seedEntry(
       Entry(
         rawTranscript: '',
-        isDraft: true,
+        type: EntryType.draft,
         language: language,
         createdAt: _nowMs(),
         wordCount: 0,
@@ -576,7 +582,7 @@ class _FakeEntryRepository implements EntryRepository {
     return seedEntry(
       Entry(
         rawTranscript: transcript,
-        isDraft: true,
+        type: EntryType.draft,
         language: language,
         createdAt: _nowMs(),
         wordCount: countWords(transcript),
@@ -589,7 +595,7 @@ class _FakeEntryRepository implements EntryRepository {
     return seedEntry(
       Entry(
         rawTranscript: transcript,
-        isDraft: false,
+        type: EntryType.saved,
         language: language,
         createdAt: _nowMs(),
         wordCount: countWords(transcript),
@@ -652,7 +658,7 @@ class _FakeEntryRepository implements EntryRepository {
     entries[id] = existing.copyWith(
       cleanedText: cleanedText,
       wordCount: wordCount,
-      isDraft: false,
+      type: EntryType.saved,
       clearAudioPath: true,
     );
   }

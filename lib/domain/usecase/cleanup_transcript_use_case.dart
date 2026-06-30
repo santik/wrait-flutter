@@ -112,7 +112,7 @@ class CleanupTranscriptUseCase {
         logWarning('Cleanup transcript received a missing entry id: $entryId.');
         return _ResolvedDraftFailure(entryId);
       }
-      if (!entry.isDraft) {
+      if (entry.type != EntryType.draft) {
         logWarning(
           'Cleanup transcript received a non-draft entry id: $entryId.',
         );

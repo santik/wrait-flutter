@@ -77,7 +77,7 @@ class _EntryListRowState extends State<EntryListRow>
           : 'Double tap to open. Swipe right to delete.',
       value: isAudioDraft
           ? 'draft, $entryListAudioDraftStateDescription'
-          : (widget.entry.isDraft ? 'draft' : null),
+          : (widget.entry.type == EntryType.draft ? 'draft' : null),
       customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
         _deleteAction: () {
           unawaited(_handleRevealFlow());
@@ -150,7 +150,7 @@ class _EntryListRowState extends State<EntryListRow>
                                     ),
                                   ),
                                 ),
-                                if (widget.entry.isDraft)
+                                if (widget.entry.type == EntryType.draft)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: WraitSpacingTokens.sm,

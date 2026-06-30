@@ -220,6 +220,12 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
     plus linked app-private files
   - uninstall/reinstall should start from fresh local state
   - Android `pm clear` should start from fresh local state
+- US-037 is an intentional entry-store exception to the usual update
+  preservation guidance: the type-based entry database now lives in
+  `wrait_entries_v2.sqlite` and does not migrate or surface the legacy
+  `wrait_entries.sqlite` entry file. Do not plan legacy entry-data
+  preservation validation for entry-type work unless a future approved story
+  explicitly changes that rollout decision.
 - `./deploy_debug.sh` is not a reliable validator for same-identity
   update-preservation behavior on `com.wrait.flutter` because its
   `flutter test` phase can reinstall or reset app state on-device.
@@ -259,6 +265,25 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - Production backend connectivity on Android depends on keeping
   `android.permission.INTERNET` in `android/app/src/main/AndroidManifest.xml`,
   not only in debug/profile manifests.
+
+### Launcher branding guidance
+
+- Android launcher branding now follows the adaptive-icon resource pattern in
+  `wrait-android/src/main/res` rather than generated launcher PNGs.
+- Keep Flutter Android launcher resources hand-authored under:
+  - `android/app/src/main/res/mipmap-anydpi/`
+  - `android/app/src/main/res/drawable/`
+  - `android/app/src/debug/res/drawable/`
+  - `android/app/src/profile/res/drawable/`
+- Do not reintroduce generated Android launcher PNGs for this app unless a
+  future approved story explicitly changes the launcher implementation.
+- Android release launcher branding should stay as background color plus the
+  `wrait` wordmark; debug/profile should stay red plus the `wrait` wordmark.
+- iOS app icons still ship through the asset catalogs, but their source
+  artwork should stay full-background plus `wrait`, with no inner circle.
+- If secure-surface behavior makes Android recents screenshots unusable for
+  launcher verification, inspect packaged APK resources with `aapt` and
+  `unzip -l` instead of relying only on overview screenshots.
 
 ## Backend API generation guidance
 

@@ -16,6 +16,7 @@ import 'package:wrait/data/entries/local_entry_database.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
+import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/main_screen_status.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
@@ -77,7 +78,7 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.rawTranscript, 'raw transcript');
       expect(entry.cleanedText, 'Cleaned transcript.');
-      expect(entry.isDraft, isFalse);
+      expect(entry.type, EntryType.saved);
     },
   );
 
@@ -132,7 +133,7 @@ void main() {
           .getPendingDrafts();
       expect(drafts, hasLength(1));
       expect(drafts.single.audioPath, audioDraftFile.path);
-      expect(drafts.single.isDraft, isTrue);
+      expect(drafts.single.type, EntryType.draft);
       expect(harness.container.read(sessionRecordQuotaStateProvider), quota);
     },
   );
@@ -226,7 +227,7 @@ void main() {
           .read(entryRepositoryProvider)
           .getEntryById(1);
       expect(entry, isNotNull);
-      expect(entry!.isDraft, isTrue);
+      expect(entry!.type, EntryType.draft);
       expect(entry.rawTranscript, 'raw transcript');
       expect(entry.cleanedText, isNull);
       expect(harness.sharedPreferences.getBool('has_ever_recorded'), isNull);

@@ -63,7 +63,7 @@ class EntryRepositoryImpl implements EntryRepository {
     return entryDao.insertEntry(
       EntryRecordsCompanion.insert(
         rawTranscript: transcript,
-        isDraft: true,
+        type: EntryType.draft.name,
         language: canonicalLanguage,
         createdAt: clock.now(),
         wordCount: Value(_countWords(transcript)),
@@ -78,7 +78,7 @@ class EntryRepositoryImpl implements EntryRepository {
     return entryDao.insertEntry(
       EntryRecordsCompanion.insert(
         rawTranscript: transcript,
-        isDraft: false,
+        type: EntryType.saved.name,
         language: canonicalLanguage,
         createdAt: clock.now(),
         wordCount: Value(_countWords(transcript)),
@@ -106,7 +106,7 @@ class EntryRepositoryImpl implements EntryRepository {
     return entryDao.insertEntry(
       EntryRecordsCompanion.insert(
         rawTranscript: '',
-        isDraft: true,
+        type: EntryType.draft.name,
         language: canonicalLanguage,
         createdAt: clock.now(),
         audioPath: Value(storedAudioPath),
@@ -229,11 +229,18 @@ class EntryRepositoryImpl implements EntryRepository {
   }
 
   Future<Entry> _mapEntryRecord(EntryRecord row) async {
+    final entryType = EntryType.tryParse(row.type);
+    if (entryType == null) {
+      throw StateError(
+        'Entry ${row.id} has unsupported persisted type: ${row.type}',
+      );
+    }
+
     return Entry(
       id: row.id,
       rawTranscript: row.rawTranscript,
       cleanedText: row.cleanedText,
-      isDraft: row.isDraft,
+      type: entryType,
       language: row.language,
       createdAt: row.createdAt,
       wordCount: row.wordCount,

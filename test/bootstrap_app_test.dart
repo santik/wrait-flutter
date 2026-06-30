@@ -29,6 +29,7 @@ void main() {
 
     expect(find.text('opening wrait'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(FlutterLogo), findsNothing);
 
     runtimeCompleter.complete(await _createRuntime());
     await tester.pumpAndSettle();
@@ -47,6 +48,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
     expect(find.text('wrait'), findsWidgets);
+    expect(find.byType(FlutterLogo), findsNothing);
   });
 
   testWidgets('shows a retry screen when bootstrap fails', (tester) async {
@@ -61,6 +63,7 @@ void main() {
 
     expect(find.text('could not open wrait'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'retry'), findsOneWidget);
+    expect(find.byType(FlutterLogo), findsNothing);
   });
 
   testWidgets('rapid retry taps do not start overlapping bootstrap runs', (
