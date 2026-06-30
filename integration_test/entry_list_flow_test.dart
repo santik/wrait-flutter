@@ -16,6 +16,8 @@ import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/entries/database_key_store.dart';
 import 'package:wrait/data/entries/entry_export_file_writer.dart';
 import 'package:wrait/data/entries/entry_export_providers.dart';
+import 'package:wrait/data/entries/entry_import_file_reader.dart';
+import 'package:wrait/data/entries/entry_import_providers.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/entries/local_entry_database.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
@@ -308,6 +310,115 @@ void main() {
 
     expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
   });
+
+  testWidgets('import adds saved and draft rows through the test reader', (
+    tester,
+  ) async {
+    final importReader = _StaticImportFileReader(
+      EntryImportFileReadResult(
+        fileName: 'import.csv',
+        contents: _validImportCsv(),
+      ),
+    );
+    final harness = await _createHarness(importFileReader: importReader);
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _prepareScreenshots(binding, tester);
+    await binding.takeScreenshot('entry-list-import-success');
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Imported 2 records from import.csv.'), findsOneWidget);
+    expect(find.text('clean entry 21'), findsOneWidget);
+    expect(find.text('imported draft entry'), findsOneWidget);
+  });
+
+  testWidgets('importing an empty Wrait csv keeps the list unchanged', (
+    tester,
+  ) async {
+    final importReader = _StaticImportFileReader(
+      const EntryImportFileReadResult(
+        fileName: 'empty.csv',
+        contents:
+            'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+      ),
+    );
+    final harness = await _createHarness(importFileReader: importReader);
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Imported 0 records from empty.csv.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryListEmptyState')), findsOneWidget);
+  });
+
+  testWidgets('re-importing the same csv stays additive', (tester) async {
+    final importReader = _StaticImportFileReader(
+      EntryImportFileReadResult(
+        fileName: 'repeat.csv',
+        contents: _validImportCsv(),
+      ),
+    );
+    final harness = await _createHarness(importFileReader: importReader);
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('clean entry 21'), findsNWidgets(2));
+    expect(find.text('imported draft entry'), findsNWidgets(2));
+  });
+
+  testWidgets('import failure leaves existing rows unchanged', (tester) async {
+    final importReader = const _ThrowingImportFileReader();
+    final harness = await _createHarness(importFileReader: importReader);
+    addTearDown(harness.dispose);
+
+    final repository = harness.container.read(entryRepositoryProvider);
+    await repository.saveEntry('existing entry', 'en-US');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not read the selected CSV file.'), findsOneWidget);
+    expect(find.text('existing entry'), findsOneWidget);
+    expect(find.text('clean entry 21'), findsNothing);
+  });
 }
 
 Future<void> _prepareScreenshots(
@@ -349,7 +460,10 @@ class _Harness {
   }
 }
 
-Future<_Harness> _createHarness({EntryExportFileWriter? exportWriter}) async {
+Future<_Harness> _createHarness({
+  EntryExportFileWriter? exportWriter,
+  EntryImportFileReader? importFileReader,
+}) async {
   final tempDirectory = await Directory.systemTemp.createTemp(
     'wrait-entry-list-int',
   );
@@ -386,6 +500,8 @@ Future<_Harness> _createHarness({EntryExportFileWriter? exportWriter}) async {
             ),
           ),
         ),
+      if (importFileReader != null)
+        entryImportFileReaderProvider.overrideWithValue(importFileReader),
       preferencesRepositoryProvider.overrideWithValue(
         const _EntryListPreferencesRepository(),
       ),
@@ -457,4 +573,32 @@ class _CapturingExportFileWriter implements EntryExportFileWriter {
       pathLabel: 'Test Downloads/Wrait',
     );
   }
+}
+
+class _StaticImportFileReader implements EntryImportFileReader {
+  const _StaticImportFileReader(this.result);
+
+  final EntryImportFileReadResult? result;
+
+  @override
+  Future<EntryImportFileReadResult?> pickCsvImport() async => result;
+}
+
+class _ThrowingImportFileReader implements EntryImportFileReader {
+  const _ThrowingImportFileReader();
+
+  @override
+  Future<EntryImportFileReadResult?> pickCsvImport() async {
+    throw const EntryImportFileReaderException('import failed');
+  }
+}
+
+String _validImportCsv() {
+  final createdAt = DateTime.utc(2026, 6, 30, 12).toIso8601String();
+  final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
+  return [
+    'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
+    '21,saved,$createdAt,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
+    '22,draft,$createdAt,$createdAtMs,fr-FR,3,imported draft entry,',
+  ].join('\n');
 }

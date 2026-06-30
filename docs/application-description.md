@@ -164,6 +164,12 @@ upcoming feature work:
 - manual CSV export from the entries screen, covering saved and draft entries,
   excluding retained audio files, and writing to an automatic local platform
   destination
+- manual CSV import from the entries screen for Wrait-produced CSV files only,
+  adding new saved and draft entries without updating or deleting existing
+  local rows
+- imported CSV draft rows remain drafts, imported saved rows remain saved, CSV
+  ids are ignored in favor of new local ids, and retained audio files are not
+  restored by import
 - right-swipe row deletion on `/entries` with immediate confirmation, cancel
   reset, and stay-on-list behavior after confirmed deletion
 - real entry-detail screen at `/entry/:id` backed by the local entry

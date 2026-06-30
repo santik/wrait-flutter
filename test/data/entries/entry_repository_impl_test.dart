@@ -289,6 +289,75 @@ void main() {
       expect(await updatedAudioFile.exists(), isFalse);
     },
   );
+
+  test(
+    'imports entries additively with generated ids and null audio paths',
+    () async {
+      await repository!.saveEntry('existing entry', 'en-US');
+
+      await repository!.importEntries(<Entry>[
+        Entry(
+          id: 99,
+          rawTranscript: 'imported saved',
+          cleanedText: 'saved cleaned',
+          type: EntryType.saved,
+          language: 'fr',
+          createdAt: _ts(2026, 6, 10),
+          wordCount: 2,
+          audioPath: '/tmp/ignored-audio.m4a',
+        ),
+        Entry(
+          id: 100,
+          rawTranscript: 'imported draft',
+          cleanedText: null,
+          type: EntryType.draft,
+          language: 'en-US',
+          createdAt: _ts(2026, 6, 11),
+          wordCount: 2,
+        ),
+      ]);
+
+      final entries = await repository!.watchAllEntries().first;
+
+      expect(entries, hasLength(3));
+      expect(entries.map((entry) => entry.rawTranscript), [
+        'imported draft',
+        'imported saved',
+        'existing entry',
+      ]);
+      expect(entries[0].id, isNot(100));
+      expect(entries[1].id, isNot(99));
+      expect(entries[1].cleanedText, 'saved cleaned');
+      expect(entries[1].language, 'fr-FR');
+      expect(entries[1].audioPath, isNull);
+      expect(entries[0].type, EntryType.draft);
+      expect(entries[0].createdAt, _ts(2026, 6, 11));
+    },
+  );
+
+  test('rolls back the whole import batch when one row is invalid', () async {
+    await expectLater(
+      database!.entryDao.insertEntries(<EntryRecordsCompanion>[
+        EntryRecordsCompanion.insert(
+          rawTranscript: 'valid row',
+          type: EntryType.saved.name,
+          language: 'en-US',
+          createdAt: _ts(2026, 6, 10),
+        ),
+        EntryRecordsCompanion.insert(
+          rawTranscript: 'invalid row',
+          type: 'archived',
+          language: 'en-US',
+          createdAt: _ts(2026, 6, 11),
+        ),
+      ]),
+      throwsA(anything),
+    );
+
+    final entries = await repository!.watchAllEntries().first;
+
+    expect(entries, isEmpty);
+  });
 }
 
 int _ts(int year, int month, int day) =>

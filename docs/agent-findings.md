@@ -159,6 +159,18 @@ this file as supporting implementation memory.
 - Entry export is a manual CSV action on `/entries`. It includes saved and
   draft entries, omits retained audio paths/files, and must not mutate entry
   state.
+- Entry import is also a manual `/entries` action and accepts only
+  Wrait-produced CSV. It is additive-only: preserve imported draft vs saved
+  state as-is, ignore CSV ids, force imported `audioPath` to null, and never
+  update or delete existing rows.
+- Import validation lives primarily in
+  `lib/domain/service/entry_import_service.dart`, with native picker/read
+  bridges in `android/app/src/main/kotlin/com/wrait/flutter/MainActivity.kt`
+  and `ios/Runner/AppDelegate.swift`. Keep user-facing import errors
+  categorized and sanitized (`invalid format`, `unreadable file`, `too large`,
+  `save failed`) rather than surfacing raw platform diagnostics.
+- Import currently enforces a 10 MB total file limit plus per-field byte caps.
+  Keep those checks at both the native boundary and the Dart service layer.
 - Same-second export requests append `-1`, `-2`, and later suffixes to the
   CSV filename to avoid collisions.
 - Android export prefers public `Downloads/Wrait` on API 29+ and falls back to
@@ -166,6 +178,11 @@ this file as supporting implementation memory.
   label clear when the fallback is app-specific.
 - Export failures intentionally keep user-facing messages generic while
   preserving richer internal diagnostic context in thrown/logged errors.
+- The current repo-local Flutter integration harness can validate import flows
+  on emulator/simulator with provider overrides and can force fresh native
+  rebuilds, but it cannot automate the platform system document picker UI
+  itself. Record that limitation explicitly in future validation evidence when
+  native picker interaction is not manually verified.
 
 ## Backend and Generation
 

@@ -57,6 +57,30 @@ class EntryRepositoryImpl implements EntryRepository {
   }
 
   @override
+  Future<void> importEntries(List<Entry> entries) async {
+    if (entries.isEmpty) {
+      return;
+    }
+
+    final importedEntries = entries
+        .map((entry) {
+          final canonicalLanguage = _requireSupportedLanguage(entry.language);
+          return EntryRecordsCompanion.insert(
+            rawTranscript: entry.rawTranscript,
+            type: entry.type.name,
+            language: canonicalLanguage,
+            createdAt: entry.createdAt,
+            wordCount: Value(entry.wordCount),
+            cleanedText: Value(entry.cleanedText),
+            audioPath: const Value(null),
+          );
+        })
+        .toList(growable: false);
+
+    await entryDao.insertEntries(importedEntries);
+  }
+
+  @override
   Future<int> saveDraft(String transcript, String language) {
     final canonicalLanguage = _requireSupportedLanguage(language);
 

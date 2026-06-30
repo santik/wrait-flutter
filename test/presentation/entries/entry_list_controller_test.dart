@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/data/entries/entry_export_file_writer.dart';
 import 'package:wrait/data/entries/entry_export_providers.dart';
+import 'package:wrait/data/entries/entry_import_file_reader.dart';
+import 'package:wrait/data/entries/entry_import_providers.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/service/entry_export_service.dart';
+import 'package:wrait/domain/service/entry_import_service.dart';
 import 'package:wrait/presentation/entries/entry_list_controller.dart';
 
 void main() {
@@ -124,6 +127,122 @@ void main() {
     expect(container.read(entryListControllerProvider).isExporting, isFalse);
     expect(repository.entriesSnapshot.single.id, 1);
   });
+
+  test('import success appends parsed entries and resets state', () async {
+    final repository = _FakeEntryRepository(entries: [_entry(id: 1)]);
+    final service = EntryImportService(
+      fileReader: _TestImportFileReader(
+        result: EntryImportFileReadResult(
+          fileName: 'import.csv',
+          contents: _validCsv(),
+        ),
+      ),
+      entryRepository: repository,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        entryRepositoryProvider.overrideWithValue(repository),
+        entryImportServiceProvider.overrideWithValue(service),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(entryListControllerProvider.notifier)
+        .importEntries();
+
+    expect(result.didImport, isTrue);
+    expect(result.importedCount, 2);
+    expect(container.read(entryListControllerProvider).isImporting, isFalse);
+    expect(repository.entriesSnapshot, hasLength(3));
+  });
+
+  test('import cancellation is silent and resets state', () async {
+    final repository = _FakeEntryRepository(entries: [_entry(id: 1)]);
+    final service = EntryImportService(
+      fileReader: _TestImportFileReader(result: null),
+      entryRepository: repository,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        entryRepositoryProvider.overrideWithValue(repository),
+        entryImportServiceProvider.overrideWithValue(service),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(entryListControllerProvider.notifier)
+        .importEntries();
+
+    expect(result.wasCancelled, isTrue);
+    expect(container.read(entryListControllerProvider).isImporting, isFalse);
+    expect(repository.entriesSnapshot, hasLength(1));
+  });
+
+  test('import failure is caught without throwing and resets state', () async {
+    final repository = _FakeEntryRepository(entries: [_entry(id: 1)]);
+    final service = EntryImportService(
+      fileReader: const _ThrowingImportFileReader(),
+      entryRepository: repository,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        entryRepositoryProvider.overrideWithValue(repository),
+        entryImportServiceProvider.overrideWithValue(service),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(entryListControllerProvider.notifier)
+        .importEntries();
+
+    expect(result.didImport, isFalse);
+    expect(result.wasCancelled, isFalse);
+    expect(result.failureCategory, EntryImportFailureCategory.unreadableFile);
+    expect(container.read(entryListControllerProvider).isImporting, isFalse);
+    expect(repository.entriesSnapshot.single.id, 1);
+  });
+
+  test('import progress prevents duplicate picker calls', () async {
+    final repository = _FakeEntryRepository(entries: const <Entry>[]);
+    final completer = Completer<EntryImportFileReadResult?>();
+    final reader = _TestImportFileReader(completer: completer);
+    final service = EntryImportService(
+      fileReader: reader,
+      entryRepository: repository,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        entryRepositoryProvider.overrideWithValue(repository),
+        entryImportServiceProvider.overrideWithValue(service),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final firstImport = container
+        .read(entryListControllerProvider.notifier)
+        .importEntries();
+    final secondImport = container
+        .read(entryListControllerProvider.notifier)
+        .importEntries();
+
+    expect(container.read(entryListControllerProvider).isImporting, isTrue);
+    expect(reader.callCount, 1);
+
+    completer.complete(
+      EntryImportFileReadResult(fileName: 'import.csv', contents: _validCsv()),
+    );
+
+    final firstResult = await firstImport;
+    final secondResult = await secondImport;
+
+    expect(firstResult.didImport, isTrue);
+    expect(secondResult.wasCancelled, isTrue);
+    expect(container.read(entryListControllerProvider).isImporting, isFalse);
+    expect(reader.callCount, 1);
+  });
 }
 
 class _FakeEntryRepository implements EntryRepository {
@@ -146,6 +265,18 @@ class _FakeEntryRepository implements EntryRepository {
 
   @override
   Future<Entry?> getEntryById(int id) async => null;
+
+  @override
+  Future<void> importEntries(List<Entry> entries) async {
+    var nextId = _entries.fold<int>(
+      0,
+      (current, entry) => entry.id > current ? entry.id : current,
+    );
+    for (final entry in entries) {
+      nextId += 1;
+      _entries.add(entry.copyWith(id: nextId));
+    }
+  }
 
   @override
   Future<int> saveDraft(String transcript, String language) async => 1;
@@ -232,6 +363,39 @@ class _ThrowingTestFileWriter implements EntryExportFileWriter {
   }) async {
     throw StateError('write failed');
   }
+}
+
+class _TestImportFileReader implements EntryImportFileReader {
+  _TestImportFileReader({this.result, this.completer});
+
+  final EntryImportFileReadResult? result;
+  final Completer<EntryImportFileReadResult?>? completer;
+  int callCount = 0;
+
+  @override
+  Future<EntryImportFileReadResult?> pickCsvImport() async {
+    callCount += 1;
+    return completer?.future ?? result;
+  }
+}
+
+class _ThrowingImportFileReader implements EntryImportFileReader {
+  const _ThrowingImportFileReader();
+
+  @override
+  Future<EntryImportFileReadResult?> pickCsvImport() async {
+    throw const EntryImportFileReaderException('read failed');
+  }
+}
+
+String _validCsv() {
+  final createdAt = DateTime.utc(2026, 6, 30, 12).toIso8601String();
+  final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
+  return [
+    'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
+    '11,saved,$createdAt,$createdAtMs,en-US,2,imported saved,clean saved',
+    '12,draft,$createdAt,$createdAtMs,fr-FR,2,imported draft,',
+  ].join('\n');
 }
 
 Entry _entry({

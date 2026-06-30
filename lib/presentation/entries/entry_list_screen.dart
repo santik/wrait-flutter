@@ -80,32 +80,68 @@ class EntryListScreen extends ConsumerWidget {
               Positioned(
                 top: WraitSpacingTokens.sm,
                 right: WraitSpacingTokens.sm,
-                child: Semantics(
-                  button: !controllerState.isExporting,
-                  enabled: !controllerState.isExporting,
-                  label: controllerState.isExporting
-                      ? 'Exporting entries'
-                      : 'Export entries',
-                  liveRegion: controllerState.isExporting,
-                  child: IconButton(
-                    key: const ValueKey('entryListExportButton'),
-                    onPressed: controllerState.isExporting
-                        ? null
-                        : () => _exportEntries(context, ref, entries),
-                    icon: controllerState.isExporting
-                        ? Semantics(
-                            label: 'Exporting entries',
-                            child: const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : const Icon(Icons.file_download_outlined),
-                    tooltip: controllerState.isExporting
-                        ? 'Exporting CSV'
-                        : 'Export CSV',
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Semantics(
+                      button: !controllerState.isImporting,
+                      enabled: !controllerState.isImporting,
+                      label: controllerState.isImporting
+                          ? 'Importing entries'
+                          : 'Import entries',
+                      liveRegion: controllerState.isImporting,
+                      child: IconButton(
+                        key: const ValueKey('entryListImportButton'),
+                        onPressed: controllerState.isImporting
+                            ? null
+                            : () => _importEntries(context, ref),
+                        icon: controllerState.isImporting
+                            ? Semantics(
+                                label: 'Importing entries',
+                                child: const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.file_upload_outlined),
+                        tooltip: controllerState.isImporting
+                            ? 'Importing CSV'
+                            : 'Import CSV',
+                      ),
+                    ),
+                    Semantics(
+                      button: !controllerState.isExporting,
+                      enabled: !controllerState.isExporting,
+                      label: controllerState.isExporting
+                          ? 'Exporting entries'
+                          : 'Export entries',
+                      liveRegion: controllerState.isExporting,
+                      child: IconButton(
+                        key: const ValueKey('entryListExportButton'),
+                        onPressed: controllerState.isExporting
+                            ? null
+                            : () => _exportEntries(context, ref, entries),
+                        icon: controllerState.isExporting
+                            ? Semantics(
+                                label: 'Exporting entries',
+                                child: const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.file_download_outlined),
+                        tooltip: controllerState.isExporting
+                            ? 'Exporting CSV'
+                            : 'Export CSV',
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -162,6 +198,34 @@ class EntryListScreen extends ConsumerWidget {
 
     messenger.showSnackBar(
       const SnackBar(content: Text('Could not export entries.')),
+    );
+  }
+
+  Future<void> _importEntries(BuildContext context, WidgetRef ref) async {
+    final result = await ref
+        .read(entryListControllerProvider.notifier)
+        .importEntries();
+    if (!context.mounted || result.wasCancelled) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    if (result.didImport) {
+      final recordLabel = result.importedCount == 1 ? 'record' : 'records';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Imported ${result.importedCount} $recordLabel from ${result.fileName}.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(result.failureMessage ?? 'Could not import entries.'),
+      ),
     );
   }
 }

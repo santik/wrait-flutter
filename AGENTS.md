@@ -242,12 +242,26 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - Entry export now lives on the `/entries` screen and writes CSV files only.
   The export includes saved and draft entries, excludes retained audio files,
   and should stay non-mutating.
+- Entry import now also lives on the `/entries` screen and accepts only
+  Wrait-produced CSV files. Import is strictly additive, preserves draft vs
+  saved state exactly as exported, ignores CSV ids, forces `audioPath` null,
+  and must not update or delete existing entries.
+- CSV import now enforces explicit size limits: reject files above 10 MB and
+  reject oversized individual fields before persistence. Keep user-facing
+  import failures sanitized by category instead of exposing raw platform or
+  parser diagnostics.
 - iOS CSV exports live in `Documents/Wrait Exports`, while the encrypted
   database stays in `Library/Application Support`.
 - Android export should prefer public `Downloads/Wrait` on API 29+ and may
   fall back to an app-specific downloads directory on older Android versions.
 - Same-second export requests can produce `-1`, `-2`, and later filename
   suffixes; treat that as expected collision avoidance, not a bug.
+- The native CSV import bridges live in
+  `android/app/src/main/kotlin/com/wrait/flutter/MainActivity.kt` and
+  `ios/Runner/AppDelegate.swift`. The current repo-local Flutter integration
+  harness can rebuild and run those bridges on emulator/simulator, but it does
+  not automate the platform system document picker UI itself; document that
+  blocker explicitly instead of claiming unverified picker interaction.
 - For Android startup or rendering work, verify a launcher-style cold start
   with `adb shell am start -W -n com.wrait.flutter/com.wrait.flutter.MainActivity`
   in addition to ordinary `flutter run` checks.

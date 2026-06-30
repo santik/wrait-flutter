@@ -555,6 +555,9 @@ class _FakeEntryRepository implements EntryRepository {
   Future<Entry?> getEntryById(int id) async => entries[id];
 
   @override
+  Future<void> importEntries(List<Entry> entries) async {}
+
+  @override
   Future<List<Entry>> getPendingDrafts() async {
     final pending = entries.values
         .where((entry) => entry.type == EntryType.draft)
