@@ -281,8 +281,16 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entryListExportButton')));
     await tester.pumpAndSettle();
 
-    expect(exportWriter.contents, contains('2,draft,'));
-    expect(exportWriter.contents, contains('1,saved,'));
+    expect(
+      exportWriter.contents,
+      startsWith(
+        'type,created_at,language,word_count,raw_transcript,cleaned_text\n',
+      ),
+    );
+    expect(exportWriter.contents, contains('draft,'));
+    expect(exportWriter.contents, contains('saved,'));
+    expect(exportWriter.contents, isNot(contains('id,')));
+    expect(exportWriter.contents, isNot(contains('created_at_epoch_ms')));
     expect(exportWriter.contents, isNot(contains('audioPath')));
     expect(find.text('Could not export entries.'), findsNothing);
   });
@@ -348,7 +356,7 @@ void main() {
       const EntryImportFileReadResult(
         fileName: 'empty.csv',
         contents:
-            'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+            'type,created_at,language,word_count,raw_transcript,cleaned_text\n',
       ),
     );
     final harness = await _createHarness(importFileReader: importReader);
@@ -394,6 +402,40 @@ void main() {
 
     expect(find.text('clean entry 21'), findsNWidgets(2));
     expect(find.text('imported draft entry'), findsNWidgets(2));
+  });
+
+  testWidgets('old-shape import failure leaves existing rows unchanged', (
+    tester,
+  ) async {
+    final importReader = _StaticImportFileReader(
+      EntryImportFileReadResult(
+        fileName: 'legacy.csv',
+        contents: _legacyImportCsv(),
+      ),
+    );
+    final harness = await _createHarness(importFileReader: importReader);
+    addTearDown(harness.dispose);
+
+    final repository = harness.container.read(entryRepositoryProvider);
+    await repository.saveEntry('existing entry', 'en-US');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Selected CSV is not a valid Wrait export.'),
+      findsOneWidget,
+    );
+    expect(find.text('existing entry'), findsOneWidget);
+    expect(find.text('clean entry 21'), findsNothing);
   });
 
   testWidgets('import failure leaves existing rows unchanged', (tester) async {
@@ -594,11 +636,18 @@ class _ThrowingImportFileReader implements EntryImportFileReader {
 }
 
 String _validImportCsv() {
-  final createdAt = DateTime.utc(2026, 6, 30, 12).toIso8601String();
+  final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
+  return [
+    'type,created_at,language,word_count,raw_transcript,cleaned_text',
+    'saved,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
+    'draft,$createdAtMs,fr-FR,3,imported draft entry,',
+  ].join('\n');
+}
+
+String _legacyImportCsv() {
   final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
   return [
     'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
-    '21,saved,$createdAt,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
-    '22,draft,$createdAt,$createdAtMs,fr-FR,3,imported draft entry,',
+    '11,saved,$createdAtMs,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
   ].join('\n');
 }

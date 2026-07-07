@@ -163,6 +163,13 @@ this file as supporting implementation memory.
   Wrait-produced CSV. It is additive-only: preserve imported draft vs saved
   state as-is, ignore CSV ids, force imported `audioPath` to null, and never
   update or delete existing rows.
+- The current Wrait CSV contract is exactly
+  `type,created_at,language,word_count,raw_transcript,cleaned_text`.
+  Older Wrait CSVs with `id` or `created_at_epoch_ms` are intentionally
+  rejected.
+- `created_at` import uses the raw stored integer value and currently rejects
+  values above `2100-01-01T00:00:00Z` (`4102444800000`) in
+  `lib/domain/service/entry_import_service.dart`.
 - Import validation lives primarily in
   `lib/domain/service/entry_import_service.dart`, with native picker/read
   bridges in `android/app/src/main/kotlin/com/wrait/flutter/MainActivity.kt`

@@ -246,6 +246,13 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   Wrait-produced CSV files. Import is strictly additive, preserves draft vs
   saved state exactly as exported, ignores CSV ids, forces `audioPath` null,
   and must not update or delete existing entries.
+- The current Wrait CSV contract is exactly
+  `type,created_at,language,word_count,raw_transcript,cleaned_text`. Do not
+  reintroduce `id` or `created_at_epoch_ms` compatibility unless a future
+  approved story explicitly changes that contract.
+- `created_at` in CSV is the raw stored database integer value. Import should
+  reject `created_at` values above `2100-01-01T00:00:00Z`
+  (`4102444800000`) instead of converting or clamping them.
 - CSV import now enforces explicit size limits: reject files above 10 MB and
   reject oversized individual fields before persistence. Keep user-facing
   import failures sanitized by category instead of exposing raw platform or

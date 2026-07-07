@@ -162,14 +162,15 @@ upcoming feature work:
 - entry-list previews derived from cleaned text first, then raw transcript,
   with audio-only drafts shown as `pending · will retry`
 - manual CSV export from the entries screen, covering saved and draft entries,
-  excluding retained audio files, and writing to an automatic local platform
-  destination
+  excluding retained audio files, database ids, and duplicate timestamp
+  fields, and writing to an automatic local platform destination
 - manual CSV import from the entries screen for Wrait-produced CSV files only,
   adding new saved and draft entries without updating or deleting existing
   local rows
 - imported CSV draft rows remain drafts, imported saved rows remain saved, CSV
-  ids are ignored in favor of new local ids, and retained audio files are not
-  restored by import
+  ids are ignored in favor of new local ids, retained audio files are not
+  restored by import, and `created_at` round-trips as the raw stored integer
+  value from the local database
 - right-swipe row deletion on `/entries` with immediate confirmation, cancel
   reset, and stay-on-list behavior after confirmed deletion
 - real entry-detail screen at `/entry/:id` backed by the local entry

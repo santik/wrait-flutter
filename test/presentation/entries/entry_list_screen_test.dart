@@ -255,10 +255,10 @@ void main() {
     expect(
       exportFileWriter.lastContents,
       contains(
-        'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
+        'type,created_at,language,word_count,raw_transcript,cleaned_text',
       ),
     );
-    expect(exportFileWriter.lastContents, contains('2,draft,'));
+    expect(exportFileWriter.lastContents, contains('draft,'));
     expect(exportFileWriter.lastContents, isNot(contains('audioPath')));
   });
 
@@ -305,7 +305,7 @@ void main() {
     );
     expect(
       exportFileWriter.lastContents,
-      'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+      'type,created_at,language,word_count,raw_transcript,cleaned_text\n',
     );
   });
 
@@ -433,7 +433,7 @@ void main() {
           result: EntryImportFileReadResult(
             fileName: 'empty.csv',
             contents:
-                'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+                'type,created_at,language,word_count,raw_transcript,cleaned_text\n',
           ),
         ),
         entryRepository: entryRepository,
@@ -761,11 +761,10 @@ class _ThrowingImportFileReader implements EntryImportFileReader {
 }
 
 String _validImportCsv() {
-  final createdAt = DateTime.utc(2026, 6, 30, 12).toIso8601String();
   final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
   return [
-    'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
-    '21,saved,$createdAt,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
-    '22,draft,$createdAt,$createdAtMs,fr-FR,3,imported draft entry,',
+    'type,created_at,language,word_count,raw_transcript,cleaned_text',
+    'saved,$createdAtMs,en-US,3,imported saved entry,clean entry 21',
+    'draft,$createdAtMs,fr-FR,3,imported draft entry,',
   ].join('\n');
 }
