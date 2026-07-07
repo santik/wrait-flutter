@@ -191,12 +191,12 @@ void main() {
   });
 
   test(
-    'fails without repository mutation when timestamps do not match',
+    'fails without repository mutation when created_at is invalid',
     () async {
       final repository = _FakeEntryRepository();
       final csv = [
-        'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
-        '1,saved,2026-06-30T09:00:00.000Z,1,en-US,2,hello,clean',
+        'type,created_at,language,word_count,raw_transcript,cleaned_text',
+        'saved,not-a-number,en-US,2,hello,clean',
       ].join('\n');
       final service = EntryImportService(
         fileReader: _StaticImportFileReader(
@@ -210,9 +210,153 @@ void main() {
       expect(result.didImport, isFalse);
       expect(result.failureCategory, EntryImportFailureCategory.invalidFormat);
       expect(result.error, isA<FormatException>());
+      expect(
+        (result.error as FormatException).message,
+        'Entry import CSV created_at must be an integer.',
+      );
       expect(repository.importCallCount, 0);
     },
   );
+
+  test('accepts a zero created_at timestamp', () async {
+    final repository = _FakeEntryRepository();
+    final csv = [
+      'type,created_at,language,word_count,raw_transcript,cleaned_text',
+      'saved,0,en-US,2,hello,clean',
+    ].join('\n');
+    final service = EntryImportService(
+      fileReader: _StaticImportFileReader(
+        EntryImportFileReadResult(fileName: 'zero-time.csv', contents: csv),
+      ),
+      entryRepository: repository,
+    );
+
+    final result = await service.importEntries();
+
+    expect(result.didImport, isTrue);
+    expect(result.importedCount, 1);
+    expect(repository.importCallCount, 1);
+    expect(repository.importedEntries.single.createdAt, 0);
+  });
+
+  test('accepts the maximum supported created_at timestamp', () async {
+    final repository = _FakeEntryRepository();
+    final csv = [
+      'type,created_at,language,word_count,raw_transcript,cleaned_text',
+      'saved,${EntryImportService.maxCreatedAtEpochMs},en-US,2,hello,clean',
+    ].join('\n');
+    final service = EntryImportService(
+      fileReader: _StaticImportFileReader(
+        EntryImportFileReadResult(fileName: 'max-time.csv', contents: csv),
+      ),
+      entryRepository: repository,
+    );
+
+    final result = await service.importEntries();
+
+    expect(result.didImport, isTrue);
+    expect(result.importedCount, 1);
+    expect(repository.importCallCount, 1);
+    expect(
+      repository.importedEntries.single.createdAt,
+      EntryImportService.maxCreatedAtEpochMs,
+    );
+  });
+
+  test(
+    'fails without repository mutation when created_at exceeds the supported maximum',
+    () async {
+      final repository = _FakeEntryRepository();
+      final csv = [
+        'type,created_at,language,word_count,raw_transcript,cleaned_text',
+        'saved,${EntryImportService.maxCreatedAtEpochMs + 1},en-US,2,hello,clean',
+      ].join('\n');
+      final service = EntryImportService(
+        fileReader: _StaticImportFileReader(
+          EntryImportFileReadResult(fileName: 'future-time.csv', contents: csv),
+        ),
+        entryRepository: repository,
+      );
+
+      final result = await service.importEntries();
+
+      expect(result.didImport, isFalse);
+      expect(result.failureCategory, EntryImportFailureCategory.invalidFormat);
+      expect(result.error, isA<FormatException>());
+      expect(
+        (result.error as FormatException).message,
+        'Entry import CSV created_at exceeds the maximum supported timestamp.',
+      );
+      expect(repository.importCallCount, 0);
+    },
+  );
+
+  test('fails without repository mutation when created_at is empty', () async {
+    final repository = _FakeEntryRepository();
+    final csv = [
+      'type,created_at,language,word_count,raw_transcript,cleaned_text',
+      'saved,,en-US,2,hello,clean',
+    ].join('\n');
+    final service = EntryImportService(
+      fileReader: _StaticImportFileReader(
+        EntryImportFileReadResult(fileName: 'empty-time.csv', contents: csv),
+      ),
+      entryRepository: repository,
+    );
+
+    final result = await service.importEntries();
+
+    expect(result.didImport, isFalse);
+    expect(result.failureCategory, EntryImportFailureCategory.invalidFormat);
+    expect(result.error, isA<FormatException>());
+    expect(
+      (result.error as FormatException).message,
+      'Entry import CSV created_at cannot be empty.',
+    );
+    expect(repository.importCallCount, 0);
+  });
+
+  test('rejects the older Wrait CSV header shape', () async {
+    final repository = _FakeEntryRepository();
+    final csv = [
+      'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
+      '1,saved,1719748800000,1719748800000,en-US,2,hello,clean',
+    ].join('\n');
+    final service = EntryImportService(
+      fileReader: _StaticImportFileReader(
+        EntryImportFileReadResult(fileName: 'old-shape.csv', contents: csv),
+      ),
+      entryRepository: repository,
+    );
+
+    final result = await service.importEntries();
+
+    expect(result.didImport, isFalse);
+    expect(result.failureCategory, EntryImportFailureCategory.invalidFormat);
+    expect(result.error, isA<FormatException>());
+    expect(repository.importCallCount, 0);
+  });
+
+  test('rejects rows with extra columns beyond the header', () async {
+    final repository = _FakeEntryRepository();
+    final csv = [
+      'type,created_at,language,word_count,raw_transcript,cleaned_text',
+      'saved,1719748800000,en-US,2,hello,clean,extra-column',
+    ].join('\n');
+    final service = EntryImportService(
+      fileReader: _StaticImportFileReader(
+        EntryImportFileReadResult(fileName: 'extra-column.csv', contents: csv),
+      ),
+      entryRepository: repository,
+    );
+
+    final result = await service.importEntries();
+
+    expect(result.didImport, isFalse);
+    expect(result.failureCategory, EntryImportFailureCategory.invalidFormat);
+    expect(result.error, isA<FormatException>());
+    expect(repository.importCallCount, 0);
+  });
 
   test('fails when the CSV exceeds the configured file size limit', () async {
     final repository = _FakeEntryRepository();

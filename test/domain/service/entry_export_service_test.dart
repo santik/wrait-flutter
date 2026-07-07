@@ -31,12 +31,16 @@ void main() {
     expect(
       writer.lastContents,
       startsWith(
-        'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+        'type,created_at,language,word_count,raw_transcript,cleaned_text\n',
       ),
     );
     final lines = writer.lastContents.trimRight().split('\n');
-    expect(lines[1], contains('7,draft,'));
-    expect(lines[2], contains('3,saved,'));
+    expect(lines[1], startsWith('draft,'));
+    expect(lines[2], startsWith('saved,'));
+    expect(
+      lines[1].split(',')[1],
+      DateTime.utc(2026, 6, 30).millisecondsSinceEpoch.toString(),
+    );
   });
 
   test('escapes commas, quotes, and newlines in CSV text fields', () {
@@ -91,7 +95,7 @@ void main() {
     expect(result.didExport, isTrue);
     expect(
       writer.lastContents,
-      'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text\n',
+      'type,created_at,language,word_count,raw_transcript,cleaned_text\n',
     );
   });
 

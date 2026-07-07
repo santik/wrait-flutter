@@ -389,12 +389,11 @@ class _ThrowingImportFileReader implements EntryImportFileReader {
 }
 
 String _validCsv() {
-  final createdAt = DateTime.utc(2026, 6, 30, 12).toIso8601String();
   final createdAtMs = DateTime.utc(2026, 6, 30, 12).millisecondsSinceEpoch;
   return [
-    'id,type,created_at,created_at_epoch_ms,language,word_count,raw_transcript,cleaned_text',
-    '11,saved,$createdAt,$createdAtMs,en-US,2,imported saved,clean saved',
-    '12,draft,$createdAt,$createdAtMs,fr-FR,2,imported draft,',
+    'type,created_at,language,word_count,raw_transcript,cleaned_text',
+    'saved,$createdAtMs,en-US,2,imported saved,clean saved',
+    'draft,$createdAtMs,fr-FR,2,imported draft,',
   ].join('\n');
 }
 

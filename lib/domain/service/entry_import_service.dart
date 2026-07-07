@@ -85,6 +85,7 @@ class EntryImportService {
   static const int defaultMaxImportBytes = 10 * 1024 * 1024;
   static const int defaultMaxTextFieldBytes = 1024 * 1024;
   static const int defaultMaxSmallFieldBytes = 128;
+  static const int maxCreatedAtEpochMs = 4102444800000; // 2100-01-01T00:00:00Z
 
   final EntryImportFileReader fileReader;
   final EntryRepository entryRepository;
@@ -186,62 +187,58 @@ class EntryImportService {
   }
 
   static Entry _parseEntryRow(List<String> row) {
-    final importedId = int.tryParse(row[0]);
-    if (importedId == null || importedId < 0) {
-      throw FormatException('Entry import CSV contains an invalid id value.');
-    }
-
-    final entryType = EntryType.tryParse(row[1]);
+    final entryType = EntryType.tryParse(row[0]);
     if (entryType == null) {
       throw FormatException(
-        'Entry import CSV contains an unsupported type: ${row[1]}.',
+        'Entry import CSV contains an unsupported type: ${row[0]}.',
       );
     }
 
-    final createdAtEpochMs = int.tryParse(row[3]);
-    if (createdAtEpochMs == null || createdAtEpochMs < 0) {
+    final createdAtValue = row[1];
+    if (createdAtValue.isEmpty) {
       throw const FormatException(
-        'Entry import CSV contains an invalid created_at_epoch_ms value.',
+        'Entry import CSV created_at cannot be empty.',
+      );
+    }
+    final createdAt = int.tryParse(createdAtValue);
+    if (createdAt == null) {
+      throw const FormatException(
+        'Entry import CSV created_at must be an integer.',
+      );
+    }
+    if (createdAt < 0) {
+      throw const FormatException(
+        'Entry import CSV created_at cannot be negative.',
+      );
+    }
+    if (createdAt > maxCreatedAtEpochMs) {
+      throw const FormatException(
+        'Entry import CSV created_at exceeds the maximum supported timestamp.',
       );
     }
 
-    final createdAtIso = row[2].trim();
-    late final DateTime createdAtDateTime;
-    try {
-      createdAtDateTime = DateTime.parse(createdAtIso);
-    } on FormatException {
-      throw const FormatException(
-        'Entry import CSV contains an invalid created_at value.',
-      );
-    }
-    if (createdAtDateTime.toUtc().millisecondsSinceEpoch != createdAtEpochMs) {
-      throw const FormatException(
-        'Entry import CSV created_at values do not match.',
-      );
-    }
-
-    final resolvedLanguage = resolveSupportedLanguageCode(row[4]);
+    final resolvedLanguage = resolveSupportedLanguageCode(row[2]);
     if (resolvedLanguage == null) {
       throw FormatException(
-        'Entry import CSV contains an unsupported language: ${row[4]}.',
+        'Entry import CSV contains an unsupported language: ${row[2]}.',
       );
     }
 
-    final wordCount = int.tryParse(row[5]);
+    final wordCount = int.tryParse(row[3]);
     if (wordCount == null || wordCount < 0) {
       throw const FormatException(
         'Entry import CSV contains an invalid word_count value.',
       );
     }
 
-    final cleanedText = row[7].isEmpty ? null : row[7];
+    final cleanedText = row[5].isEmpty ? null : row[5];
 
     return Entry(
-      rawTranscript: row[6],
+      rawTranscript: row[4],
       cleanedText: cleanedText,
       type: entryType,
       language: resolvedLanguage,
-      createdAt: createdAtEpochMs,
+      createdAt: createdAt,
       wordCount: wordCount,
     );
   }

@@ -28,10 +28,8 @@ class EntryExportService {
   // Keep the header order aligned with the approved CSV contract so exported
   // files stay predictable for spreadsheet import and validation.
   static const List<String> csvHeaders = <String>[
-    'id',
     'type',
     'created_at',
-    'created_at_epoch_ms',
     'language',
     'word_count',
     'raw_transcript',
@@ -85,14 +83,7 @@ class EntryExportService {
     for (final entry in entries) {
       buffer.writeln(
         <String>[
-          entry.id.toString(),
           _escapeCsv(entry.type.name),
-          _escapeCsv(
-            DateTime.fromMillisecondsSinceEpoch(
-              entry.createdAt,
-              isUtc: true,
-            ).toIso8601String(),
-          ),
           entry.createdAt.toString(),
           _escapeCsv(entry.language),
           entry.wordCount.toString(),
