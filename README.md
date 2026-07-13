@@ -1,92 +1,151 @@
-# wrait Flutter
+# wrait
 
-Flutter rewrite of wrait, a minimal voice diary app for Android and iOS.
+*One button. Your voice. Your words. Kept private by design.*
 
-## Android debug deployment
+wrait is a minimal voice diary for Android and iOS. Open the app, tap the
+button, speak, tap again, and wrait turns the recording into a diary entry.
+Entries are stored locally on your device in an encrypted database.
 
-Connect and authorize one physical Android phone, then run:
+This repository contains the Flutter mobile client.
+
+---
+
+## What It Does
+
+wrait records short spoken diary entries, sends the recording to the configured
+wrait backend for transcription, sends the raw transcript back to the backend
+for cleanup, and saves the result locally on the device.
+
+The current Flutter app includes:
+
+- one-button voice recording
+- cloud-backed transcription and transcript cleanup through the wrait backend
+- encrypted local entry storage
+- retryable local drafts when backend work cannot finish immediately
+- entry list and entry detail screens
+- entry editing, sharing, and deletion
+- CSV export and import from the entries screen
+- app-wide privacy lock using device authentication
+- Android screenshot, screen recording, and recent-app protection
+- iOS background/app-switch privacy cover
+- Android and iOS app branding
+
+![wrait main screen](docs/main-screen.png)
+
+---
+
+## Privacy Model
+
+### What stays on your device
+
+- Saved diary entries, including raw transcript and cleaned text
+- Draft entries waiting for retry
+- The encrypted local database key
+- The app's anonymous device identifier after it is generated
+- CSV exports that you explicitly create
+
+### What leaves your device
+
+The current Flutter app uses the configured wrait backend for the main
+recording flow:
+
+1. Voice audio is sent to `/api/transcribe` for speech-to-text processing.
+2. Raw transcript text is sent to `/api/cleanup` for readability cleanup.
+3. An anonymous device ID is sent to `/api/register` on launch and with backend
+   requests.
+
+The cleaned diary entry is not sent back to wrait-operated servers by the app.
+It is stored locally after cleanup completes.
+
+For the full disclosure, see [PRIVACY.md](PRIVACY.md).
+
+---
+
+## Backend
+
+The mobile client talks to a backend compatible with the checked-in OpenAPI
+contract:
+
+- Source of truth: [api/wrait-backend.yaml](api/wrait-backend.yaml)
+- Default backend URL: `https://wrait-backend.vercel.app`
+- Runtime configuration keys:
+  - `BACKEND_URL`
+  - `PROXY_SECRET`
+  - `RECORDING_HARD_CAP_MS`
+
+Backend client code is generated locally during project bootstrap and is not
+committed to this repository.
+
+---
+
+## Building From Source
+
+### Requirements
+
+- Flutter `3.44.3`
+- Dart SDK compatible with `^3.12.2`
+- Xcode for iOS builds
+- Android Studio and Android SDK for Android builds
+- Node.js and npm for OpenAPI client generation
+
+### Setup
 
 ```sh
-PROXY_SECRET=SECRET_WRAIT_VALUE ./deploy_debug.sh
+git clone https://github.com/santik/wrait.git
+cd wrait
+npm install
+npm run build
+flutter pub get
 ```
 
-The script:
-
-- finds the single connected Android phone with `adb devices`
-- requires a `PROXY_SECRET` with no whitespace and at least 8 characters so
-  the installed app can authenticate launch registration and recording
-  requests
-- supports starting from a locked phone with the screen off
-- wakes the phone before the real-device test phase and before the final
-  verified launch
-- may keep the phone awake during the automated run when the automation flow is
-  active
-- temporarily enables a namespaced Android automation setting so the
-  debuggable activity can show over the lock screen during the test phase
-- auto-grants `android.permission.RECORD_AUDIO` during the automated test setup
-  so recording tests do not block on a permission dialog while `flutter test`
-  reinstalls the app under test
-- builds the Flutter debug APK for the `flutter test` phase
-- runs `flutter test --no-pub -d <phone-serial> integration_test`
-- builds the Flutter profile APK for the final installed app
-- installs `build/app/outputs/flutter-apk/app-profile.apk` only after tests
-  pass
-- verifies the built APK exists and is non-empty before install
-- re-checks that the phone is still connected before install
-- verifies `com.wrait.flutter` is installed after deployment
-- verifies the native `com.wrait.app` app is still installed when it was
-  present before deployment
-- restores the temporary stay-awake and automation-setting values before exit
-
-The Flutter Android app installs as `com.wrait.flutter`, so it can coexist with
-the native Wrait Android app installed as `com.wrait.app`. The deploy script
-must never uninstall `com.wrait.app`.
-
-The split between debug-for-tests and profile-for-final-install is deliberate:
-the connected validation phone can run the existing Flutter integration flow,
-but a standalone debug cold launch can remain stuck on the Flutter splash
-screen after deployment. The equivalent profile build launches normally on that
-device, so `deploy_debug.sh` installs profile only after the debug test phase
-passes.
-
-If no usable Android phone is connected, or if the phone is unauthorized or
-offline, the script exits before build/install with a clear error. Emulator-only
-deployment is intentionally out of scope for this command.
-
-The script restores the temporary Android stay-awake and automation-setting
-values that it changes, but it does not restore the phone's visible screen or
-lock presentation state after the run. USB debugging authorization is still
-required, and some device policies may block automation until private
-credentials are entered manually.
-
-## Manual debug APK build
-
-To build the Android debug APK manually with the proxy secret baked into the
-Flutter runtime config, run:
+### Common Checks
 
 ```sh
-PROXY_SECRET=SECRET_WRAIT_VALUE \
-  /opt/homebrew/bin/flutter build apk --debug \
-  --dart-define=PROXY_SECRET=SECRET_WRAIT_VALUE
+flutter analyze
+flutter test
+flutter build apk --debug
 ```
 
-The generated APK path is:
+For Android real-device debug and release deployment details, see
+[docs/development.md](docs/development.md).
+
+---
+
+## Architecture
+
+The Flutter app follows a layered structure:
 
 ```text
-/Users/alexander/projects/wrait/write-flutter/build/app/outputs/flutter-apk/app-debug.apk
+lib/
+  core/          runtime config, router, time helpers
+  data/          API, audio, auth, entry, preferences, launch infrastructure
+  domain/        models, repositories, services, use cases
+  presentation/  app lock, entries, main screen, theme, UI controllers
 ```
 
-To install that APK on the connected phone:
+Important implementation boundaries:
 
-```sh
-adb -s 4A181FDJH0030G install -r \
-  /Users/alexander/projects/wrait/write-flutter/build/app/outputs/flutter-apk/app-debug.apk
-```
+- `api/wrait-backend.yaml` is the backend contract source of truth.
+- `lib/data/api/generated/backend_api_generated.dart` is the stable bridge over
+  the generated backend package.
+- The encrypted local entry database is `wrait_entries_v2.sqlite`.
+- Android release package ID is `com.wrait.flutter`.
+- Android debug/profile package ID is `com.wrait.flutter.dev`.
+- iOS bundle ID is `com.wrait.app`.
 
-## Common checks
+---
 
-```sh
-/opt/homebrew/bin/flutter analyze
-/opt/homebrew/bin/flutter test
-/opt/homebrew/bin/flutter build apk --debug
-```
+## Tester Guide
+
+See [BETA_TESTER_GUIDE.md](BETA_TESTER_GUIDE.md) for install notes, suggested
+test flows, privacy expectations, and known rough edges.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+---
+
+*wrait - speak your mind. keep it private.*

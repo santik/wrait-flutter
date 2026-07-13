@@ -3,8 +3,8 @@ info:
   title: Wrait Backend API
   version: 0.1.0
   license:
-    name: Proprietary
-    url: https://wrait.app
+    name: MIT
+    url: https://github.com/santik/wrait/blob/main/LICENSE
   description: |
     Consumer-facing API contract for device registration, transcription proxying,
     and transcript cleanup.
