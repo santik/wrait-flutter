@@ -302,9 +302,13 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   the SDK secret, and do not use the legacy `wrait-android` directory.
 - The feedback adapter must keep email and screenshot prompts hidden, avoid
   Wiredash analytics, and replace `metadata.custom` with a fresh allowlisted
-  map containing only approved broad context and explicit contact text. Do not
-  attach journal text, transcripts, audio, paths, identifiers, screenshots,
-  proxy secrets, or raw diagnostics.
+  map containing only approved broad context and explicit contact text. When
+  contact is supplied, copy the same trimmed plain-text value to Wiredash's
+  standard `userId` field so it survives Wiredash's hidden-email submission
+  path; also populate `userEmail` defensively. Do not auto-collect or validate
+  it as an email. Do not attach journal text,
+  transcripts, audio, paths, identifiers, screenshots, proxy secrets, or raw
+  diagnostics.
 - Wiredash's public `2.6.1` API does not expose typed API exception classes;
   preserve the generic sanitized user-facing failure boundary and use
   developer-only logs for diagnostics.

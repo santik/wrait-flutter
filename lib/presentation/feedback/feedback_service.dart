@@ -129,14 +129,13 @@ class WiredashFeedbackService implements FeedbackService {
         email: EmailPrompt.hidden,
         screenshot: ScreenshotPrompt.hidden,
         collectMetaData: (metadata) {
-          final safeMetadata = buildFeedbackMetadata(
+          return applyFeedbackMetadata(
+            metadata: metadata,
             draft: draft,
             appArea: appArea,
             locale: locale,
             platform: platform,
           );
-          metadata.custom = safeMetadata;
-          return metadata;
         },
       ),
     );

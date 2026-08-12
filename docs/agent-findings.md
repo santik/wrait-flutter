@@ -327,9 +327,13 @@ this file as supporting implementation memory.
 - The adapter hides Wiredash email and screenshot prompts and does not call
   analytics. `metadata.custom` must be replaced with a clean allowlist map,
   not merged with SDK-provided custom fields. Only broad context, category,
-  and trimmed non-blank explicit contact text are allowed; journal content,
-  transcripts, audio, paths, identifiers, screenshots, proxy secrets, and raw
-  diagnostics stay excluded.
+  and trimmed non-blank explicit contact text are allowed. That contact is
+  copied to Wiredash's standard `userId` field for console visibility as well
+  as custom `reply_contact`. `userEmail` is populated defensively, but Wiredash
+  2.6.1 drops it when the email prompt is hidden. The contact is not
+  auto-collected or email-validated. Journal content, transcripts, audio,
+  paths, identifiers, screenshots, proxy secrets, and raw diagnostics stay
+  excluded.
 - Wiredash `2.6.1` has no public typed API exception classes. Keep the
   generic sanitized failure result and developer-only diagnostic logging.
 - The preparation panel must remain top-anchored and fixed-height while the

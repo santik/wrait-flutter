@@ -53,8 +53,11 @@ sanitized catch boundary and sends diagnostics only to `developer.log`.
 
 The current Wiredash Flutter package is `2.6.1`. Its public API supports root
 initialization, `Wiredash.of(context).show()`, custom feedback options, and
-custom metadata. The package's built-in email prompt is email-specific, so it
-cannot be used for this story's unrestricted contact field. See the [package
+custom metadata, and standard `userId`/`userEmail` metadata fields. The package's
+built-in email prompt is
+email-specific, so it cannot be used for this story's unrestricted contact
+input; the explicit contact value is assigned to the standard field only after
+the prompt is hidden. See the [package
 quick start](https://pub.dev/packages/wiredash), [Wiredash API](https://pub.dev/documentation/wiredash/latest/wiredash/Wiredash-class.html),
 and [feedback options API](https://pub.dev/documentation/wiredash/latest/wiredash/WiredashFeedbackOptions-class.html).
 
@@ -66,7 +69,7 @@ and [feedback options API](https://pub.dev/documentation/wiredash/latest/wiredas
 | User flow shape | Wrait top-anchored preparation panel followed by Wiredash message flow | Wiredash's `EmailPrompt` accepts email only; the preparation panel preserves the approved plain-text contact requirement, provides Wrait-specific privacy copy, and stays fixed when the keyboard appears. |
 | Main-screen entry point | One top-right `IconButton` in the main screen's safe-area header, using `Icons.feedback_outlined` with tooltip and semantic label | Top-right is a conventional action location, keeps the recording control unobstructed, and avoids implying back navigation from the top-left. |
 | Category transport | Store the selected category as custom Wiredash metadata | Avoids a second category selector inside Wiredash and avoids environment-specific console label IDs. The four allowed values remain exactly `Bug`, `Idea`, `Confusing`, and `Praise`. |
-| Contact transport | Store non-empty user-entered contact text, trimmed only at the transport boundary, as custom Wiredash metadata | Preserves arbitrary plain text without format validation, without using `userEmail` or Wiredash email validation. Blank or whitespace-only contact is omitted. |
+| Contact transport | Store non-empty user-entered contact text, trimmed only at the transport boundary, in custom `reply_contact` metadata and Wiredash's standard `userId` field, with `userEmail` also populated defensively | Makes the explicit contact survive Wiredash 2.6.1's hidden-email submission path while preserving arbitrary plain text. `EmailPrompt.hidden` means the value is not collected or email-validated by Wiredash. Blank or whitespace-only contact is omitted from all fields. |
 | Screenshot handling | `ScreenshotPrompt.hidden` | The approved scope excludes screenshots and the app contains private journal content elsewhere. Screenshot capture is disabled at the feedback-flow boundary. |
 | Wiredash email handling | `EmailPrompt.hidden` | Prevents Wiredash from presenting an email-only field or rejecting valid non-email contact text. |
 | Metadata policy | Fresh allowlisted metadata map per feedback flow | Prevents device IDs, user IDs, backend credentials, transcripts, entry text, file paths, audio, and raw diagnostics from being forwarded accidentally. Wiredash's automatic app-version/submission-time metadata is accepted only after runtime console inspection confirms it contains no Wrait journal data. |
@@ -183,7 +186,11 @@ When the user taps the main-screen button:
    - set the email prompt to hidden;
    - set the screenshot prompt to hidden;
    - add only the approved category, broad app area, platform, locale, and
-     explicit contact text to custom metadata.
+     explicit contact text to custom metadata;
+   - copy the same trimmed explicit contact text to Wiredash's standard
+     `userId` and `userEmail` metadata fields, or clear both fields when contact
+     is blank. `userId` is required because Wiredash 2.6.1 drops `userEmail`
+     when the email prompt is hidden.
 6. On `FeedbackResult.hasSubmittedFeedback == true`, show a concise success
    confirmation and return to the normal main screen.
 7. On cancellation, discard the preparation sheet state without submitting.
@@ -192,9 +199,13 @@ When the user taps the main-screen button:
    exception text, URLs, credentials, or stack traces.
 
 The metadata callback must replace the custom map with a clean allowlist object;
-it must never merge existing custom fields. It must never set `userId`,
-`userEmail`, a Wrait device ID, or any entry/audio-related field. The approved
-custom metadata keys are:
+it must never merge existing custom fields. The standard `userId` and
+`userEmail` fields may contain only the same trimmed, explicitly supplied
+contact text as `reply_contact`; they must remain unset when contact is blank.
+`userId` is the reliable standard transport for this non-email value because
+Wiredash 2.6.1 drops `userEmail` when the email prompt is hidden. No Wrait device
+ID or entry/audio-related field may be sent. The approved custom metadata keys
+are:
 
 ```text
 app_area = main
@@ -207,8 +218,8 @@ reply_contact = user-entered text, only when non-blank
 Do not add raw current route paths, entry IDs, entry titles, transcripts,
 cleaned text, recording paths, audio bytes, export names, backend URLs, proxy
 secrets, screenshots, or diagnostic logs. The [custom metadata API](https://pub.dev/documentation/wiredash/latest/wiredash/CustomizableWiredashMetaData-class.html)
-supports a custom map; user-entered contact text belongs there only because the
-user explicitly supplied it.
+supports a custom map; user-entered contact text belongs in the custom map and
+standard fields only because the user explicitly supplied it.
 
 ## File changes
 
@@ -405,7 +416,11 @@ required.
 ## Integration notes
 
 - Wiredash is an external service; feedback content and explicitly supplied
-  contact text leave the device.
+  contact text leave the device. The contact is sent in the custom
+  `reply_contact` field and Wiredash's standard `userId` field for console
+  visibility. The email field is populated defensively, but Wiredash 2.6.1
+  drops it when `EmailPrompt.hidden` is used. The contact is not auto-collected
+  or email-validated.
 - The app must not send feedback through the existing Wrait backend or reuse
   `PROXY_SECRET` for Wiredash.
 - The app must not call Wiredash analytics APIs. A feedback submission is not a
@@ -447,7 +462,7 @@ required.
 | Wiredash's built-in email step rejects the approved arbitrary contact text | High | High | Collect contact text in the Wrait preparation sheet and set Wiredash email prompt to hidden. Add a no-validation test with a non-email value. |
 | Wiredash screenshot capture exposes private app content | Medium | High | Set screenshot prompt to hidden, do not expose an attachment control, inspect the real flow on both platforms, and retain existing native capture protections. |
 | Wiredash is mounted above the app lock and remains visible after relock | Medium | High | Mount it below `AppLockGate`, test foreground-exit behavior, and treat any overlay placement failure as a blocker. |
-| SDK metadata includes more device information than intended | Medium | High | Start from clean metadata, populate only the allowlist, inspect the staging console/request payload, and never set user/device identifiers. |
+| SDK metadata includes more device information than intended | Medium | High | Start from clean metadata, populate only the allowlist, copy only explicitly supplied contact text to the standard `userId`/`userEmail` fields, inspect the staging console/request payload, and never set app/device identifiers. |
 | Wiredash submission failure clears the native message draft | Medium | High | Use the SDK's offline/pending path, do not rebuild or dismiss the native flow on failure, and validate network failure with synthetic text. |
 | Missing or incorrectly supplied build defines make feedback unusable | Medium | Medium | Keep startup non-blocking but make release deployment require paired values; add deploy-script tests and a sanitized runtime fallback. |
 | Wiredash dependency changes Android build constraints | Medium | Medium | Verify current AGP/Gradle/Kotlin compatibility before implementation and run generated backend package checks plus Flutter analyze after dependency resolution. |

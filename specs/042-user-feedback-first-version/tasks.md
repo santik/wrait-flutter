@@ -74,8 +74,10 @@ main screen.
       `lib/presentation/main/main_screen.dart`
   - Depends on: Group 1 feedback key/provider tasks
 - [x] Verify that no `Wiredash.trackEvent`, `WiredashAnalytics`, screenshot
-      attachment, `userId`, `userEmail`, entry data, audio data, backend URL,
-      proxy secret, or raw diagnostic data is sent by the feature.
+      attachment, auto-collected user identity, entry data, audio data,
+      backend URL, proxy secret, or raw diagnostic data is sent by the feature.
+      Explicit contact text is sent only when supplied by the user, in the
+      standard Wiredash `userId` field and custom `reply_contact`.
   - Depends on: Wiredash adapter task
 - [x] Complete debug/release build-define forwarding and validation. Require
       paired Wiredash values for release builds, keep the secret in the same
@@ -94,7 +96,8 @@ submit real feedback to Wiredash.
       `test/core/config/app_config_test.dart`
 - [x] [P] Add metadata tests proving the exact allowlist, category values,
       broad platform/locale/app-area fields, blank-contact omission, arbitrary
-      contact preservation, and exclusion of journal/audio/diagnostic fields —
+      contact preservation in Wiredash standard metadata and custom
+      `reply_contact`, and exclusion of journal/audio/diagnostic fields —
       `test/presentation/feedback/feedback_metadata_test.dart`
 - [x] [P] Add preparation-sheet widget tests for all four categories, privacy
       copy, no contact validation with a non-email value, blank contact,
@@ -146,9 +149,11 @@ using the non-production project/environment.
       privacy copy, and arbitrary non-email contact text.
 - [B] Verify Android Wiredash flow contains no email or screenshot step,
       enter and submit synthetic free-text feedback, and inspect the
-      console/request payload for the safe metadata allowlist, including safe
-      app version, platform, broad app area, locale, and submission timestamp
-      where supplied by the SDK. Pending a credentialed runtime build.
+      console/request payload for the safe metadata allowlist, including the
+      explicit contact in the standard `userId` field and custom
+      `reply_contact`, plus safe app version, platform, broad app area, locale,
+      and submission timestamp where supplied by the SDK. Pending a
+      credentialed runtime build.
 - [x] Verify Android failure/unavailable behavior, retry behavior, typed
       message preservation, sanitized errors, cancellation, and app-lock
       coverage.
@@ -165,9 +170,10 @@ using the non-production project/environment.
       non-email contact text.
 - [B] Verify iOS Wiredash flow contains no email or screenshot step, submit
       synthetic free-text feedback, and inspect the console/request payload for
-      the safe metadata allowlist, including safe app version, platform, broad
-      app area, locale, and submission timestamp where supplied by the SDK.
-      Pending a credentialed runtime build.
+      the safe metadata allowlist, including the explicit contact in the
+      standard `userId` field and custom `reply_contact`, plus safe app version,
+      platform, broad app area, locale, and submission timestamp where supplied
+      by the SDK. Pending a credentialed runtime build.
 - [x] Verify iOS failure/retry behavior, cancellation, typed message
       preservation, sanitized errors, and app-lock coverage.
 - [B] Capture iOS validation evidence: test output, main-screen and

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -27,6 +28,7 @@ import 'package:wrait/data/transcription/transcription_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/pulse_ring.dart';
 import 'package:wrait/presentation/main/main_screen_test_keys.dart';
+import 'package:wrait/presentation/main/recording_state.dart';
 import 'package:wrait/presentation/theme/design_tokens.dart';
 
 import '../test/test_doubles/fake_monotonic_clock.dart';
@@ -54,6 +56,19 @@ void main() {
           ({required transcript, required language}) async =>
               const backend.CleanupSuccess(cleanedText: 'Cleaned transcript.');
 
+      final savedState = Completer<void>();
+      final savedStateSubscription = harness.container
+          .listen<RecordingControllerState>(mainRecordingControllerProvider, (
+            previous,
+            next,
+          ) {
+            if (next.recordingState is RecordingSaved &&
+                !savedState.isCompleted) {
+              savedState.complete();
+            }
+          });
+      addTearDown(savedStateSubscription.close);
+
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: harness.container,
@@ -73,11 +88,8 @@ void main() {
 
       harness.monotonicClock.advance(const Duration(seconds: 6));
       await tester.tap(find.byKey(mainActionButtonKey));
-      await _pumpUntilFound(
-        tester,
-        find.text('saved, tap to read'),
-        timeout: const Duration(milliseconds: 40),
-      );
+      await savedState.future.timeout(const Duration(seconds: 5));
+      await tester.pump();
 
       expect(find.text('saved, tap to read'), findsOneWidget);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wiredash/wiredash.dart';
 import 'package:wrait/presentation/feedback/feedback_metadata.dart';
 import 'package:wrait/presentation/feedback/feedback_model.dart';
 
@@ -65,5 +66,41 @@ void main() {
     );
 
     expect(metadata['platform'], 'unsupported');
+  });
+
+  test('sets the console contact field without validating plain text', () {
+    final metadata = applyFeedbackMetadata(
+      metadata: CustomizableWiredashMetaData(),
+      draft: const FeedbackDraft(
+        category: FeedbackCategory.idea,
+        replyContact: '  Signal: wrait-test  ',
+      ),
+      appArea: 'main',
+      locale: const Locale('en', 'US'),
+      platform: TargetPlatform.android,
+    );
+
+    expect(metadata.userEmail, 'Signal: wrait-test');
+    expect(metadata.userId, 'Signal: wrait-test');
+    expect(metadata.custom['reply_contact'], 'Signal: wrait-test');
+  });
+
+  test('clears the standard contact field when contact is blank', () {
+    final metadata = CustomizableWiredashMetaData()..userEmail = 'old value';
+
+    applyFeedbackMetadata(
+      metadata: metadata,
+      draft: const FeedbackDraft(
+        category: FeedbackCategory.praise,
+        replyContact: '   ',
+      ),
+      appArea: 'main',
+      locale: const Locale('en', 'US'),
+      platform: TargetPlatform.iOS,
+    );
+
+    expect(metadata.userEmail, isNull);
+    expect(metadata.userId, isNull);
+    expect(metadata.custom.containsKey('reply_contact'), isFalse);
   });
 }

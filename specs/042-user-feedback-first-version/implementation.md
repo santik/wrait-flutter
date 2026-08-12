@@ -93,6 +93,14 @@ device ID, route path, journal entry ID or text,
 transcript, audio path or bytes, export name, backend URL, proxy secret,
 screenshot, analytics event, or raw diagnostic data is attached.
 
+When contact is non-blank, the same trimmed value is sent in both custom
+`reply_contact` metadata and Wiredash's standard `userId` metadata field. The
+standard `userEmail` field is populated as well, but Wiredash 2.6.1 drops that
+field while constructing a submission when `EmailPrompt.hidden` is enabled, so
+`userId` is the reliable standard transport for this unrestricted plain-text
+value. It is not auto-collected or email-validated; it carries only the value
+the user explicitly entered.
+
 `Wiredash` is mounted below `AppLockGate` in the existing app-shell builder,
 so a foreground exit keeps an open feedback surface covered by the privacy
 lock. Wiredash does not participate in startup or bootstrap work.
@@ -137,6 +145,9 @@ and documentation gaps. The approved fixes are complete:
   cannot create duplicate preparation dialogs or race the in-memory retry
   draft.
 - Reply contact is trimmed only at metadata transport time.
+- Explicit contact is copied to Wiredash's standard `userId` field and custom
+  `reply_contact` (with `userEmail` populated defensively), so it survives the
+  hidden-email submission path without enabling email validation.
 - Debug and release deployment scripts validate project ID, secret, and
   environment format before building, without printing the secret.
 - Production and widget tests use the same top-anchored

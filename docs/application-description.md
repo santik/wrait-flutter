@@ -214,10 +214,15 @@ free-text message through Wiredash without leaving the app.
 Feedback is an external service boundary. The app disables Wiredash email and
 screenshot prompts, does not use Wiredash analytics, and sends only an
 explicitly allowlisted category, broad app area, platform, locale, and
-trimmed non-blank contact value. Journal entries, transcripts, audio, file
-paths, identifiers, screenshots, proxy secrets, and raw diagnostics are not
-attached automatically. The preparation form includes privacy guidance telling
-users not to include private journal content unless they choose to type it.
+trimmed non-blank contact value. When supplied, the contact is sent both as
+custom `reply_contact` metadata and in Wiredash's standard `userId` field so it
+survives the SDK's hidden-email submission path. The `userEmail` field is also
+populated defensively, but is dropped by Wiredash 2.6.1 when the email prompt is
+hidden. The contact is not auto-collected or email validated. Journal entries,
+transcripts, audio, file paths, identifiers,
+screenshots, proxy secrets, and raw diagnostics are not attached
+automatically. The preparation form includes privacy guidance telling users
+not to include private journal content unless they choose to type it.
 
 Wiredash credentials are build-time configuration values, not Wrait backend
 credentials. Missing values keep the app launchable and make feedback degrade
