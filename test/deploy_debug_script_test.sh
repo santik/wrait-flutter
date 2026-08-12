@@ -296,6 +296,28 @@ EOF
   chmod +x "$TMP_DIR/bin/adb" "$TMP_DIR/bin/flutter"
 }
 
+write_debug_config() {
+  local config_path="$1"
+  local proxy_secret="$2"
+  local wiredash_project_id="${3:-}"
+  local wiredash_secret="${4:-}"
+  local wiredash_environment="${5:-}"
+
+  mkdir -p "$(dirname "$config_path")"
+  {
+    printf 'PROXY_SECRET=%s\n' "$proxy_secret"
+    if [[ -n "$wiredash_project_id" ]]; then
+      printf 'WIREDASH_PROJECT_ID=%s\n' "$wiredash_project_id"
+    fi
+    if [[ -n "$wiredash_secret" ]]; then
+      printf 'WIREDASH_SECRET=%s\n' "$wiredash_secret"
+    fi
+    if [[ -n "$wiredash_environment" ]]; then
+      printf 'WIREDASH_ENVIRONMENT=%s\n' "$wiredash_environment"
+    fi
+  } >"$config_path"
+}
+
 run_script() {
   local scenario="$1"
   local initial_stay_awake_setting="${2:-0}"
@@ -305,6 +327,7 @@ run_script() {
   local debug_apk_path="$TMP_DIR/$scenario/app-debug.apk"
   local profile_apk_path="$TMP_DIR/$scenario/app-profile.apk"
   local state_dir="$TMP_DIR/$scenario/state"
+  local config_path="$TMP_DIR/$scenario/android/local.properties"
   local wiredash_project_id=""
   local wiredash_secret=""
   local wiredash_environment=""
@@ -336,6 +359,13 @@ run_script() {
       ;;
   esac
 
+  write_debug_config \
+    "$config_path" \
+    "test-proxy-secret" \
+    "$wiredash_project_id" \
+    "$wiredash_secret" \
+    "$wiredash_environment"
+
   if [[ "$scenario" == "build_no_apk" ]]; then
     mkdir -p "$(dirname "$debug_apk_path")"
     printf 'stale apk\n' >"$debug_apk_path"
@@ -351,13 +381,10 @@ run_script() {
       DEPLOY_TEST_ROOT="$ROOT_DIR" \
       DEPLOY_TEST_INITIAL_STAY_AWAKE_SETTING="$initial_stay_awake_setting" \
       DEPLOY_TEST_INITIAL_AUTOMATION_LOCKSCREEN_MODE_SETTING="$initial_automation_setting" \
-      PROXY_SECRET="test-proxy-secret" \
-      WIREDASH_PROJECT_ID="$wiredash_project_id" \
-      WIREDASH_SECRET="$wiredash_secret" \
-      WIREDASH_ENVIRONMENT="$wiredash_environment" \
       DEPLOY_TEST_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_TEST_PROFILE_APK_PATH="$profile_apk_path" \
       DEPLOY_TEST_STATE_DIR="$state_dir" \
+      DEPLOY_DEBUG_LOCAL_PROPERTIES_PATH="$config_path" \
       DEPLOY_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_PROFILE_APK_PATH="$profile_apk_path" \
       ./deploy_debug.sh
@@ -384,7 +411,10 @@ run_script_without_proxy_secret_expect_failure() {
   local debug_apk_path="$TMP_DIR/missing_proxy_secret/app-debug.apk"
   local profile_apk_path="$TMP_DIR/missing_proxy_secret/app-profile.apk"
   local state_dir="$TMP_DIR/missing_proxy_secret/state"
+  local config_path="$TMP_DIR/missing_proxy_secret/android/local.properties"
   : >"$log"
+  mkdir -p "$(dirname "$config_path")"
+  printf 'WIREDASH_PROJECT_ID=test-wiredash-project\n' >"$config_path"
 
   if (
     cd "$ROOT_DIR"
@@ -395,6 +425,7 @@ run_script_without_proxy_secret_expect_failure() {
       DEPLOY_TEST_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_TEST_PROFILE_APK_PATH="$profile_apk_path" \
       DEPLOY_TEST_STATE_DIR="$state_dir" \
+      DEPLOY_DEBUG_LOCAL_PROPERTIES_PATH="$config_path" \
       DEPLOY_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_PROFILE_APK_PATH="$profile_apk_path" \
       ./deploy_debug.sh
@@ -411,7 +442,9 @@ run_script_with_proxy_secret_expect_failure() {
   local debug_apk_path="$TMP_DIR/$scenario/app-debug.apk"
   local profile_apk_path="$TMP_DIR/$scenario/app-profile.apk"
   local state_dir="$TMP_DIR/$scenario/state"
+  local config_path="$TMP_DIR/$scenario/android/local.properties"
   : >"$log"
+  write_debug_config "$config_path" "$proxy_secret"
 
   if (
     cd "$ROOT_DIR"
@@ -419,10 +452,10 @@ run_script_with_proxy_secret_expect_failure() {
       DEPLOY_TEST_SCENARIO="one_phone" \
       DEPLOY_TEST_LOG="$log" \
       DEPLOY_TEST_ROOT="$ROOT_DIR" \
-      PROXY_SECRET="$proxy_secret" \
       DEPLOY_TEST_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_TEST_PROFILE_APK_PATH="$profile_apk_path" \
       DEPLOY_TEST_STATE_DIR="$state_dir" \
+      DEPLOY_DEBUG_LOCAL_PROPERTIES_PATH="$config_path" \
       DEPLOY_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_PROFILE_APK_PATH="$profile_apk_path" \
       ./deploy_debug.sh
@@ -447,7 +480,7 @@ assert_not_contains "$TMP_DIR/no_phone.log" "flutter build"
 assert_not_contains "$TMP_DIR/no_phone.log" "install"
 
 run_script_without_proxy_secret_expect_failure
-assert_contains "$TMP_DIR/missing_proxy_secret.out" "required environment variable PROXY_SECRET is not set"
+assert_contains "$TMP_DIR/missing_proxy_secret.out" "PROXY_SECRET is missing or blank"
 assert_not_contains "$TMP_DIR/missing_proxy_secret.log" "flutter build"
 assert_not_contains "$TMP_DIR/missing_proxy_secret.log" "install"
 

@@ -293,6 +293,8 @@ EXISTING_KEY=keep-me
 KEYSTORE_PATH=stale-path
 PROXY_SECRET=stale-secret
 WIREDASH_SECRET=stale-wiredash-secret
+WRAIT_RELEASE_KEYSTORE_PASSWORD=stale-release-keystore-password
+WRAIT_RELEASE_KEY_PASSWORD=stale-release-key-password
 EOF
 }
 
@@ -421,6 +423,18 @@ EOF
       rm -f "$source_path.bak"
       ;;
     invalid_keystore_password|invalid_key_password)
+      ;;
+    wrait_password_property)
+      sed -i.bak \
+        -e 's/^KEYSTORE_PASSWORD=.*/WRAIT_RELEASE_KEYSTORE_PASSWORD=release-keystore-password/' \
+        -e 's/^KEY_PASSWORD=.*/WRAIT_RELEASE_KEY_PASSWORD=release-key-password/' \
+        "$source_path"
+      rm -f "$source_path.bak"
+      ;;
+    same_file_config)
+      source_path="$target_path"
+      write_default_source_config "$source_path"
+      printf 'fake keystore\n' >"$scenario_dir/android/release-key.jks"
       ;;
     missing_keystore_file)
       rm -f "$scenario_dir/private-config/release-key.jks"
@@ -598,6 +612,18 @@ run_script_expect_success native_absent
 assert_contains "$TMP_DIR/native_absent.out" "Native Wrait app (com.wrait.app) was not installed before deployment."
 assert_contains "$TMP_DIR/native_absent.out" "Installed and launched com.wrait.flutter on PHONE123."
 
+run_script_expect_success wrait_password_property
+assert_contains "$TMP_DIR/wrait_password_property.out" "Synchronized release signing and runtime config into $TMP_DIR/wrait_password_property/android/local.properties."
+assert_contains "$TMP_DIR/wrait_password_property.log" "flutter build apk --release --dart-define=BACKEND_URL=https://release.example.test --dart-define=PROXY_SECRET=release-proxy-secret"
+assert_not_contains "$TMP_DIR/wrait_password_property/android/local.properties" "WRAIT_RELEASE_KEYSTORE_PASSWORD="
+assert_not_contains "$TMP_DIR/wrait_password_property/android/local.properties" "WRAIT_RELEASE_KEY_PASSWORD="
+
+run_script_expect_success same_file_config
+assert_contains "$TMP_DIR/same_file_config.out" "Using release signing and runtime config from $TMP_DIR/same_file_config/android/local.properties."
+assert_contains "$TMP_DIR/same_file_config.log" "flutter build apk --release --dart-define=BACKEND_URL=https://release.example.test --dart-define=PROXY_SECRET=release-proxy-secret"
+assert_file_contains_line "$TMP_DIR/same_file_config/android/local.properties" "KEYSTORE_PASSWORD=release-keystore-password"
+assert_file_contains_line "$TMP_DIR/same_file_config/android/local.properties" "KEY_PASSWORD=release-key-password"
+
 run_script_expect_success one_phone
 assert_contains "$TMP_DIR/one_phone.out" "Synchronized release signing and runtime config into $TMP_DIR/one_phone/android/local.properties."
 assert_contains "$TMP_DIR/one_phone.out" "Detected existing native Wrait app (com.wrait.app); it will be left installed."
@@ -634,6 +660,8 @@ assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "WIREDAS
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "KEYSTORE_PATH=stale-path"
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "KEYSTORE_PASSWORD="
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "KEY_PASSWORD="
+assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "WRAIT_RELEASE_KEYSTORE_PASSWORD="
+assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "WRAIT_RELEASE_KEY_PASSWORD="
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "PROXY_SECRET=stale-secret"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "WIREDASH_SECRET=release-wiredash-secret"
 

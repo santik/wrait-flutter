@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEBUG_LOCAL_PROPERTIES_PATH="${DEPLOY_DEBUG_LOCAL_PROPERTIES_PATH:-$ROOT_DIR/android/local.properties}"
 DEBUG_APK_PATH="${DEPLOY_DEBUG_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-debug.apk}"
 PROFILE_APK_PATH="${DEPLOY_PROFILE_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-profile.apk}"
 FLUTTER_PACKAGE="com.wrait.flutter.dev"
@@ -17,6 +18,10 @@ RUNTIME_PERMISSION_WATCHDOG_PID=""
 CLEANUP_PHONE_SERIAL=""
 ORIGINAL_STAY_AWAKE_SETTING=""
 ORIGINAL_AUTOMATION_LOCKSCREEN_MODE_SETTING=""
+RESOLVED_PROXY_SECRET=""
+RESOLVED_WIREDASH_PROJECT_ID=""
+RESOLVED_WIREDASH_SECRET=""
+RESOLVED_WIREDASH_ENVIRONMENT=""
 
 fail() {
   printf 'error: %s\n' "$*" >&2
@@ -29,12 +34,6 @@ warn() {
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
-}
-
-require_non_empty_env() {
-  local name="$1"
-  local value="${!name:-}"
-  [[ -n "$value" ]] || fail "required environment variable $name is not set"
 }
 
 validate_positive_integer() {
@@ -69,18 +68,102 @@ validate_wiredash_secret() {
 }
 
 validate_wiredash_config() {
-  local project_id="${WIREDASH_PROJECT_ID:-}"
-  local secret="${WIREDASH_SECRET:-}"
-  local environment="${WIREDASH_ENVIRONMENT:-}"
+  local project_id="$RESOLVED_WIREDASH_PROJECT_ID"
+  local secret="$RESOLVED_WIREDASH_SECRET"
+  local environment="$RESOLVED_WIREDASH_ENVIRONMENT"
 
   if [[ -n "$project_id" || -n "$secret" || -n "$environment" ]]; then
     [[ -n "$project_id" && -n "$secret" ]] || fail \
-      "WIREDASH_PROJECT_ID and WIREDASH_SECRET must be supplied together"
+      "WIREDASH_PROJECT_ID and WIREDASH_SECRET must be supplied together in $DEBUG_LOCAL_PROPERTIES_PATH"
     validate_wiredash_project_id "$project_id"
     validate_wiredash_secret "$secret"
     [[ "$environment" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || fail \
       "WIREDASH_ENVIRONMENT must be 1-64 characters using letters, numbers, dots, underscores, or hyphens"
   fi
+}
+
+trim_value() {
+  printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+read_property_from_file() {
+  local file_path="$1"
+  local property_name="$2"
+
+  awk -v key="$property_name" '
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    {
+      line = $0
+      separator_index = index(line, "=")
+      if (separator_index == 0) {
+        next
+      }
+
+      current_key = substr(line, 1, separator_index - 1)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", current_key)
+      if (current_key == key) {
+        print substr(line, separator_index + 1)
+        found = 1
+        exit
+      }
+    }
+    END {
+      if (!found) {
+        exit 1
+      }
+    }
+  ' "$file_path"
+}
+
+require_readable_file() {
+  local file_path="$1"
+  local description="$2"
+
+  [[ -f "$file_path" ]] || fail "$description is missing: $file_path"
+  [[ -r "$file_path" ]] || fail "$description is not readable: $file_path"
+}
+
+require_non_blank_property() {
+  local file_path="$1"
+  local property_name="$2"
+  local value
+  local trimmed
+
+  value="$(read_property_from_file "$file_path" "$property_name" 2>/dev/null || true)"
+  value="${value%$'\r'}"
+  trimmed="$(trim_value "$value")"
+  [[ -n "$trimmed" ]] || fail "$property_name is missing or blank in $file_path"
+  printf '%s\n' "$trimmed"
+}
+
+optional_trimmed_property() {
+  local file_path="$1"
+  local property_name="$2"
+  local value
+
+  value="$(read_property_from_file "$file_path" "$property_name" 2>/dev/null || true)"
+  value="${value%$'\r'}"
+  trim_value "$value"
+}
+
+load_and_validate_debug_config() {
+  require_readable_file "$DEBUG_LOCAL_PROPERTIES_PATH" "debug config"
+
+  RESOLVED_PROXY_SECRET="$(
+    require_non_blank_property "$DEBUG_LOCAL_PROPERTIES_PATH" "PROXY_SECRET"
+  )"
+  RESOLVED_WIREDASH_PROJECT_ID="$(
+    optional_trimmed_property "$DEBUG_LOCAL_PROPERTIES_PATH" "WIREDASH_PROJECT_ID"
+  )"
+  RESOLVED_WIREDASH_SECRET="$(
+    optional_trimmed_property "$DEBUG_LOCAL_PROPERTIES_PATH" "WIREDASH_SECRET"
+  )"
+  RESOLVED_WIREDASH_ENVIRONMENT="$(
+    optional_trimmed_property "$DEBUG_LOCAL_PROPERTIES_PATH" "WIREDASH_ENVIRONMENT"
+  )"
+
+  validate_proxy_secret "$RESOLVED_PROXY_SECRET"
+  validate_wiredash_config
 }
 
 configure_java() {
@@ -503,9 +586,7 @@ main() {
   configure_java
   require_command adb
   require_command flutter
-  require_non_empty_env PROXY_SECRET
-  validate_proxy_secret "$PROXY_SECRET"
-  validate_wiredash_config
+  load_and_validate_debug_config
   validate_positive_integer "DEPLOY_RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS" \
     "$RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS"
 
@@ -515,13 +596,13 @@ main() {
   trap cleanup_on_exit EXIT
   local native_wrait_was_installed=false
   local flutter_build_args=(
-    "--dart-define=PROXY_SECRET=$PROXY_SECRET"
+    "--dart-define=PROXY_SECRET=$RESOLVED_PROXY_SECRET"
   )
-  if [[ -n "${WIREDASH_PROJECT_ID:-}" ]]; then
+  if [[ -n "$RESOLVED_WIREDASH_PROJECT_ID" ]]; then
     flutter_build_args+=(
-      "--dart-define=WIREDASH_PROJECT_ID=$WIREDASH_PROJECT_ID"
-      "--dart-define=WIREDASH_SECRET=$WIREDASH_SECRET"
-      "--dart-define=WIREDASH_ENVIRONMENT=$WIREDASH_ENVIRONMENT"
+      "--dart-define=WIREDASH_PROJECT_ID=$RESOLVED_WIREDASH_PROJECT_ID"
+      "--dart-define=WIREDASH_SECRET=$RESOLVED_WIREDASH_SECRET"
+      "--dart-define=WIREDASH_ENVIRONMENT=$RESOLVED_WIREDASH_ENVIRONMENT"
     )
   fi
 

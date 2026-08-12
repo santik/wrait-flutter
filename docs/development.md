@@ -9,14 +9,22 @@ the top-level README can stay public-facing.
 Connect and authorize one physical Android phone, then run:
 
 ```sh
-PROXY_SECRET=SECRET_WRAIT_VALUE ./deploy_debug.sh
+./deploy_debug.sh
+```
+
+The script reads runtime config from the ignored current Flutter file
+`android/local.properties`. At minimum, that file must contain:
+
+```properties
+PROXY_SECRET=SECRET_WRAIT_VALUE
 ```
 
 The script:
 
 - finds the single connected Android phone with `adb devices`
-- requires a `PROXY_SECRET` with no whitespace and at least 8 characters so the
-  installed app can authenticate launch registration and recording requests
+- requires `PROXY_SECRET` in `android/local.properties` with no whitespace and
+  at least 8 characters so the installed app can authenticate launch
+  registration and recording requests
 - supports starting from a locked phone with the screen off
 - wakes the phone before the real-device test phase and before the final
   verified launch
@@ -70,14 +78,16 @@ Prerequisites:
 
 - exactly one connected physical Android phone
 - release config in the ignored current Flutter file `android/local.properties`
-- signing password environment variables:
-  - `WRAIT_RELEASE_KEYSTORE_PASSWORD`
-  - `WRAIT_RELEASE_KEY_PASSWORD`
+- signing passwords in `android/local.properties` as `KEYSTORE_PASSWORD` and
+  `KEY_PASSWORD`, or as `WRAIT_RELEASE_KEYSTORE_PASSWORD` and
+  `WRAIT_RELEASE_KEY_PASSWORD`; the same `WRAIT_RELEASE_*` names can also be
+  supplied transiently as environment variables
 
-The release script copies only non-secret release configuration into
-`android/local.properties`, validates signing inputs before building, builds
-the release APK, installs it, launches it, and preserves any existing debug app
-or native Android app install.
+The release script reads signing and runtime configuration from
+`android/local.properties`, forwards signing passwords only as in-memory build
+environment values, validates signing inputs before building, builds the
+release APK, installs it, launches it, and preserves any existing debug app or
+native Android app install.
 
 ## Manual Debug APK Build
 

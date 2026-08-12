@@ -4,11 +4,10 @@ set -euo pipefail
 # Usage: ./deploy_release.sh
 # Prerequisites:
 # - exactly one connected physical Android phone
-# - current Flutter Android config at android/local.properties
-# - writable Flutter app-local target config at android/local.properties
-# - release-signing keys and runtime values present in the source config
-# - release-signing passwords stay in-memory for build/keytool validation and
-#   are not synchronized into android/local.properties
+# - release-signing keys and runtime values present in android/local.properties
+# - release-signing passwords present in android/local.properties or supplied
+#   through transient WRAIT_RELEASE_* environment variables
+# - release-signing passwords stay in-memory for build/keytool validation
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_APK_PATH="${DEPLOY_RELEASE_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-release.apk}"
@@ -33,6 +32,7 @@ RESOLVED_RECORDING_HARD_CAP_MS=""
 RESOLVED_WIREDASH_PROJECT_ID=""
 RESOLVED_WIREDASH_SECRET=""
 RESOLVED_WIREDASH_ENVIRONMENT=""
+SYNCED_TARGET_LOCAL_PROPERTIES=false
 
 fail() {
   printf 'error: %s\n' "$*" >&2
@@ -371,10 +371,60 @@ require_non_blank_property() {
   printf '%s\n' "$trimmed"
 }
 
+optional_trimmed_property() {
+  local file_path="$1"
+  local property_name="$2"
+  local value
+
+  value="$(read_property_from_file "$file_path" "$property_name" 2>/dev/null || true)"
+  value="${value%$'\r'}"
+  trim_value "$value"
+}
+
+require_first_non_blank_property() {
+  local file_path="$1"
+  shift
+  local property_name
+  local value
+
+  for property_name in "$@"; do
+    value="$(optional_trimmed_property "$file_path" "$property_name")"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+  done
+
+  fail "$* is missing or blank in $file_path"
+}
+
+absolute_path_for_compare() {
+  local path="$1"
+  local dir
+  local base
+
+  dir="$(dirname "$path")"
+  base="$(basename "$path")"
+  if [[ -d "$dir" ]]; then
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
+local_properties_paths_match() {
+  [[ "$(absolute_path_for_compare "$SOURCE_LOCAL_PROPERTIES_PATH")" == \
+    "$(absolute_path_for_compare "$TARGET_LOCAL_PROPERTIES_PATH")" ]]
+}
+
 sync_target_local_properties() {
   local target_dir
   local filtered_tmpfile
   local final_tmpfile
+
+  if local_properties_paths_match; then
+    return 0
+  fi
 
   target_dir="$(dirname "$TARGET_LOCAL_PROPERTIES_PATH")"
   [[ -d "$target_dir" ]] || fail "Flutter app-local config directory is missing: $target_dir"
@@ -396,6 +446,8 @@ sync_target_local_properties() {
         managed["WIREDASH_SECRET"] = 1
         managed["KEYSTORE_PASSWORD"] = 1
         managed["KEY_PASSWORD"] = 1
+        managed["WRAIT_RELEASE_KEYSTORE_PASSWORD"] = 1
+        managed["WRAIT_RELEASE_KEY_PASSWORD"] = 1
       }
       {
         line = $0
@@ -428,6 +480,7 @@ sync_target_local_properties() {
 
   mv "$final_tmpfile" "$TARGET_LOCAL_PROPERTIES_PATH"
   rm -f "$filtered_tmpfile"
+  SYNCED_TARGET_LOCAL_PROPERTIES=true
 }
 
 validate_release_keystore() {
@@ -443,7 +496,7 @@ validate_release_keystore() {
     >/dev/null 2>&1; then
     rm -f "$csr_tmpfile"
     fail \
-      "release keystore validation failed; verify KEYSTORE_PATH, KEY_ALIAS, and KEYSTORE_PASSWORD in $SOURCE_LOCAL_PROPERTIES_PATH"
+      "release keystore validation failed; verify KEYSTORE_PATH, KEY_ALIAS, and KEYSTORE_PASSWORD or WRAIT_RELEASE_KEYSTORE_PASSWORD in $SOURCE_LOCAL_PROPERTIES_PATH"
   fi
 
   if ! keytool \
@@ -456,7 +509,7 @@ validate_release_keystore() {
     >/dev/null 2>&1; then
     rm -f "$csr_tmpfile"
     fail \
-      "release key validation failed; verify KEY_ALIAS and KEY_PASSWORD in $SOURCE_LOCAL_PROPERTIES_PATH"
+      "release key validation failed; verify KEY_ALIAS and KEY_PASSWORD or WRAIT_RELEASE_KEY_PASSWORD in $SOURCE_LOCAL_PROPERTIES_PATH"
   fi
 
   rm -f "$csr_tmpfile"
@@ -473,7 +526,10 @@ load_and_validate_private_config() {
   RESOLVED_KEYSTORE_PASSWORD="${WRAIT_RELEASE_KEYSTORE_PASSWORD:-}"
   if [[ -z "$RESOLVED_KEYSTORE_PASSWORD" ]]; then
     RESOLVED_KEYSTORE_PASSWORD="$(
-      require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEYSTORE_PASSWORD"
+      require_first_non_blank_property \
+        "$SOURCE_LOCAL_PROPERTIES_PATH" \
+        "KEYSTORE_PASSWORD" \
+        "WRAIT_RELEASE_KEYSTORE_PASSWORD"
     )"
   fi
   RESOLVED_KEY_ALIAS="$(
@@ -482,7 +538,10 @@ load_and_validate_private_config() {
   RESOLVED_KEY_PASSWORD="${WRAIT_RELEASE_KEY_PASSWORD:-}"
   if [[ -z "$RESOLVED_KEY_PASSWORD" ]]; then
     RESOLVED_KEY_PASSWORD="$(
-      require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEY_PASSWORD"
+      require_first_non_blank_property \
+        "$SOURCE_LOCAL_PROPERTIES_PATH" \
+        "KEY_PASSWORD" \
+        "WRAIT_RELEASE_KEY_PASSWORD"
     )"
   fi
   RESOLVED_BACKEND_URL="$(
@@ -544,7 +603,11 @@ main() {
 
   phone_serial="$(find_connected_phone)"
 
-  printf 'Synchronized release signing and runtime config into %s.\n' "$TARGET_LOCAL_PROPERTIES_PATH"
+  if [[ "$SYNCED_TARGET_LOCAL_PROPERTIES" == true ]]; then
+    printf 'Synchronized release signing and runtime config into %s.\n' "$TARGET_LOCAL_PROPERTIES_PATH"
+  else
+    printf 'Using release signing and runtime config from %s.\n' "$SOURCE_LOCAL_PROPERTIES_PATH"
+  fi
   printf 'Building Flutter release APK...\n'
   prepare_apk_output "$RELEASE_APK_PATH"
   env \
