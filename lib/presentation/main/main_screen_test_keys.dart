@@ -5,3 +5,4 @@ import 'package:flutter/foundation.dart';
 const mainActionButtonKey = ValueKey<String>('actionButton');
 const mainActionButtonLabelKey = ValueKey<String>('actionButtonLabel');
 const mainStatusLineSlotKey = ValueKey<String>('statusLineSlot');
+const mainFeedbackButtonKey = ValueKey<String>('mainFeedbackButton');

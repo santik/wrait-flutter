@@ -2,19 +2,32 @@ class AppConfig {
   static const String backendUrlDefine = 'BACKEND_URL';
   static const String proxySecretDefine = 'PROXY_SECRET';
   static const String recordingHardCapMsDefine = 'RECORDING_HARD_CAP_MS';
+  static const String wiredashProjectIdDefine = 'WIREDASH_PROJECT_ID';
+  static const String wiredashSecretDefine = 'WIREDASH_SECRET';
+  static const String wiredashEnvironmentDefine = 'WIREDASH_ENVIRONMENT';
 
   static const String defaultBackendUrl = 'https://wrait-backend.vercel.app';
   static const String defaultRecordingHardCapMs = '120000';
+  static const String defaultWiredashEnvironment = 'dev';
 
   const AppConfig({
     required this.backendUrl,
     required this.proxySecret,
     required this.recordingHardCapMs,
+    this.wiredashProjectId = '',
+    this.wiredashSecret = '',
+    this.wiredashEnvironment = defaultWiredashEnvironment,
   });
 
   final String backendUrl;
   final String proxySecret;
   final int recordingHardCapMs;
+  final String wiredashProjectId;
+  final String wiredashSecret;
+  final String wiredashEnvironment;
+
+  bool get wiredashConfigured =>
+      wiredashProjectId.trim().isNotEmpty && wiredashSecret.trim().isNotEmpty;
 
   Uri get backendUri => Uri.parse(backendUrl);
 
@@ -32,6 +45,18 @@ class AppConfig {
         recordingHardCapMsDefine,
         defaultValue: defaultRecordingHardCapMs,
       ),
+      wiredashProjectId: const String.fromEnvironment(
+        wiredashProjectIdDefine,
+        defaultValue: '',
+      ),
+      wiredashSecret: const String.fromEnvironment(
+        wiredashSecretDefine,
+        defaultValue: '',
+      ),
+      wiredashEnvironment: const String.fromEnvironment(
+        wiredashEnvironmentDefine,
+        defaultValue: defaultWiredashEnvironment,
+      ),
     );
   }
 
@@ -39,11 +64,18 @@ class AppConfig {
     String? backendUrl,
     String? proxySecret,
     String? recordingHardCapMs,
+    String? wiredashProjectId,
+    String? wiredashSecret,
+    String? wiredashEnvironment,
   }) {
     final resolvedBackendUrl = (backendUrl ?? defaultBackendUrl).trim();
     final resolvedProxySecret = (proxySecret ?? '').trim();
     final resolvedHardCapRaw = (recordingHardCapMs ?? defaultRecordingHardCapMs)
         .trim();
+    final resolvedWiredashProjectId = (wiredashProjectId ?? '').trim();
+    final resolvedWiredashSecret = (wiredashSecret ?? '').trim();
+    final resolvedWiredashEnvironment =
+        (wiredashEnvironment ?? defaultWiredashEnvironment).trim();
 
     final parsedBackendUri = Uri.tryParse(resolvedBackendUrl);
     if (parsedBackendUri == null ||
@@ -65,6 +97,11 @@ class AppConfig {
       backendUrl: parsedBackendUri.toString(),
       proxySecret: resolvedProxySecret,
       recordingHardCapMs: parsedHardCap,
+      wiredashProjectId: resolvedWiredashProjectId,
+      wiredashSecret: resolvedWiredashSecret,
+      wiredashEnvironment: resolvedWiredashEnvironment.isEmpty
+          ? defaultWiredashEnvironment
+          : resolvedWiredashEnvironment,
     );
   }
 }

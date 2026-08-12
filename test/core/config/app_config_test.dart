@@ -12,6 +12,10 @@ void main() {
         config.recordingHardCapMs,
         int.parse(AppConfig.defaultRecordingHardCapMs),
       );
+      expect(config.wiredashProjectId, isEmpty);
+      expect(config.wiredashSecret, isEmpty);
+      expect(config.wiredashEnvironment, AppConfig.defaultWiredashEnvironment);
+      expect(config.wiredashConfigured, isFalse);
     });
 
     test('applies explicit override values', () {
@@ -19,12 +23,27 @@ void main() {
         backendUrl: 'https://example.com/api',
         proxySecret: 'proxy-secret',
         recordingHardCapMs: '60000',
+        wiredashProjectId: 'project-id',
+        wiredashSecret: 'sdk-secret',
+        wiredashEnvironment: 'staging',
       );
 
       expect(config.backendUrl, 'https://example.com/api');
       expect(config.backendUri.host, 'example.com');
       expect(config.proxySecret, 'proxy-secret');
       expect(config.recordingHardCapMs, 60000);
+      expect(config.wiredashProjectId, 'project-id');
+      expect(config.wiredashSecret, 'sdk-secret');
+      expect(config.wiredashEnvironment, 'staging');
+      expect(config.wiredashConfigured, isTrue);
+    });
+
+    test('treats partial Wiredash configuration as unavailable', () {
+      final projectOnly = AppConfig.fromValues(wiredashProjectId: 'project');
+      final secretOnly = AppConfig.fromValues(wiredashSecret: 'secret');
+
+      expect(projectOnly.wiredashConfigured, isFalse);
+      expect(secretOnly.wiredashConfigured, isFalse);
     });
 
     test('rejects a non-positive recording hard cap', () {

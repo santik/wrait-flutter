@@ -204,6 +204,27 @@ Current platform limitation to keep in mind:
   during `simctl recordVideo`; stronger evidence for that path still belongs to
   future physical-device validation.
 
+## Feedback and privacy
+
+The main screen includes one top-right feedback button for the first-version
+user feedback flow. Users choose `Bug`, `Idea`, `Confusing`, or `Praise`, may
+provide unrestricted plain-text reply contact information, and then submit a
+free-text message through Wiredash without leaving the app.
+
+Feedback is an external service boundary. The app disables Wiredash email and
+screenshot prompts, does not use Wiredash analytics, and sends only an
+explicitly allowlisted category, broad app area, platform, locale, and
+trimmed non-blank contact value. Journal entries, transcripts, audio, file
+paths, identifiers, screenshots, proxy secrets, and raw diagnostics are not
+attached automatically. The preparation form includes privacy guidance telling
+users not to include private journal content unless they choose to type it.
+
+Wiredash credentials are build-time configuration values, not Wrait backend
+credentials. Missing values keep the app launchable and make feedback degrade
+to a sanitized unavailable state. The integration is pinned to Wiredash
+`2.6.1`; future SDK upgrades require dependency, analyzer, and Android/iOS
+integration validation.
+
 ## Important product themes
 
 - Voice-first capture
@@ -246,8 +267,8 @@ Current runtime behavior on top of that generated client:
 - proxy-authenticated debug deployments require `PROXY_SECRET` to be present so
   the app can send the expected `X-Proxy-Secret` request header during launch
   registration and later backend calls
-- release-signed Android deployments use `./deploy_release.sh`, read canonical
-  private config from `wrait-android/local.properties`, and keep signing
+- release-signed Android deployments use `./deploy_release.sh`, read the
+  current private config from `android/local.properties`, and keep signing
   passwords transient rather than persisting them into
   `android/local.properties`
 - production Android backend connectivity depends on

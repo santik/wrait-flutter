@@ -99,7 +99,7 @@ void main() {
       const RecordingErrorState(RecordingError.apiFailed):
           'something went wrong',
       const RecordingDeleted(2): 'deleted',
-      const RecordingUploading(): 'uploading...',
+      const RecordingUploading(): 'processing...',
       const RecordingProcessing(): 'cleaning up...',
     };
 

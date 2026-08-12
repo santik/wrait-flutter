@@ -69,7 +69,7 @@ Android build for the stable package identity `com.wrait.flutter`.
 Prerequisites:
 
 - exactly one connected physical Android phone
-- release config in `wrait-android/local.properties`
+- release config in the ignored current Flutter file `android/local.properties`
 - signing password environment variables:
   - `WRAIT_RELEASE_KEYSTORE_PASSWORD`
   - `WRAIT_RELEASE_KEY_PASSWORD`

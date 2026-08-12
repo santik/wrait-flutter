@@ -66,7 +66,7 @@ case "${1:-}" in
         printf 'adb failed\n' >&2
         exit 1
         ;;
-      one_phone|one_phone_custom_state|locked_phone|keyguard_dismiss_refused|wake_failure|native_absent|native_removed_after_install|test_failure|build_no_apk|zero_size_apk|launch_timeout)
+      one_phone|one_phone_custom_state|locked_phone|keyguard_dismiss_refused|wake_failure|native_absent|native_removed_after_install|test_failure|build_no_apk|zero_size_apk|launch_timeout|wiredash_configured|partial_wiredash_config)
         printf 'PHONE123\tdevice\n'
         ;;
       *)
@@ -305,7 +305,36 @@ run_script() {
   local debug_apk_path="$TMP_DIR/$scenario/app-debug.apk"
   local profile_apk_path="$TMP_DIR/$scenario/app-profile.apk"
   local state_dir="$TMP_DIR/$scenario/state"
+  local wiredash_project_id=""
+  local wiredash_secret=""
+  local wiredash_environment=""
   : >"$log"
+
+  case "$scenario" in
+    wiredash_configured)
+      wiredash_project_id="test-wiredash-project"
+      wiredash_secret="test-wiredash-secret"
+      wiredash_environment="staging"
+      ;;
+    partial_wiredash_config)
+      wiredash_project_id="test-wiredash-project"
+      ;;
+    invalid_wiredash_project)
+      wiredash_project_id=".."
+      wiredash_secret="test-wiredash-secret"
+      wiredash_environment="staging"
+      ;;
+    invalid_wiredash_secret)
+      wiredash_project_id="test-wiredash-project"
+      wiredash_secret="short"
+      wiredash_environment="staging"
+      ;;
+    invalid_wiredash_environment)
+      wiredash_project_id="test-wiredash-project"
+      wiredash_secret="test-wiredash-secret"
+      wiredash_environment=".."
+      ;;
+  esac
 
   if [[ "$scenario" == "build_no_apk" ]]; then
     mkdir -p "$(dirname "$debug_apk_path")"
@@ -323,6 +352,9 @@ run_script() {
       DEPLOY_TEST_INITIAL_STAY_AWAKE_SETTING="$initial_stay_awake_setting" \
       DEPLOY_TEST_INITIAL_AUTOMATION_LOCKSCREEN_MODE_SETTING="$initial_automation_setting" \
       PROXY_SECRET="test-proxy-secret" \
+      WIREDASH_PROJECT_ID="$wiredash_project_id" \
+      WIREDASH_SECRET="$wiredash_secret" \
+      WIREDASH_ENVIRONMENT="$wiredash_environment" \
       DEPLOY_TEST_DEBUG_APK_PATH="$debug_apk_path" \
       DEPLOY_TEST_PROFILE_APK_PATH="$profile_apk_path" \
       DEPLOY_TEST_STATE_DIR="$state_dir" \
@@ -426,6 +458,33 @@ assert_not_contains "$TMP_DIR/short_proxy_secret.log" "flutter build"
 run_script_with_proxy_secret_expect_failure whitespace_proxy_secret "  secret value  "
 assert_contains "$TMP_DIR/whitespace_proxy_secret.out" "PROXY_SECRET must not contain whitespace"
 assert_not_contains "$TMP_DIR/whitespace_proxy_secret.log" "flutter build"
+
+run_script_expect_failure partial_wiredash_config
+assert_contains "$TMP_DIR/partial_wiredash_config.out" \
+  "WIREDASH_PROJECT_ID and WIREDASH_SECRET must be supplied together"
+assert_not_contains "$TMP_DIR/partial_wiredash_config.log" "flutter build"
+
+run_script_expect_failure invalid_wiredash_project
+assert_contains "$TMP_DIR/invalid_wiredash_project.out" \
+  "WIREDASH_PROJECT_ID must be 3-128 characters"
+assert_not_contains "$TMP_DIR/invalid_wiredash_project.log" "flutter build"
+
+run_script_expect_failure invalid_wiredash_secret
+assert_contains "$TMP_DIR/invalid_wiredash_secret.out" \
+  "WIREDASH_SECRET must be at least 8 characters long"
+assert_not_contains "$TMP_DIR/invalid_wiredash_secret.log" "flutter build"
+
+run_script_expect_failure invalid_wiredash_environment
+assert_contains "$TMP_DIR/invalid_wiredash_environment.out" \
+  "WIREDASH_ENVIRONMENT must be 1-64 characters"
+assert_not_contains "$TMP_DIR/invalid_wiredash_environment.log" "flutter build"
+
+run_script_expect_success wiredash_configured
+assert_contains "$TMP_DIR/wiredash_configured.log" \
+  "flutter build apk --debug --dart-define=PROXY_SECRET=test-proxy-secret --dart-define=WIREDASH_PROJECT_ID=test-wiredash-project --dart-define=WIREDASH_SECRET=test-wiredash-secret --dart-define=WIREDASH_ENVIRONMENT=staging"
+assert_contains "$TMP_DIR/wiredash_configured.log" \
+  "flutter build apk --profile --dart-define=PROXY_SECRET=test-proxy-secret --dart-define=WIREDASH_PROJECT_ID=test-wiredash-project --dart-define=WIREDASH_SECRET=test-wiredash-secret --dart-define=WIREDASH_ENVIRONMENT=staging"
+assert_not_contains "$TMP_DIR/wiredash_configured.out" "test-wiredash-secret"
 
 run_script_expect_failure adb_failure
 assert_contains "$TMP_DIR/adb_failure.out" "adb devices failed"

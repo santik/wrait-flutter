@@ -13,6 +13,8 @@ import '../../data/audio/audio_recording_providers.dart';
 import '../../data/display/display_awake_service.dart';
 import '../../data/preferences/preferences_providers.dart';
 import '../app_lock/app_lock_controller.dart';
+import '../feedback/feedback_providers.dart';
+import '../feedback/feedback_service.dart';
 import '../theme/design_tokens.dart';
 import 'button_area.dart';
 import 'main_recording_controller.dart';
@@ -46,6 +48,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   double? _measuredPulseDiameter;
   Size? _lastPulseViewportSize;
   EdgeInsets? _lastPulseViewPadding;
+  bool _feedbackInFlight = false;
 
   @override
   void initState() {
@@ -110,6 +113,42 @@ class _MainScreenState extends ConsumerState<MainScreen>
     }
   }
 
+  Future<void> _openFeedback() async {
+    if (_feedbackInFlight) {
+      return;
+    }
+
+    setState(() {
+      _feedbackInFlight = true;
+    });
+
+    final result = await ref
+        .read(feedbackServiceProvider)
+        .open(context, appArea: 'main');
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _feedbackInFlight = false;
+    });
+
+    final message = switch (result.status) {
+      FeedbackLaunchStatus.submitted => 'feedback sent',
+      FeedbackLaunchStatus.unavailable => 'feedback is unavailable right now',
+      FeedbackLaunchStatus.failed => 'feedback could not be sent. try again',
+      FeedbackLaunchStatus.cancelled => null,
+    };
+    if (message == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<RecordingControllerState>(mainRecordingControllerProvider, (
@@ -162,135 +201,165 @@ class _MainScreenState extends ConsumerState<MainScreen>
           ),
         ),
         child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final mediaQuery = MediaQuery.of(context);
-              _schedulePulseMeasurement(
-                viewportSize: mediaQuery.size,
-                viewPadding: mediaQuery.padding,
-              );
-              final pulseDiameter =
-                  _measuredPulseDiameter ??
-                  _fallbackPulseDiameter(constraints.biggest);
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final mediaQuery = MediaQuery.of(context);
+                  _schedulePulseMeasurement(
+                    viewportSize: mediaQuery.size,
+                    viewPadding: mediaQuery.padding,
+                  );
+                  final pulseDiameter =
+                      _measuredPulseDiameter ??
+                      _fallbackPulseDiameter(constraints.biggest);
 
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Center(
+                  return SingleChildScrollView(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 520),
-                      child: Padding(
-                        padding: WraitDesignTokens.screenPadding,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              key: const ValueKey('quotaLineSlot'),
-                              height: WraitQuotaLineTokens.reservedHeight,
-                              child: Center(
-                                child: quota == null
-                                    ? const SizedBox.shrink()
-                                    : Semantics(
-                                        container: true,
-                                        label:
-                                            'Recording quota ${quota.limit} total and ${quota.remaining} left.',
-                                        child: Text(
-                                          '${quota.limit} total / ${quota.remaining} left',
-                                          key: const ValueKey('quotaLineText'),
-                                          style: theme.textTheme.labelLarge
-                                              ?.copyWith(
-                                                color: colorScheme.secondary,
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 520),
+                          child: Padding(
+                            padding: WraitDesignTokens.screenPadding,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  key: const ValueKey('quotaLineSlot'),
+                                  height: WraitQuotaLineTokens.reservedHeight,
+                                  child: Center(
+                                    child: quota == null
+                                        ? const SizedBox.shrink()
+                                        : Semantics(
+                                            container: true,
+                                            label:
+                                                'Recording quota ${quota.limit} total and ${quota.remaining} left.',
+                                            child: Text(
+                                              '${quota.limit} total / ${quota.remaining} left',
+                                              key: const ValueKey(
+                                                'quotaLineText',
                                               ),
-                                          textAlign: TextAlign.center,
+                                              style: theme.textTheme.labelLarge
+                                                  ?.copyWith(
+                                                    color:
+                                                        colorScheme.secondary,
+                                                  ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: WraitQuotaLineTokens.gapBelow,
+                                ),
+                                ValueListenableBuilder<double?>(
+                                  valueListenable: _countdownProgress,
+                                  builder: (context, countdownProgress, _) {
+                                    return ButtonArea(
+                                      key: _buttonAreaKey,
+                                      recordingState:
+                                          controllerState.recordingState,
+                                      shakeErrorKey:
+                                          controllerState.shakeErrorKey,
+                                      buttonLabel: status.buttonLabel,
+                                      countdownProgress: countdownProgress,
+                                      pulseDiameter: pulseDiameter,
+                                      onPressed: () {
+                                        ref
+                                            .read(
+                                              mainRecordingControllerProvider
+                                                  .notifier,
+                                            )
+                                            .onMainButtonTapped();
+                                      },
+                                    );
+                                  },
+                                ),
+                                const SizedBox(
+                                  height: WraitStatusLineTokens.gapAbove,
+                                ),
+                                SizedBox(
+                                  key: mainStatusLineSlotKey,
+                                  height: WraitStatusLineTokens.reservedHeight,
+                                  child: Center(
+                                    child: AnimatedSwitcher(
+                                      duration: WraitAnimationTokens.fade,
+                                      child: _StatusLine(
+                                        key: ValueKey(
+                                          '${status.statusText}-${status.action}-${status.savedEntryId}-$_statusLineGeneration',
+                                        ),
+                                        presentation: status,
+                                        onTap: () =>
+                                            _handleStatusAction(status),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: WraitStatsLineTokens.gapAbove,
+                                ),
+                                SizedBox(
+                                  key: const ValueKey('statsLineSlot'),
+                                  height: WraitStatsLineTokens.reservedHeight,
+                                  child: Center(
+                                    child: Semantics(
+                                      button: true,
+                                      label:
+                                          'Entry stats ${stats.displayText}. Opens the entry list.',
+                                      child: InkWell(
+                                        key: const ValueKey('statsLineButton'),
+                                        borderRadius: BorderRadius.circular(
+                                          WraitRadiusTokens.card,
+                                        ),
+                                        onTap: () => context.go('/entries'),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: WraitSpacingTokens.md,
+                                            vertical: WraitSpacingTokens.sm,
+                                          ),
+                                          child: Text(
+                                            stats.displayText,
+                                            key: const ValueKey(
+                                              'statsLineText',
+                                            ),
+                                            style: theme.textTheme.labelLarge,
+                                            textAlign: TextAlign.center,
+                                          ),
                                         ),
                                       ),
-                              ),
-                            ),
-                            const SizedBox(
-                              height: WraitQuotaLineTokens.gapBelow,
-                            ),
-                            ValueListenableBuilder<double?>(
-                              valueListenable: _countdownProgress,
-                              builder: (context, countdownProgress, _) {
-                                return ButtonArea(
-                                  key: _buttonAreaKey,
-                                  recordingState:
-                                      controllerState.recordingState,
-                                  shakeErrorKey: controllerState.shakeErrorKey,
-                                  buttonLabel: status.buttonLabel,
-                                  countdownProgress: countdownProgress,
-                                  pulseDiameter: pulseDiameter,
-                                  onPressed: () {
-                                    ref
-                                        .read(
-                                          mainRecordingControllerProvider
-                                              .notifier,
-                                        )
-                                        .onMainButtonTapped();
-                                  },
-                                );
-                              },
-                            ),
-                            const SizedBox(
-                              height: WraitStatusLineTokens.gapAbove,
-                            ),
-                            SizedBox(
-                              key: mainStatusLineSlotKey,
-                              height: WraitStatusLineTokens.reservedHeight,
-                              child: Center(
-                                child: AnimatedSwitcher(
-                                  duration: WraitAnimationTokens.fade,
-                                  child: _StatusLine(
-                                    key: ValueKey(
-                                      '${status.statusText}-${status.action}-${status.savedEntryId}-$_statusLineGeneration',
-                                    ),
-                                    presentation: status,
-                                    onTap: () => _handleStatusAction(status),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(
-                              height: WraitStatsLineTokens.gapAbove,
-                            ),
-                            SizedBox(
-                              key: const ValueKey('statsLineSlot'),
-                              height: WraitStatsLineTokens.reservedHeight,
-                              child: Center(
-                                child: Semantics(
-                                  button: true,
-                                  label:
-                                      'Entry stats ${stats.displayText}. Opens the entry list.',
-                                  child: InkWell(
-                                    key: const ValueKey('statsLineButton'),
-                                    borderRadius: BorderRadius.circular(
-                                      WraitRadiusTokens.card,
-                                    ),
-                                    onTap: () => context.go('/entries'),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: WraitSpacingTokens.md,
-                                        vertical: WraitSpacingTokens.sm,
-                                      ),
-                                      child: Text(
-                                        stats.displayText,
-                                        key: const ValueKey('statsLineText'),
-                                        style: theme.textTheme.labelLarge,
-                                        textAlign: TextAlign.center,
-                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
+                  );
+                },
+              ),
+              Positioned(
+                top: WraitSpacingTokens.xs,
+                right: WraitSpacingTokens.sm,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Send feedback',
+                  onTap: _feedbackInFlight ? null : _openFeedback,
+                  child: IconButton(
+                    key: mainFeedbackButtonKey,
+                    tooltip: 'Send feedback',
+                    onPressed: _feedbackInFlight ? null : _openFeedback,
+                    icon: const Icon(Icons.feedback_outlined),
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
