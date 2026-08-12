@@ -52,7 +52,7 @@ MainScreenStatusPresentation resolveMainScreenStatus({
     ),
     RecordingUploading() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'uploading...',
+      statusText: 'processing...',
     ),
     RecordingProcessing() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,

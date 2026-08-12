@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wiredash/wiredash.dart';
 
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
@@ -22,6 +23,7 @@ class WraitApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final appConfig = ref.watch(appConfigProvider);
 
     return MaterialApp.router(
       title: 'Wrait',
@@ -34,7 +36,15 @@ class WraitApp extends ConsumerWidget {
       routerConfig: router,
       builder: (context, child) {
         final routerChild = child ?? const SizedBox.shrink();
-        return AppLockGate(child: routerChild);
+        final feedbackChild = appConfig.wiredashConfigured
+            ? Wiredash(
+                projectId: appConfig.wiredashProjectId,
+                secret: appConfig.wiredashSecret,
+                environment: appConfig.wiredashEnvironment,
+                child: routerChild,
+              )
+            : routerChild;
+        return AppLockGate(child: feedbackChild);
       },
     );
   }

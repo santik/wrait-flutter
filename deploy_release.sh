@@ -4,7 +4,7 @@ set -euo pipefail
 # Usage: ./deploy_release.sh
 # Prerequisites:
 # - exactly one connected physical Android phone
-# - private source config at wrait-android/local.properties
+# - current Flutter Android config at android/local.properties
 # - writable Flutter app-local target config at android/local.properties
 # - release-signing keys and runtime values present in the source config
 # - release-signing passwords stay in-memory for build/keytool validation and
@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_APK_PATH="${DEPLOY_RELEASE_APK_PATH:-$ROOT_DIR/build/app/outputs/flutter-apk/app-release.apk}"
-SOURCE_LOCAL_PROPERTIES_PATH="${DEPLOY_RELEASE_SOURCE_LOCAL_PROPERTIES_PATH:-$ROOT_DIR/wrait-android/local.properties}"
+SOURCE_LOCAL_PROPERTIES_PATH="${DEPLOY_RELEASE_SOURCE_LOCAL_PROPERTIES_PATH:-$ROOT_DIR/android/local.properties}"
 TARGET_LOCAL_PROPERTIES_PATH="${DEPLOY_RELEASE_TARGET_LOCAL_PROPERTIES_PATH:-$ROOT_DIR/android/local.properties}"
 FLUTTER_PACKAGE="com.wrait.flutter"
 FLUTTER_NAMESPACE="com.wrait.flutter"
@@ -30,6 +30,9 @@ RESOLVED_KEY_PASSWORD=""
 RESOLVED_BACKEND_URL=""
 RESOLVED_PROXY_SECRET=""
 RESOLVED_RECORDING_HARD_CAP_MS=""
+RESOLVED_WIREDASH_PROJECT_ID=""
+RESOLVED_WIREDASH_SECRET=""
+RESOLVED_WIREDASH_ENVIRONMENT=""
 
 fail() {
   printf 'error: %s\n' "$*" >&2
@@ -58,6 +61,28 @@ validate_proxy_secret() {
   [[ -n "$collapsed" ]] || fail "PROXY_SECRET must not be blank or whitespace only"
   [[ "$value" == "$collapsed" ]] || fail "PROXY_SECRET must not contain whitespace"
   (( ${#value} >= 8 )) || fail "PROXY_SECRET must be at least 8 characters long"
+}
+
+validate_wiredash_project_id() {
+  local value="$1"
+
+  [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$ ]] || fail \
+    "WIREDASH_PROJECT_ID must be 3-128 characters using letters, numbers, dots, underscores, or hyphens"
+}
+
+validate_wiredash_secret() {
+  local value="$1"
+
+  [[ "$value" != *[[:space:]]* ]] || fail \
+    "WIREDASH_SECRET must not contain whitespace"
+  (( ${#value} >= 8 )) || fail "WIREDASH_SECRET must be at least 8 characters long"
+}
+
+validate_wiredash_environment() {
+  local value="$1"
+
+  [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || fail \
+    "WIREDASH_ENVIRONMENT must be 1-64 characters using letters, numbers, dots, underscores, or hyphens"
 }
 
 validate_backend_url() {
@@ -366,6 +391,9 @@ sync_target_local_properties() {
         managed["BACKEND_URL"] = 1
         managed["PROXY_SECRET"] = 1
         managed["RECORDING_HARD_CAP_MS"] = 1
+        managed["WIREDASH_PROJECT_ID"] = 1
+        managed["WIREDASH_ENVIRONMENT"] = 1
+        managed["WIREDASH_SECRET"] = 1
         managed["KEYSTORE_PASSWORD"] = 1
         managed["KEY_PASSWORD"] = 1
       }
@@ -393,6 +421,9 @@ sync_target_local_properties() {
     printf 'BACKEND_URL=%s\n' "$RESOLVED_BACKEND_URL"
     printf 'PROXY_SECRET=%s\n' "$RESOLVED_PROXY_SECRET"
     printf 'RECORDING_HARD_CAP_MS=%s\n' "$RESOLVED_RECORDING_HARD_CAP_MS"
+    printf 'WIREDASH_PROJECT_ID=%s\n' "$RESOLVED_WIREDASH_PROJECT_ID"
+    printf 'WIREDASH_SECRET=%s\n' "$RESOLVED_WIREDASH_SECRET"
+    printf 'WIREDASH_ENVIRONMENT=%s\n' "$RESOLVED_WIREDASH_ENVIRONMENT"
   } >"$final_tmpfile"
 
   mv "$final_tmpfile" "$TARGET_LOCAL_PROPERTIES_PATH"
@@ -439,15 +470,21 @@ load_and_validate_private_config() {
   RESOLVED_KEYSTORE_PATH="$(
     require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEYSTORE_PATH"
   )"
-  RESOLVED_KEYSTORE_PASSWORD="$(
-    require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEYSTORE_PASSWORD"
-  )"
+  RESOLVED_KEYSTORE_PASSWORD="${WRAIT_RELEASE_KEYSTORE_PASSWORD:-}"
+  if [[ -z "$RESOLVED_KEYSTORE_PASSWORD" ]]; then
+    RESOLVED_KEYSTORE_PASSWORD="$(
+      require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEYSTORE_PASSWORD"
+    )"
+  fi
   RESOLVED_KEY_ALIAS="$(
     require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEY_ALIAS"
   )"
-  RESOLVED_KEY_PASSWORD="$(
-    require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEY_PASSWORD"
-  )"
+  RESOLVED_KEY_PASSWORD="${WRAIT_RELEASE_KEY_PASSWORD:-}"
+  if [[ -z "$RESOLVED_KEY_PASSWORD" ]]; then
+    RESOLVED_KEY_PASSWORD="$(
+      require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "KEY_PASSWORD"
+    )"
+  fi
   RESOLVED_BACKEND_URL="$(
     require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "BACKEND_URL"
   )"
@@ -456,6 +493,15 @@ load_and_validate_private_config() {
   )"
   RESOLVED_RECORDING_HARD_CAP_MS="$(
     require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "RECORDING_HARD_CAP_MS"
+  )"
+  RESOLVED_WIREDASH_PROJECT_ID="$(
+    require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "WIREDASH_PROJECT_ID"
+  )"
+  RESOLVED_WIREDASH_SECRET="$(
+    require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "WIREDASH_SECRET"
+  )"
+  RESOLVED_WIREDASH_ENVIRONMENT="$(
+    require_non_blank_property "$SOURCE_LOCAL_PROPERTIES_PATH" "WIREDASH_ENVIRONMENT"
   )"
 
   raw_keystore_path="$RESOLVED_KEYSTORE_PATH"
@@ -469,6 +515,9 @@ load_and_validate_private_config() {
   validate_backend_url "$RESOLVED_BACKEND_URL"
   validate_proxy_secret "$RESOLVED_PROXY_SECRET"
   validate_positive_integer "RECORDING_HARD_CAP_MS" "$RESOLVED_RECORDING_HARD_CAP_MS"
+  validate_wiredash_project_id "$RESOLVED_WIREDASH_PROJECT_ID"
+  validate_wiredash_secret "$RESOLVED_WIREDASH_SECRET"
+  validate_wiredash_environment "$RESOLVED_WIREDASH_ENVIRONMENT"
   validate_release_keystore
 }
 
@@ -488,6 +537,9 @@ main() {
     "--dart-define=BACKEND_URL=$RESOLVED_BACKEND_URL"
     "--dart-define=PROXY_SECRET=$RESOLVED_PROXY_SECRET"
     "--dart-define=RECORDING_HARD_CAP_MS=$RESOLVED_RECORDING_HARD_CAP_MS"
+    "--dart-define=WIREDASH_PROJECT_ID=$RESOLVED_WIREDASH_PROJECT_ID"
+    "--dart-define=WIREDASH_SECRET=$RESOLVED_WIREDASH_SECRET"
+    "--dart-define=WIREDASH_ENVIRONMENT=$RESOLVED_WIREDASH_ENVIRONMENT"
   )
 
   phone_serial="$(find_connected_phone)"

@@ -17,7 +17,9 @@ import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/app_lock/app_lock_test_keys.dart';
+import 'package:wrait/presentation/feedback/feedback_preparation_sheet.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 void main() {
@@ -157,6 +159,53 @@ void main() {
     expect(harness.authenticator.authenticateCallCount, 2);
     expect(find.byKey(appLockOverlayKey), findsNothing);
   });
+
+  testWidgets(
+    'app lock covers an open feedback surface after foreground exit',
+    (tester) async {
+      final harness = await _buildHarness(
+        authResults: <AppLockAuthResult>[
+          AppLockAuthResult.success,
+          AppLockAuthResult.canceled,
+          AppLockAuthResult.success,
+        ],
+      );
+
+      await tester.pumpWidget(harness.app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mainFeedbackButtonKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
+      await tester.tap(find.text('Idea'));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(appLockOverlayKey), findsOneWidget);
+      expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(feedbackContinueButtonKey),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
+
+      await tester.tap(find.byKey(appLockUnlockButtonKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(appLockOverlayKey), findsNothing);
+
+      await tester.tap(find.text('cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(feedbackPrivacyCopyKey), findsNothing);
+    },
+  );
 }
 
 class _Harness {

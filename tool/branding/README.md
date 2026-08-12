@@ -44,7 +44,7 @@ Notes:
 
 - Android launcher icons use adaptive-icon XML resources that render only a
   solid background plus the `wrait` wordmark, matching
-  `wrait-android/src/main/res`.
+  `android/app/src/main/res`.
 - iOS app icon outputs are rendered onto the dark background color above so
   the generated icon catalog remains fully opaque.
 - The generator overwrites the tracked iOS PNG outputs and validates that each

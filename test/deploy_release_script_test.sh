@@ -274,6 +274,9 @@ KEY_PASSWORD=release-key-password
 BACKEND_URL=https://release.example.test
 PROXY_SECRET=release-proxy-secret
 RECORDING_HARD_CAP_MS=180000
+WIREDASH_PROJECT_ID=release-wiredash-project
+WIREDASH_SECRET=release-wiredash-secret
+WIREDASH_ENVIRONMENT=production
 EOF
 }
 
@@ -289,12 +292,13 @@ flutter.versionCode=1
 EXISTING_KEY=keep-me
 KEYSTORE_PATH=stale-path
 PROXY_SECRET=stale-secret
+WIREDASH_SECRET=stale-wiredash-secret
 EOF
 }
 
 prepare_config_files() {
   local scenario_dir="$1"
-  local source_dir="$scenario_dir/wrait-android"
+  local source_dir="$scenario_dir/private-config"
   local target_dir="$scenario_dir/android"
 
   mkdir -p "$source_dir" "$target_dir"
@@ -310,7 +314,7 @@ run_script() {
   local log="$TMP_DIR/$scenario.log"
   local release_apk_path="$scenario_dir/app-release.apk"
   local state_dir="$scenario_dir/state"
-  local source_path="$scenario_dir/wrait-android/local.properties"
+  local source_path="$scenario_dir/private-config/local.properties"
   local target_path="$scenario_dir/android/local.properties"
   : >"$log"
 
@@ -335,6 +339,9 @@ KEY_PASSWORD=release-key-password
 BACKEND_URL=https://release.example.test
 PROXY_SECRET=release-proxy-secret
 RECORDING_HARD_CAP_MS=180000
+WIREDASH_PROJECT_ID=release-wiredash-project
+WIREDASH_SECRET=release-wiredash-secret
+WIREDASH_ENVIRONMENT=production
 EOF
       ;;
     blank_key_alias)
@@ -346,6 +353,9 @@ KEY_PASSWORD=release-key-password
 BACKEND_URL=https://release.example.test
 PROXY_SECRET=release-proxy-secret
 RECORDING_HARD_CAP_MS=180000
+WIREDASH_PROJECT_ID=release-wiredash-project
+WIREDASH_SECRET=release-wiredash-secret
+WIREDASH_ENVIRONMENT=production
 EOF
       ;;
     invalid_backend_url)
@@ -357,6 +367,9 @@ KEY_PASSWORD=release-key-password
 BACKEND_URL=not-a-url
 PROXY_SECRET=release-proxy-secret
 RECORDING_HARD_CAP_MS=180000
+WIREDASH_PROJECT_ID=release-wiredash-project
+WIREDASH_SECRET=release-wiredash-secret
+WIREDASH_ENVIRONMENT=production
 EOF
       ;;
     blank_proxy_secret)
@@ -368,6 +381,9 @@ KEY_PASSWORD=release-key-password
 BACKEND_URL=https://release.example.test
 PROXY_SECRET=
 RECORDING_HARD_CAP_MS=180000
+WIREDASH_PROJECT_ID=release-wiredash-project
+WIREDASH_SECRET=release-wiredash-secret
+WIREDASH_ENVIRONMENT=production
 EOF
       ;;
     invalid_recording_cap)
@@ -379,12 +395,35 @@ KEY_PASSWORD=release-key-password
 BACKEND_URL=https://release.example.test
 PROXY_SECRET=release-proxy-secret
 RECORDING_HARD_CAP_MS=0
+WIREDASH_PROJECT_ID=release-wiredash-project
+WIREDASH_SECRET=release-wiredash-secret
+WIREDASH_ENVIRONMENT=production
 EOF
+      ;;
+    missing_wiredash_project)
+      sed -i.bak '/^WIREDASH_PROJECT_ID=/d' "$source_path"
+      rm -f "$source_path.bak"
+      ;;
+    blank_wiredash_secret)
+      sed -i.bak 's/^WIREDASH_SECRET=.*/WIREDASH_SECRET=/' "$source_path"
+      rm -f "$source_path.bak"
+      ;;
+    invalid_wiredash_project)
+      sed -i.bak 's/^WIREDASH_PROJECT_ID=.*/WIREDASH_PROJECT_ID=../' "$source_path"
+      rm -f "$source_path.bak"
+      ;;
+    invalid_wiredash_secret)
+      sed -i.bak 's/^WIREDASH_SECRET=.*/WIREDASH_SECRET=short/' "$source_path"
+      rm -f "$source_path.bak"
+      ;;
+    invalid_wiredash_environment)
+      sed -i.bak 's/^WIREDASH_ENVIRONMENT=.*/WIREDASH_ENVIRONMENT=../' "$source_path"
+      rm -f "$source_path.bak"
       ;;
     invalid_keystore_password|invalid_key_password)
       ;;
     missing_keystore_file)
-      rm -f "$scenario_dir/wrait-android/release-key.jks"
+      rm -f "$scenario_dir/private-config/release-key.jks"
       ;;
     one_phone|debug_removed_after_install)
       mkdir -p "$state_dir"
@@ -464,6 +503,31 @@ run_script_expect_failure invalid_recording_cap
 assert_contains "$TMP_DIR/invalid_recording_cap.out" "RECORDING_HARD_CAP_MS must be a positive integer"
 assert_not_contains "$TMP_DIR/invalid_recording_cap.log" "flutter build"
 
+run_script_expect_failure missing_wiredash_project
+assert_contains "$TMP_DIR/missing_wiredash_project.out" \
+  "WIREDASH_PROJECT_ID is missing or blank"
+assert_not_contains "$TMP_DIR/missing_wiredash_project.log" "flutter build"
+
+run_script_expect_failure blank_wiredash_secret
+assert_contains "$TMP_DIR/blank_wiredash_secret.out" \
+  "WIREDASH_SECRET is missing or blank"
+assert_not_contains "$TMP_DIR/blank_wiredash_secret.log" "flutter build"
+
+run_script_expect_failure invalid_wiredash_project
+assert_contains "$TMP_DIR/invalid_wiredash_project.out" \
+  "WIREDASH_PROJECT_ID must be 3-128 characters"
+assert_not_contains "$TMP_DIR/invalid_wiredash_project.log" "flutter build"
+
+run_script_expect_failure invalid_wiredash_secret
+assert_contains "$TMP_DIR/invalid_wiredash_secret.out" \
+  "WIREDASH_SECRET must be at least 8 characters long"
+assert_not_contains "$TMP_DIR/invalid_wiredash_secret.log" "flutter build"
+
+run_script_expect_failure invalid_wiredash_environment
+assert_contains "$TMP_DIR/invalid_wiredash_environment.out" \
+  "WIREDASH_ENVIRONMENT must be 1-64 characters"
+assert_not_contains "$TMP_DIR/invalid_wiredash_environment.log" "flutter build"
+
 run_script_expect_failure missing_keystore_file
 assert_contains "$TMP_DIR/missing_keystore_file.out" "KEYSTORE_PATH does not point to a file reachable"
 assert_not_contains "$TMP_DIR/missing_keystore_file.log" "flutter build"
@@ -501,6 +565,7 @@ assert_not_contains "$TMP_DIR/offline_phone.log" "install"
 run_script_expect_failure build_no_apk
 assert_contains "$TMP_DIR/build_no_apk.out" "release APK was not created"
 assert_contains "$TMP_DIR/build_no_apk.log" "flutter build apk --release --dart-define=BACKEND_URL=https://release.example.test --dart-define=PROXY_SECRET=release-proxy-secret --dart-define=RECORDING_HARD_CAP_MS=180000"
+assert_contains "$TMP_DIR/build_no_apk.log" "--dart-define=WIREDASH_PROJECT_ID=release-wiredash-project --dart-define=WIREDASH_SECRET=release-wiredash-secret --dart-define=WIREDASH_ENVIRONMENT=production"
 assert_not_contains "$TMP_DIR/build_no_apk.log" "install"
 
 run_script_expect_failure zero_size_apk
@@ -540,9 +605,9 @@ assert_contains "$TMP_DIR/one_phone.out" "Verified com.wrait.app remains install
 assert_contains "$TMP_DIR/one_phone.out" "Detected existing debug Flutter app (com.wrait.flutter.dev); it must remain installed."
 assert_contains "$TMP_DIR/one_phone.out" "Verified com.wrait.flutter.dev remains installed."
 assert_contains "$TMP_DIR/one_phone.out" "Installed and launched com.wrait.flutter on PHONE123."
-assert_contains "$TMP_DIR/one_phone.log" "flutter build apk --release --dart-define=BACKEND_URL=https://release.example.test --dart-define=PROXY_SECRET=release-proxy-secret --dart-define=RECORDING_HARD_CAP_MS=180000"
-assert_contains "$TMP_DIR/one_phone.log" "keytool -list -keystore $TMP_DIR/one_phone/wrait-android/release-key.jks -storepass <redacted> -alias release-key-alias"
-assert_contains "$TMP_DIR/one_phone.log" "keytool -certreq -keystore $TMP_DIR/one_phone/wrait-android/release-key.jks -storepass <redacted> -alias release-key-alias -keypass <redacted>"
+assert_contains "$TMP_DIR/one_phone.log" "flutter build apk --release --dart-define=BACKEND_URL=https://release.example.test --dart-define=PROXY_SECRET=release-proxy-secret --dart-define=RECORDING_HARD_CAP_MS=180000 --dart-define=WIREDASH_PROJECT_ID=release-wiredash-project --dart-define=WIREDASH_SECRET=release-wiredash-secret --dart-define=WIREDASH_ENVIRONMENT=production"
+assert_contains "$TMP_DIR/one_phone.log" "keytool -list -keystore $TMP_DIR/one_phone/private-config/release-key.jks -storepass <redacted> -alias release-key-alias"
+assert_contains "$TMP_DIR/one_phone.log" "keytool -certreq -keystore $TMP_DIR/one_phone/private-config/release-key.jks -storepass <redacted> -alias release-key-alias -keypass <redacted>"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell am force-stop com.wrait.flutter"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell pm path com.wrait.app"
 assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 install -r $TMP_DIR/one_phone/app-release.apk"
@@ -552,20 +617,24 @@ assert_contains "$TMP_DIR/one_phone.log" "adb -s PHONE123 shell am start -W -n c
 assert_not_contains "$TMP_DIR/one_phone.log" "flutter test --no-pub"
 assert_not_contains "$TMP_DIR/one_phone.log" "release-keystore-password"
 assert_not_contains "$TMP_DIR/one_phone.log" "release-key-password"
+assert_not_contains "$TMP_DIR/one_phone.out" "release-wiredash-secret"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "sdk.dir=/tmp/android-sdk"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "flutter.sdk=/tmp/flutter-sdk"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "flutter.buildMode=release"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "flutter.versionName=1.0.0"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "flutter.versionCode=1"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "EXISTING_KEY=keep-me"
-assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "KEYSTORE_PATH=$TMP_DIR/one_phone/wrait-android/release-key.jks"
+assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "KEYSTORE_PATH=$TMP_DIR/one_phone/private-config/release-key.jks"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "KEY_ALIAS=release-key-alias"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "BACKEND_URL=https://release.example.test"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "PROXY_SECRET=release-proxy-secret"
 assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "RECORDING_HARD_CAP_MS=180000"
+assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "WIREDASH_PROJECT_ID=release-wiredash-project"
+assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "WIREDASH_ENVIRONMENT=production"
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "KEYSTORE_PATH=stale-path"
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "KEYSTORE_PASSWORD="
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "KEY_PASSWORD="
 assert_not_contains "$TMP_DIR/one_phone/android/local.properties" "PROXY_SECRET=stale-secret"
+assert_file_contains_line "$TMP_DIR/one_phone/android/local.properties" "WIREDASH_SECRET=release-wiredash-secret"
 
 printf 'deploy_release_script_test.sh: all tests passed\n'

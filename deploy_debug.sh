@@ -53,6 +53,36 @@ validate_proxy_secret() {
   (( ${#value} >= 8 )) || fail "PROXY_SECRET must be at least 8 characters long"
 }
 
+validate_wiredash_project_id() {
+  local value="$1"
+
+  [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$ ]] || fail \
+    "WIREDASH_PROJECT_ID must be 3-128 characters using letters, numbers, dots, underscores, or hyphens"
+}
+
+validate_wiredash_secret() {
+  local value="$1"
+
+  [[ "$value" != *[[:space:]]* ]] || fail \
+    "WIREDASH_SECRET must not contain whitespace"
+  (( ${#value} >= 8 )) || fail "WIREDASH_SECRET must be at least 8 characters long"
+}
+
+validate_wiredash_config() {
+  local project_id="${WIREDASH_PROJECT_ID:-}"
+  local secret="${WIREDASH_SECRET:-}"
+  local environment="${WIREDASH_ENVIRONMENT:-}"
+
+  if [[ -n "$project_id" || -n "$secret" || -n "$environment" ]]; then
+    [[ -n "$project_id" && -n "$secret" ]] || fail \
+      "WIREDASH_PROJECT_ID and WIREDASH_SECRET must be supplied together"
+    validate_wiredash_project_id "$project_id"
+    validate_wiredash_secret "$secret"
+    [[ "$environment" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || fail \
+      "WIREDASH_ENVIRONMENT must be 1-64 characters using letters, numbers, dots, underscores, or hyphens"
+  fi
+}
+
 configure_java() {
   # Some editors inject a Java runtime path that no longer exists.
   unset VSCODE_JAVA_EXEC || true
@@ -475,6 +505,7 @@ main() {
   require_command flutter
   require_non_empty_env PROXY_SECRET
   validate_proxy_secret "$PROXY_SECRET"
+  validate_wiredash_config
   validate_positive_integer "DEPLOY_RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS" \
     "$RUNTIME_PERMISSION_WATCHDOG_MAX_SECONDS"
 
@@ -486,6 +517,13 @@ main() {
   local flutter_build_args=(
     "--dart-define=PROXY_SECRET=$PROXY_SECRET"
   )
+  if [[ -n "${WIREDASH_PROJECT_ID:-}" ]]; then
+    flutter_build_args+=(
+      "--dart-define=WIREDASH_PROJECT_ID=$WIREDASH_PROJECT_ID"
+      "--dart-define=WIREDASH_SECRET=$WIREDASH_SECRET"
+      "--dart-define=WIREDASH_ENVIRONMENT=$WIREDASH_ENVIRONMENT"
+    )
+  fi
 
   printf 'Building Flutter debug APK...\n'
   prepare_apk_output "$DEBUG_APK_PATH"

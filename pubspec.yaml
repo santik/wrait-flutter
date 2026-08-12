@@ -54,6 +54,7 @@ dependencies:
   path_provider: ^2.1.6
   connectivity_plus: ^7.1.1
   wakelock_plus: ^1.6.1
+  wiredash: ^2.6.1
   wrait_backend_api:
     path: tool/openapi-generator/output/backend_api
 

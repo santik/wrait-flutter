@@ -17,10 +17,13 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
+import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
+import 'package:wrait/presentation/feedback/feedback_providers.dart';
+import 'package:wrait/presentation/feedback/feedback_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 import 'package:wrait/presentation/theme/design_tokens.dart';
-import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
 
 import '../../test_doubles/fake_display_awake_service.dart';
 
@@ -130,6 +133,89 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+  });
+
+  testWidgets('top-right feedback button launches the feedback service', (
+    tester,
+  ) async {
+    final feedbackService = _FakeFeedbackService();
+    final semanticsHandle = tester.ensureSemantics();
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      feedbackService: feedbackService,
+    );
+
+    final feedbackButton = find.byKey(mainFeedbackButtonKey);
+    expect(feedbackButton, findsOneWidget);
+    expect(tester.widget<IconButton>(feedbackButton).tooltip, 'Send feedback');
+    final feedbackSemanticsFinder = find.bySemanticsLabel('Send feedback');
+    expect(feedbackSemanticsFinder, findsOneWidget);
+    final feedbackSemantics = tester.getSemantics(feedbackSemanticsFinder);
+    expect(feedbackSemantics.label, 'Send feedback');
+    expect(
+      feedbackSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+
+    await tester.tap(feedbackButton);
+    await tester.pumpAndSettle();
+
+    expect(feedbackService.appArea, 'main');
+    semanticsHandle.dispose();
+  });
+
+  testWidgets('ignores rapid successive feedback button taps', (tester) async {
+    final feedbackService = _BlockingFeedbackService();
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      feedbackService: feedbackService,
+    );
+
+    await tester.tap(find.byKey(mainFeedbackButtonKey));
+    await tester.pump();
+    await tester.tap(find.byKey(mainFeedbackButtonKey));
+    await tester.pump();
+
+    expect(feedbackService.openCount, 1);
+
+    feedbackService.complete(
+      const FeedbackLaunchResult(FeedbackLaunchStatus.cancelled),
+    );
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('shows a sanitized message when feedback is unavailable', (
+    tester,
+  ) async {
+    final feedbackService = _FakeFeedbackService(
+      status: FeedbackLaunchStatus.unavailable,
+    );
+
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      feedbackService: feedbackService,
+    );
+
+    await tester.tap(find.byKey(mainFeedbackButtonKey));
+    await tester.pumpAndSettle();
+
+    expect(find.text('feedback is unavailable right now'), findsOneWidget);
+    expect(find.textContaining('WIREDASH'), findsNothing);
+    expect(find.textContaining('secret'), findsNothing);
   });
 
   testWidgets('saved feedback auto-clears after the saved display window', (
@@ -663,6 +749,7 @@ Future<void> _pumpTestApp(
   RecordingFeedbackDelays feedbackDelays = const RecordingFeedbackDelays(),
   bool appLockEnabled = false,
   _TestAppLockController? appLockController,
+  FeedbackService? feedbackService,
   bool settle = true,
 }) async {
   final router = buildAppRouter();
@@ -685,6 +772,8 @@ Future<void> _pumpTestApp(
         displayAwakeServiceProvider.overrideWithValue(
           resolvedDisplayAwakeService,
         ),
+        if (feedbackService != null)
+          feedbackServiceProvider.overrideWithValue(feedbackService),
         if (appLockController != null)
           appLockControllerProvider.overrideWith(() => appLockController),
       ],
@@ -697,6 +786,40 @@ Future<void> _pumpTestApp(
   }
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 1));
+}
+
+class _FakeFeedbackService implements FeedbackService {
+  _FakeFeedbackService({this.status = FeedbackLaunchStatus.cancelled});
+
+  final FeedbackLaunchStatus status;
+  String? appArea;
+
+  @override
+  Future<FeedbackLaunchResult> open(
+    BuildContext context, {
+    required String appArea,
+  }) async {
+    this.appArea = appArea;
+    return FeedbackLaunchResult(status);
+  }
+}
+
+class _BlockingFeedbackService implements FeedbackService {
+  int openCount = 0;
+  final _completion = Completer<FeedbackLaunchResult>();
+
+  @override
+  Future<FeedbackLaunchResult> open(
+    BuildContext context, {
+    required String appArea,
+  }) {
+    openCount += 1;
+    return _completion.future;
+  }
+
+  void complete(FeedbackLaunchResult result) {
+    _completion.complete(result);
+  }
 }
 
 class _TestMainRecordingController extends MainRecordingController {

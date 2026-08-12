@@ -178,7 +178,7 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 - `./deploy_release.sh` targets the release Flutter app identity
   `com.wrait.flutter` and should preserve any pre-existing
   `com.wrait.flutter.dev` debug install.
-- Canonical private release config lives in `wrait-android/local.properties`.
+- Current private release config lives in the ignored `android/local.properties`.
 - `./deploy_release.sh` synchronizes only non-secret release keys into the
   ignored Flutter-local `android/local.properties`.
 - Provide transient signing-password env vars before the release build:
@@ -288,6 +288,32 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   limitation to document and re-check, not as automatic proof of an app-side
   regression.
 
+### Feedback integration guidance
+
+- The feedback entry point is the single top-right icon on the main screen;
+  do not add a Settings entry point or a second main-screen trigger without an
+  approved story.
+- Wiredash `2.6.1` is mounted below `AppLockGate` in `lib/app.dart`, is
+  configured only when all `WIREDASH_PROJECT_ID`, `WIREDASH_SECRET`, and
+  `WIREDASH_ENVIRONMENT` values are present, and must not participate in
+  startup/bootstrap work.
+- Keep Wiredash values in ignored `android/local.properties`, CI secret
+  storage, or transient environment/build-define inputs. Never log or commit
+  the SDK secret, and do not use the legacy `wrait-android` directory.
+- The feedback adapter must keep email and screenshot prompts hidden, avoid
+  Wiredash analytics, and replace `metadata.custom` with a fresh allowlisted
+  map containing only approved broad context and explicit contact text. Do not
+  attach journal text, transcripts, audio, paths, identifiers, screenshots,
+  proxy secrets, or raw diagnostics.
+- Wiredash's public `2.6.1` API does not expose typed API exception classes;
+  preserve the generic sanitized user-facing failure boundary and use
+  developer-only logs for diagnostics.
+- The preparation form is a top-anchored fixed-height dialog. Its keyboard
+  layout depends on `android:windowSoftInputMode="adjustNothing"` in the main
+  Android manifest, keyboard-inset removal around the dialog, and a fixed
+  bottom action gap. Preserve the panel-bound and action-gap regression tests
+  when changing this surface.
+
 ### Android identity note
 
 - The release/update Flutter Android application/package ID is
@@ -303,8 +329,8 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
 
 ### Launcher branding guidance
 
-- Android launcher branding now follows the adaptive-icon resource pattern in
-  `wrait-android/src/main/res` rather than generated launcher PNGs.
+- Android launcher branding follows the current resource pattern in
+  `android/app/src/main/res` rather than the legacy Android implementation.
 - Keep Flutter Android launcher resources hand-authored under:
   - `android/app/src/main/res/mipmap-anydpi/`
   - `android/app/src/main/res/drawable/`

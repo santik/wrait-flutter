@@ -79,9 +79,9 @@ this file as supporting implementation memory.
   preserve any pre-existing release install.
 - Prefer `./deploy_release.sh` for physical-phone release deployment when the
   stable release identity or update-compatible installs matter.
-- Canonical private release config lives in `wrait-android/local.properties`;
-  only non-secret release keys should be synchronized to
-  `android/local.properties`.
+- Current private release config lives in the ignored
+  `android/local.properties`; runtime values are passed through transient
+  build defines and signing passwords remain environment-only.
 - Release signing passwords stay transient in
   `WRAIT_RELEASE_KEYSTORE_PASSWORD` and `WRAIT_RELEASE_KEY_PASSWORD`.
 - `./deploy_release.sh` should validate the configured keystore with `keytool`
@@ -91,7 +91,7 @@ this file as supporting implementation memory.
 
 - Android launcher icons are adaptive-icon XML resources, not generated PNGs.
 - Reference structure for Android launcher branding is
-  `wrait-android/src/main/res`.
+  `android/app/src/main/res`.
 - Main Android release launcher resources live under
   `android/app/src/main/res/mipmap-anydpi/` and
   `android/app/src/main/res/drawable/`.
@@ -311,6 +311,36 @@ this file as supporting implementation memory.
   shared body text.
 - Entry-list back handling should prefer a real navigator pop when route
   history exists and only fall back to `/` when no prior route can be popped.
+
+## Feedback and Wiredash
+
+- The only feedback entry point is the top-right main-screen icon. The
+  preparation flow lives in
+  `lib/presentation/feedback/feedback_preparation_sheet.dart` and uses a
+  top-anchored `showGeneralDialog` before opening Wiredash.
+- Wiredash `2.6.1` is mounted below `AppLockGate` in `lib/app.dart`. Keep it
+  lazy and startup-safe; missing `WIREDASH_PROJECT_ID`, `WIREDASH_SECRET`, or
+  `WIREDASH_ENVIRONMENT` must not block launch.
+- Keep Wiredash credentials in ignored `android/local.properties`, CI secret
+  storage, or transient build defines. Never print the SDK secret, and never
+  use `wrait-android`, which is legacy and unused.
+- The adapter hides Wiredash email and screenshot prompts and does not call
+  analytics. `metadata.custom` must be replaced with a clean allowlist map,
+  not merged with SDK-provided custom fields. Only broad context, category,
+  and trimmed non-blank explicit contact text are allowed; journal content,
+  transcripts, audio, paths, identifiers, screenshots, proxy secrets, and raw
+  diagnostics stay excluded.
+- Wiredash `2.6.1` has no public typed API exception classes. Keep the
+  generic sanitized failure result and developer-only diagnostic logging.
+- The preparation panel must remain top-anchored and fixed-height while the
+  keyboard appears. Android uses
+  `android:windowSoftInputMode="adjustNothing"`; preserve the panel-height
+  and action-gap regression coverage when changing the form.
+- Feedback validation uses stable keys from the feedback presentation layer,
+  the focused feedback/main-screen widget suite, the deterministic
+  `integration_test/main_feedback_flow_test.dart`, and Android/iOS platform
+  runs. Do not claim live Wiredash console delivery or payload inspection
+  without credentialed runtime evidence.
 
 ## Testing and Validation Gotchas
 

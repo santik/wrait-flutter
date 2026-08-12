@@ -12,6 +12,7 @@ import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
+import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 import 'package:wrait/presentation/theme/design_tokens.dart';
 
@@ -22,6 +23,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+    expect(find.byKey(mainFeedbackButtonKey), findsOneWidget);
     expect(find.text('wrait'), findsWidgets);
   });
 
