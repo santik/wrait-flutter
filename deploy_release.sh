@@ -657,4 +657,6 @@ main() {
   printf 'Installed and launched %s on %s.\n' "$FLUTTER_PACKAGE" "$phone_serial"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
