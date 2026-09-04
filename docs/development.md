@@ -89,6 +89,41 @@ environment values, validates signing inputs before building, builds the
 release APK, installs it, launches it, and preserves any existing debug app or
 native Android app install.
 
+## Android Play Bundle
+
+Use `./deploy_bundle.sh` when creating the release Android App Bundle for Play
+Console upload:
+
+```sh
+./deploy_bundle.sh
+```
+
+By default, the bundle uses the `version` value from `pubspec.yaml`. For a
+release-specific version override, pass the Flutter build name and Android
+build number directly to the script:
+
+```sh
+./deploy_bundle.sh --build-name 1.0.0 --build-number 2
+```
+
+The build number must increase for each Google Play upload. These options are
+used only for the current bundle; they do not modify `pubspec.yaml` or create a
+Git tag.
+
+The bundle script uses the same ignored `android/local.properties` signing,
+runtime, and Wiredash configuration as `./deploy_release.sh`, and it performs
+the same keystore validation before building. It does not call `adb`, install
+the app, or launch the app on a device.
+
+The generated bundle path is:
+
+```text
+build/app/outputs/bundle/release/app-release.aab
+```
+
+Run `./deploy_release.sh` separately when you need physical-phone release APK
+validation before uploading the bundle.
+
 ## Manual Debug APK Build
 
 To build the Android debug APK manually with the proxy secret baked into the
