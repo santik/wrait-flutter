@@ -305,13 +305,18 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   map containing only approved broad context and explicit contact text. When
   contact is supplied, copy the same trimmed plain-text value to Wiredash's
   standard `userId` field so it survives Wiredash's hidden-email submission
-  path; also populate `userEmail` defensively. Do not auto-collect or validate
-  it as an email. Do not attach journal text,
+  path; keep the strict `userEmail` field unset, even when the free-text
+  contact happens to look like an email. Do not auto-collect or validate it as
+  an email. Do not attach journal text,
   transcripts, audio, paths, identifiers, screenshots, proxy secrets, or raw
   diagnostics.
 - Wiredash's public `2.6.1` API does not expose typed API exception classes;
   preserve the generic sanitized user-facing failure boundary and use
   developer-only logs for diagnostics.
+- The direct feedback adapter is coupled to Wiredash internals and the
+  dependency is exact-pinned at `2.6.1` in `pubspec.yaml`. Before any SDK
+  upgrade, update and pass the adapter's real-SDK/local-HTTP transport contract
+  test, then repeat Android emulator and iOS simulator feedback validation.
 - The preparation form is a top-anchored fixed-height dialog. Its keyboard
   layout depends on `android:windowSoftInputMode="adjustNothing"` in the main
   Android manifest, keyboard-inset removal around the dialog, and a fixed

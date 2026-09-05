@@ -6,8 +6,9 @@ import 'feedback_model.dart';
 const feedbackPrivacyCopy =
     'Do not include private journal content unless you choose to type it into your message.';
 const feedbackContactFieldKey = ValueKey<String>('feedbackContactField');
+const feedbackMessageFieldKey = ValueKey<String>('feedbackMessageField');
 const feedbackPrivacyCopyKey = ValueKey<String>('feedbackPrivacyCopy');
-const feedbackContinueButtonKey = ValueKey<String>('feedbackContinueButton');
+const feedbackSubmitButtonKey = ValueKey<String>('feedbackSubmitButton');
 const feedbackPreparationPanelKey = ValueKey<String>(
   'feedbackPreparationPanel',
 );
@@ -26,13 +27,9 @@ Future<FeedbackDraft?> showFeedbackPreparationDialog(
           .clamp(0.0, double.infinity)
           .toDouble();
 
-      return MediaQuery.removeViewInsets(
-        context: context,
-        removeBottom: true,
-        child: _FeedbackPreparationDialog(
-          initialDraft: initialDraft,
-          maxHeight: maxHeight,
-        ),
+      return _FeedbackPreparationDialog(
+        initialDraft: initialDraft,
+        maxHeight: maxHeight,
       );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -83,31 +80,52 @@ class _FeedbackPreparationDialogState
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardAvailableHeight = (_maxHeight - mediaQuery.viewInsets.bottom)
+        .clamp(0.0, double.infinity)
+        .toDouble();
     final preparationSheet = FeedbackPreparationSheet(
       initialDraft: widget.initialDraft,
+      keyboardInset: _initialPanelHeight == null
+          ? 0
+          : mediaQuery.viewInsets.bottom,
+      keyboardAvailableHeight: keyboardAvailableHeight,
     );
-    final panelContent = _initialPanelHeight == null
+    final panelHeight = _initialPanelHeight;
+    final panelContent = panelHeight == null
         ? ConstrainedBox(
             constraints: BoxConstraints(maxHeight: _maxHeight),
             child: preparationSheet,
           )
-        : SizedBox(height: _initialPanelHeight, child: preparationSheet);
+        : SizedBox(height: panelHeight, child: preparationSheet);
 
-    return SafeArea(
-      bottom: false,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: KeyedSubtree(
-          key: feedbackPreparationPanelKey,
-          child: Material(
-            key: _panelKey,
-            color: Theme.of(context).colorScheme.surface,
-            elevation: 8,
-            clipBehavior: Clip.antiAlias,
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(WraitRadiusTokens.card),
+    return MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: double.infinity,
+            child: OverflowBox(
+              alignment: Alignment.topCenter,
+              minHeight: 0,
+              maxHeight: double.infinity,
+              child: KeyedSubtree(
+                key: feedbackPreparationPanelKey,
+                child: Material(
+                  key: _panelKey,
+                  color: Theme.of(context).colorScheme.surface,
+                  elevation: 8,
+                  clipBehavior: Clip.antiAlias,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(WraitRadiusTokens.card),
+                  ),
+                  child: panelContent,
+                ),
+              ),
             ),
-            child: panelContent,
           ),
         ),
       ),
@@ -116,9 +134,16 @@ class _FeedbackPreparationDialogState
 }
 
 class FeedbackPreparationSheet extends StatefulWidget {
-  const FeedbackPreparationSheet({this.initialDraft, super.key});
+  const FeedbackPreparationSheet({
+    this.initialDraft,
+    this.keyboardInset = 0,
+    this.keyboardAvailableHeight,
+    super.key,
+  });
 
   final FeedbackDraft? initialDraft;
+  final double keyboardInset;
+  final double? keyboardAvailableHeight;
 
   @override
   State<FeedbackPreparationSheet> createState() =>
@@ -127,6 +152,9 @@ class FeedbackPreparationSheet extends StatefulWidget {
 
 class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
   late final TextEditingController _contactController;
+  late final TextEditingController _messageController;
+  late final FocusNode _contactFocusNode;
+  late final FocusNode _messageFocusNode;
   FeedbackCategory? _category;
 
   @override
@@ -136,18 +164,35 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
     _contactController = TextEditingController(
       text: widget.initialDraft?.replyContact ?? '',
     );
+    _contactFocusNode = FocusNode();
+    _messageController = TextEditingController(
+      text: widget.initialDraft?.message ?? '',
+    )..addListener(_handleMessageChanged);
+    _messageFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
+    _messageController.removeListener(_handleMessageChanged);
+    _messageController.dispose();
     _contactController.dispose();
+    _messageFocusNode.dispose();
+    _contactFocusNode.dispose();
     super.dispose();
+  }
+
+  void _handleMessageChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final category = _category;
+    final canSubmit =
+        category != null && _messageController.text.trim().isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -156,74 +201,120 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
         WraitSpacingTokens.lg,
         WraitSpacingTokens.xs,
       ),
-      child: SingleChildScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('send feedback', style: theme.textTheme.titleLarge),
-            const SizedBox(height: WraitSpacingTokens.sm),
-            Text(
-              'What would you like to share?',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: WraitSpacingTokens.sm),
-            Wrap(
-              spacing: WraitSpacingTokens.sm,
-              runSpacing: WraitSpacingTokens.sm,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final scrollView = SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final option in FeedbackCategory.values)
-                  ChoiceChip(
-                    label: Text(option.label),
-                    selected: category == option,
-                    onSelected: (_) => setState(() => _category = option),
+                Text('send feedback', style: theme.textTheme.titleLarge),
+                const SizedBox(height: WraitSpacingTokens.sm),
+                Text(
+                  'What would you like to share?',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: WraitSpacingTokens.sm),
+                Wrap(
+                  spacing: WraitSpacingTokens.sm,
+                  runSpacing: WraitSpacingTokens.sm,
+                  children: [
+                    for (final option in FeedbackCategory.values)
+                      ChoiceChip(
+                        label: Text(option.label),
+                        selected: category == option,
+                        onSelected: (_) => setState(() => _category = option),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: WraitSpacingTokens.sm),
+                TextField(
+                  key: feedbackContactFieldKey,
+                  controller: _contactController,
+                  focusNode: _contactFocusNode,
+                  maxLines: 1,
+                  scrollPadding: EdgeInsets.zero,
+                  decoration: const InputDecoration(
+                    labelText: 'reply contact (optional)',
+                    hintText: 'any contact information',
                   ),
+                ),
+                const SizedBox(height: WraitSpacingTokens.sm),
+                TextField(
+                  key: feedbackMessageFieldKey,
+                  controller: _messageController,
+                  focusNode: _messageFocusNode,
+                  keyboardType: TextInputType.multiline,
+                  minLines: 3,
+                  maxLines: 10,
+                  maxLength: 2048,
+                  scrollPadding: EdgeInsets.zero,
+                  decoration: const InputDecoration(
+                    labelText: 'feedback',
+                    hintText: 'what would you like to share?',
+                  ),
+                ),
+                const SizedBox(height: WraitSpacingTokens.md),
+                Text(
+                  feedbackPrivacyCopy,
+                  key: feedbackPrivacyCopyKey,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: WraitSpacingTokens.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('cancel'),
+                    ),
+                    const SizedBox(width: WraitSpacingTokens.sm),
+                    FilledButton(
+                      key: feedbackSubmitButtonKey,
+                      onPressed: canSubmit
+                          ? () {
+                              Navigator.of(context).pop(
+                                FeedbackDraft(
+                                  category: category,
+                                  replyContact: _contactController.text,
+                                  message: _messageController.text.trim(),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: const Text('submit'),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: WraitSpacingTokens.sm),
-            TextField(
-              key: feedbackContactFieldKey,
-              controller: _contactController,
-              maxLines: 1,
-              scrollPadding: EdgeInsets.zero,
-              decoration: const InputDecoration(
-                labelText: 'reply contact (optional)',
-                hintText: 'any contact information',
-              ),
-            ),
-            const SizedBox(height: WraitSpacingTokens.md),
-            Text(
-              feedbackPrivacyCopy,
-              key: feedbackPrivacyCopyKey,
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: WraitSpacingTokens.lg),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('cancel'),
-                ),
-                const SizedBox(width: WraitSpacingTokens.sm),
-                FilledButton(
-                  key: feedbackContinueButtonKey,
-                  onPressed: category == null
-                      ? null
-                      : () {
-                          Navigator.of(context).pop(
-                            FeedbackDraft(
-                              category: category,
-                              replyContact: _contactController.text,
-                            ),
-                          );
-                        },
-                  child: const Text('continue'),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+
+          final keyboardAvailableHeight = widget.keyboardAvailableHeight;
+          final visibleHeight =
+              widget.keyboardInset > 0 &&
+                  keyboardAvailableHeight != null &&
+                  constraints.maxHeight.isFinite
+              ? () {
+                  final availableContentHeight =
+                      (keyboardAvailableHeight -
+                              WraitSpacingTokens.md -
+                              WraitSpacingTokens.xs)
+                          .clamp(0.0, double.infinity)
+                          .toDouble();
+                  return availableContentHeight < constraints.maxHeight
+                      ? availableContentHeight
+                      : null;
+                }()
+              : null;
+          // Keep the wrapper stable across inset changes so the focused
+          // EditableText is not detached when the keyboard opens.
+          return Align(
+            alignment: Alignment.topCenter,
+            heightFactor: 1,
+            child: SizedBox(height: visibleHeight, child: scrollView),
+          );
+        },
       ),
     );
   }

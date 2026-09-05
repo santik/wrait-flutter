@@ -10,8 +10,13 @@ extension FeedbackCategoryLabel on FeedbackCategory {
 }
 
 class FeedbackDraft {
-  const FeedbackDraft({required this.category, required this.replyContact});
+  const FeedbackDraft({
+    required this.category,
+    required this.replyContact,
+    required this.message,
+  });
 
   final FeedbackCategory category;
   final String replyContact;
+  final String message;
 }

@@ -42,10 +42,10 @@ CustomizableWiredashMetaData applyFeedbackMetadata({
 
   final explicitContact = replyContact is String ? replyContact : null;
 
-  // Wiredash 2.6.1 drops customizable userEmail when the email prompt is
-  // hidden while building the final feedback item. Keep the explicit contact
-  // in userId as a non-email standard field as well as custom metadata.
-  metadata.userEmail = explicitContact;
+  // Wiredash's userEmail field is server-validated even when its prompt is
+  // hidden. Keep the reply contact as free text in the non-email userId field
+  // and the allowlisted custom field instead.
+  metadata.userEmail = null;
   metadata.userId = explicitContact;
   metadata.custom = safeMetadata;
   return metadata;

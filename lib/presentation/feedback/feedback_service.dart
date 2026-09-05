@@ -1,12 +1,10 @@
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:wiredash/wiredash.dart';
 
-import 'feedback_metadata.dart';
 import 'feedback_model.dart';
 import 'feedback_preparation_sheet.dart';
+import 'wiredash_feedback_submission.dart';
 
 enum FeedbackLaunchStatus { submitted, cancelled, unavailable, failed }
 
@@ -31,10 +29,21 @@ abstract interface class FeedbackService {
 }
 
 class WiredashFeedbackService implements FeedbackService {
-  WiredashFeedbackService({required this.isConfigured, this.launchFlow});
+  WiredashFeedbackService({
+    required this.isConfigured,
+    this.projectId = '',
+    this.secret = '',
+    this.environment = 'dev',
+    this.launchFlow,
+    this.submission,
+  });
 
   final bool isConfigured;
+  final String projectId;
+  final String secret;
+  final String environment;
   final WiredashFlowLauncher? launchFlow;
+  final WiredashFeedbackSubmission? submission;
   FeedbackDraft? _pendingDraft;
   Future<FeedbackLaunchResult>? _openInFlight;
 
@@ -77,20 +86,23 @@ class WiredashFeedbackService implements FeedbackService {
     }
 
     _pendingDraft = draft;
-    final controller = launchFlow == null ? Wiredash.maybeOf(context) : null;
-    if (!isConfigured || (launchFlow == null && controller == null)) {
+    if (!isConfigured ||
+        (launchFlow == null &&
+            (submission == null &&
+                (projectId.trim().isEmpty || secret.trim().isEmpty)))) {
       return const FeedbackLaunchResult(FeedbackLaunchStatus.unavailable);
     }
 
     try {
       final submitted = launchFlow != null
           ? await launchFlow!(context: context, draft: draft, appArea: appArea)
-          : await _launchWiredash(
-              controller: controller!,
-              context: context,
-              draft: draft,
-              appArea: appArea,
-            );
+          : await (submission ??
+                    WiredashFeedbackSubmission(
+                      projectId: projectId,
+                      secret: secret,
+                      environment: environment,
+                    ))
+                .submit(context: context, draft: draft, appArea: appArea);
 
       if (submitted) {
         _pendingDraft = null;
@@ -112,33 +124,5 @@ class WiredashFeedbackService implements FeedbackService {
       );
       return const FeedbackLaunchResult(FeedbackLaunchStatus.failed);
     }
-  }
-
-  Future<bool> _launchWiredash({
-    required WiredashController controller,
-    required BuildContext context,
-    required FeedbackDraft draft,
-    required String appArea,
-  }) async {
-    final locale = Localizations.localeOf(context);
-    final platform = defaultTargetPlatform;
-    final result = await controller.show(
-      inheritMaterialTheme: true,
-      options: WiredashFeedbackOptions(
-        labels: const [],
-        email: EmailPrompt.hidden,
-        screenshot: ScreenshotPrompt.hidden,
-        collectMetaData: (metadata) {
-          return applyFeedbackMetadata(
-            metadata: metadata,
-            draft: draft,
-            appArea: appArea,
-            locale: locale,
-            platform: platform,
-          );
-        },
-      ),
-    );
-    return result.hasSubmittedFeedback;
   }
 }
