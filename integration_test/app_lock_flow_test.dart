@@ -191,7 +191,7 @@ void main() {
       expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
 
       await tester.tap(
-        find.byKey(feedbackContinueButtonKey),
+        find.byKey(feedbackSubmitButtonKey),
         warnIfMissed: false,
       );
       await tester.pumpAndSettle();

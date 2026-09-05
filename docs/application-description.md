@@ -216,19 +216,19 @@ screenshot prompts, does not use Wiredash analytics, and sends only an
 explicitly allowlisted category, broad app area, platform, locale, and
 trimmed non-blank contact value. When supplied, the contact is sent both as
 custom `reply_contact` metadata and in Wiredash's standard `userId` field so it
-survives the SDK's hidden-email submission path. The `userEmail` field is also
-populated defensively, but is dropped by Wiredash 2.6.1 when the email prompt is
-hidden. The contact is not auto-collected or email validated. Journal entries,
-transcripts, audio, file paths, identifiers,
+survives the SDK's hidden-email submission path. The strict `userEmail` field
+remains unset, even when the free-text contact looks like an email, because the
+contact is not auto-collected or email validated. Journal entries, transcripts,
+audio, file paths, identifiers,
 screenshots, proxy secrets, and raw diagnostics are not attached
 automatically. The preparation form includes privacy guidance telling users
 not to include private journal content unless they choose to type it.
 
 Wiredash credentials are build-time configuration values, not Wrait backend
 credentials. Missing values keep the app launchable and make feedback degrade
-to a sanitized unavailable state. The integration is pinned to Wiredash
-`2.6.1`; future SDK upgrades require dependency, analyzer, and Android/iOS
-integration validation.
+to a sanitized unavailable state. The integration is exact-pinned to Wiredash
+`2.6.1`; future SDK upgrades require the adapter contract test,
+dependency/analyzer checks, and Android/iOS integration validation.
 
 ## Important product themes
 

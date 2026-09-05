@@ -26,6 +26,7 @@ void main() {
     expect(result.status, FeedbackLaunchStatus.submitted);
     expect(receivedDraft?.category, FeedbackCategory.idea);
     expect(receivedDraft?.replyContact, 'Signal: wrait-test');
+    expect(receivedDraft?.message, 'The recording flow is clear.');
   });
 
   testWidgets('returns cancelled when the fake Wiredash flow is cancelled', (
@@ -63,6 +64,19 @@ void main() {
     expect(result.status, FeedbackLaunchStatus.unavailable);
   });
 
+  testWidgets('returns failed when the submission times out', (tester) async {
+    final service = WiredashFeedbackService(
+      isConfigured: true,
+      launchFlow: ({required context, required draft, required appArea}) async {
+        throw TimeoutException('feedback request timed out');
+      },
+    );
+
+    final result = await _openService(tester, service);
+
+    expect(result.status, FeedbackLaunchStatus.failed);
+  });
+
   testWidgets('coalesces concurrent open calls into one feedback flow', (
     tester,
   ) async {
@@ -96,7 +110,13 @@ void main() {
     expect(find.text('send feedback'), findsOneWidget);
     await tester.tap(find.text('Idea'));
     await tester.pump();
-    await tester.tap(find.byKey(feedbackContinueButtonKey));
+    await tester.enterText(
+      find.byKey(feedbackMessageFieldKey),
+      'The recording flow is clear.',
+    );
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+    await tester.tap(find.byKey(feedbackSubmitButtonKey));
     await tester.pump();
     expect(launchCount, 1);
 
@@ -128,12 +148,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Idea'))
+          .selected,
+      isTrue,
+    );
+    expect(
+      tester
           .widget<TextField>(find.byKey(feedbackContactFieldKey))
           .controller!
           .text,
       'Signal: wrait-test',
     );
-    await tester.tap(find.byKey(feedbackContinueButtonKey));
+    expect(
+      tester
+          .widget<TextField>(find.byKey(feedbackMessageFieldKey))
+          .controller!
+          .text,
+      'The recording flow is clear.',
+    );
+    await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+    await tester.tap(find.byKey(feedbackSubmitButtonKey));
     await tester.pumpAndSettle();
 
     expect(attempts, 2);
@@ -172,7 +206,7 @@ void main() {
     );
     final buttonBottomSpaceBeforeKeyboard =
         panelBeforeKeyboard.bottom -
-        tester.getRect(find.byKey(feedbackContinueButtonKey)).bottom;
+        tester.getRect(find.byKey(feedbackSubmitButtonKey)).bottom;
     expect(
       buttonBottomSpaceBeforeKeyboard,
       closeTo(WraitSpacingTokens.xs, 0.1),
@@ -181,11 +215,20 @@ void main() {
         .getRect(find.text('send feedback'))
         .top;
 
-    await tester.tap(find.byKey(feedbackContactFieldKey));
+    final contactField = find.byKey(feedbackContactFieldKey);
+    final contactFieldElement = tester.element(contactField);
+    await tester.tap(contactField);
+    final contactFocusNode = tester
+        .widget<TextField>(find.byKey(feedbackContactFieldKey))
+        .focusNode!;
+    expect(contactFocusNode.hasFocus, isTrue);
 
     tester.view.physicalSize = const Size(400, 480);
     tester.view.viewInsets = const FakeViewPadding(bottom: 320);
     await tester.pump(const Duration(milliseconds: 200));
+
+    expect(contactFocusNode.hasFocus, isTrue);
+    expect(tester.element(contactField), same(contactFieldElement));
 
     expect(
       tester.getRect(find.text('send feedback')).top,
@@ -197,8 +240,85 @@ void main() {
     );
     expect(
       panelBeforeKeyboard.bottom -
-          tester.getRect(find.byKey(feedbackContinueButtonKey)).bottom,
+          tester.getRect(find.byKey(feedbackSubmitButtonKey)).bottom,
       closeTo(buttonBottomSpaceBeforeKeyboard, 0.1),
+    );
+    await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+    expect(
+      tester.getRect(find.byKey(feedbackSubmitButtonKey)).bottom,
+      lessThanOrEqualTo(480),
+    );
+
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pump();
+    await tester.tap(find.text('cancel'));
+    await tester.pumpAndSettle();
+    expect(result?.status, FeedbackLaunchStatus.cancelled);
+  });
+
+  testWidgets('keeps the full form visible when the keyboard fits below it', (
+    tester,
+  ) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 1000);
+
+    FeedbackLaunchResult? result;
+    final service = WiredashFeedbackService(isConfigured: false);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () async {
+                result = await service.open(context, appArea: 'main');
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final panelBeforeKeyboard = tester.getRect(
+      find.byKey(feedbackPreparationPanelKey),
+    );
+    final titleTopBeforeKeyboard = tester
+        .getRect(find.text('send feedback'))
+        .top;
+    final submitBottomBeforeKeyboard = tester
+        .getRect(find.byKey(feedbackSubmitButtonKey))
+        .bottom;
+
+    final messageField = find.byKey(feedbackMessageFieldKey);
+    await tester.tap(messageField);
+    final messageFocusNode = tester.widget<TextField>(messageField).focusNode!;
+    expect(messageFocusNode.hasFocus, isTrue);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(messageFocusNode.hasFocus, isTrue);
+    expect(
+      tester.getRect(find.byKey(feedbackPreparationPanelKey)),
+      panelBeforeKeyboard,
+    );
+    expect(
+      tester.getRect(find.text('send feedback')).top,
+      closeTo(titleTopBeforeKeyboard, 0.1),
+    );
+    expect(
+      tester.getRect(find.byKey(feedbackSubmitButtonKey)).bottom,
+      closeTo(submitBottomBeforeKeyboard, 0.1),
+    );
+    expect(
+      tester.getRect(find.byKey(feedbackPreparationPanelKey)).bottom,
+      lessThanOrEqualTo(680),
     );
 
     await tester.tap(find.text('cancel'));
@@ -234,7 +354,13 @@ Future<FeedbackLaunchResult> _openService(
     find.byKey(feedbackContactFieldKey),
     'Signal: wrait-test',
   );
-  await tester.tap(find.byKey(feedbackContinueButtonKey));
+  await tester.enterText(
+    find.byKey(feedbackMessageFieldKey),
+    'The recording flow is clear.',
+  );
+  await tester.pump();
+  await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+  await tester.tap(find.byKey(feedbackSubmitButtonKey));
   await tester.pumpAndSettle();
 
   return result!;

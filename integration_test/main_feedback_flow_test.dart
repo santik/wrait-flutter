@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -24,7 +25,7 @@ import 'package:wrait/presentation/main/recording_state.dart';
 import '../test/test_doubles/fake_display_awake_service.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('submits feedback through the main-screen flow', (tester) async {
     final messageFlow = _FakeMessageFlow();
@@ -43,28 +44,56 @@ void main() {
     expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
 
     await tester.tap(find.text('Idea'));
-    await tester.enterText(
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(feedbackContactFieldKey));
+    await tester.tap(find.byKey(feedbackContactFieldKey));
+    await tester.pumpAndSettle();
+    _expectFeedbackFieldFocused(tester, find.byKey(feedbackContactFieldKey));
+    await _enterFeedbackText(
+      tester,
       find.byKey(feedbackContactFieldKey),
       'Signal: wrait-test',
     );
-    await tester.tap(find.byKey(feedbackContinueButtonKey));
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(feedbackContactFieldKey))
+          .controller!
+          .text,
+      'Signal: wrait-test',
+    );
+    await tester.ensureVisible(find.byKey(feedbackMessageFieldKey));
+    await tester.tap(find.byKey(feedbackMessageFieldKey));
     await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.byKey(_messageFieldKey),
+    _expectFeedbackFieldFocused(tester, find.byKey(feedbackMessageFieldKey));
+    await _enterFeedbackText(
+      tester,
+      find.byKey(feedbackMessageFieldKey),
       'The recording flow is clear.',
     );
-    await tester.tap(find.text('submit feedback'));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await binding.convertFlutterSurfaceToImage();
+      await tester.pump();
+    }
+    final screenshot = await binding.takeScreenshot(
+      'feedback_form_${defaultTargetPlatform == TargetPlatform.android ? 'android' : 'ios'}',
+    );
+    expect(screenshot, isNotEmpty);
+    await tester.tap(find.byKey(feedbackSubmitButtonKey));
     await tester.pumpAndSettle();
 
     expect(messageFlow.lastDraft?.category.name, 'idea');
     expect(messageFlow.lastDraft?.replyContact, 'Signal: wrait-test');
-    expect(messageFlow.lastMessage, 'The recording flow is clear.');
+    expect(messageFlow.lastDraft?.message, 'The recording flow is clear.');
     expect(find.text('feedback sent'), findsOneWidget);
     expect(find.byKey(mainFeedbackButtonKey), findsOneWidget);
   });
 
-  testWidgets('cancels and retries without losing preparation data', (
+  testWidgets('cancels and retries with failed draft preserved', (
     tester,
   ) async {
     final messageFlow = _FakeMessageFlow()..failNext = true;
@@ -80,7 +109,22 @@ void main() {
     await tester.tap(find.byKey(mainFeedbackButtonKey));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Praise'));
-    await tester.enterText(find.byKey(feedbackContactFieldKey), 'not-an-email');
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(feedbackContactFieldKey));
+    await tester.tap(find.byKey(feedbackContactFieldKey));
+    await tester.pumpAndSettle();
+    _expectFeedbackFieldFocused(tester, find.byKey(feedbackContactFieldKey));
+    await _enterFeedbackText(
+      tester,
+      find.byKey(feedbackContactFieldKey),
+      'not-an-email',
+    );
+    await tester.pump();
+    if (tester.testTextInput.isRegistered) {
+      tester.testTextInput.hide();
+    }
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('cancel'));
     await tester.tap(find.text('cancel'));
     await tester.pumpAndSettle();
     expect(find.text('send feedback'), findsNothing);
@@ -90,19 +134,65 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<FilledButton>(find.byKey(feedbackContinueButtonKey))
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Praise'))
+          .selected,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(feedbackContactFieldKey))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(feedbackSubmitButtonKey))
           .onPressed,
       isNull,
     );
     await tester.tap(find.text('Praise'));
-    await tester.enterText(find.byKey(feedbackContactFieldKey), 'not-an-email');
-    await tester.tap(find.byKey(feedbackContinueButtonKey));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(feedbackContactFieldKey));
+    await tester.tap(find.byKey(feedbackContactFieldKey));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(_messageFieldKey), 'First attempt.');
-    await tester.tap(find.text('submit feedback'));
+    await _enterFeedbackText(
+      tester,
+      find.byKey(feedbackContactFieldKey),
+      'not-an-email',
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(feedbackContactFieldKey))
+          .controller!
+          .text,
+      'not-an-email',
+    );
+    await tester.ensureVisible(find.byKey(feedbackMessageFieldKey));
+    await tester.tap(find.byKey(feedbackMessageFieldKey));
     await tester.pumpAndSettle();
+    _expectFeedbackFieldFocused(tester, find.byKey(feedbackMessageFieldKey));
+    await _enterFeedbackText(
+      tester,
+      find.byKey(feedbackMessageFieldKey),
+      'First attempt.',
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(feedbackContactFieldKey))
+          .controller!
+          .text,
+      'not-an-email',
+    );
+    await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+    await tester.tap(find.byKey(feedbackSubmitButtonKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('feedback could not be sent. try again'), findsOneWidget);
+    expect(messageFlow.lastDraft?.replyContact, 'not-an-email');
     tester
         .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
         .hideCurrentSnackBar();
@@ -117,10 +207,25 @@ void main() {
           .text,
       'not-an-email',
     );
-    await tester.tap(find.byKey(feedbackContinueButtonKey));
+    expect(
+      tester
+          .widget<TextField>(find.byKey(feedbackMessageFieldKey))
+          .controller!
+          .text,
+      'First attempt.',
+    );
+    await tester.ensureVisible(find.byKey(feedbackMessageFieldKey));
+    await tester.tap(find.byKey(feedbackMessageFieldKey));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(_messageFieldKey), 'Retry attempt.');
-    await tester.tap(find.text('submit feedback'));
+    _expectFeedbackFieldFocused(tester, find.byKey(feedbackMessageFieldKey));
+    await _enterFeedbackText(
+      tester,
+      find.byKey(feedbackMessageFieldKey),
+      'Retry attempt.',
+    );
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(feedbackSubmitButtonKey));
+    await tester.tap(find.byKey(feedbackSubmitButtonKey));
     await tester.pumpAndSettle();
 
     expect(messageFlow.openCount, 2);
@@ -128,7 +233,28 @@ void main() {
   });
 }
 
-const _messageFieldKey = ValueKey<String>('fakeWiredashMessageField');
+void _expectFeedbackFieldFocused(WidgetTester tester, Finder finder) {
+  expect(tester.widget<TextField>(finder).focusNode?.hasFocus, isTrue);
+}
+
+Future<void> _enterFeedbackText(
+  WidgetTester tester,
+  Finder finder,
+  String text,
+) async {
+  await tester.enterText(finder, text);
+  await tester.pump();
+  if (tester.widget<TextField>(finder).controller!.text == text) {
+    return;
+  }
+
+  // The real IME connection can replace the first test-input update on a
+  // device. The field is already focused, so retry through that connection.
+  await tester.tap(finder);
+  await tester.pump();
+  tester.testTextInput.enterText(text);
+  await tester.pump();
+}
 
 Widget _buildApp(
   FeedbackService feedbackService,
@@ -167,7 +293,6 @@ class _FakeMessageFlow {
   bool failNext = false;
   int openCount = 0;
   FeedbackDraft? lastDraft;
-  String? lastMessage;
 
   Future<bool> open({
     required BuildContext context,
@@ -178,42 +303,8 @@ class _FakeMessageFlow {
     lastDraft = draft;
     if (failNext) {
       failNext = false;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('wiredash feedback'),
-          content: TextField(key: _messageFieldKey),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('submit feedback'),
-            ),
-          ],
-        ),
-      );
       throw StateError('network failure');
     }
-
-    final message = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('wiredash feedback'),
-          content: TextField(key: _messageFieldKey, controller: controller),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
-              child: const Text('submit feedback'),
-            ),
-          ],
-        );
-      },
-    );
-    if (message == null) {
-      return false;
-    }
-    lastMessage = message;
     return true;
   }
 }

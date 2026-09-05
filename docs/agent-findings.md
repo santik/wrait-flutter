@@ -329,11 +329,15 @@ this file as supporting implementation memory.
   not merged with SDK-provided custom fields. Only broad context, category,
   and trimmed non-blank explicit contact text are allowed. That contact is
   copied to Wiredash's standard `userId` field for console visibility as well
-  as custom `reply_contact`. `userEmail` is populated defensively, but Wiredash
-  2.6.1 drops it when the email prompt is hidden. The contact is not
+  as custom `reply_contact`. The strict `userEmail` field must remain unset,
+  even when the contact looks like an email; the contact is not
   auto-collected or email-validated. Journal content, transcripts, audio,
   paths, identifiers, screenshots, proxy secrets, and raw diagnostics stay
   excluded.
+- The direct feedback adapter uses Wiredash internals, so `pubspec.yaml` keeps
+  Wiredash exact-pinned at `2.6.1`. Before upgrading it, pass the real-SDK
+  adapter contract test with a local HTTP client and repeat Android/iOS
+  feedback validation.
 - Wiredash `2.6.1` has no public typed API exception classes. Keep the
   generic sanitized failure result and developer-only diagnostic logging.
 - The preparation panel must remain top-anchored and fixed-height while the
@@ -345,6 +349,10 @@ this file as supporting implementation memory.
   `integration_test/main_feedback_flow_test.dart`, and Android/iOS platform
   runs. Do not claim live Wiredash console delivery or payload inspection
   without credentialed runtime evidence.
+- iOS integration screenshots can show the native `Private` capture cover, and
+  simulator screenshots can be blocked by an existing passcode prompt. Do not
+  weaken native capture privacy to obtain form screenshots; record the
+  limitation instead.
 
 ## Testing and Validation Gotchas
 
