@@ -71,7 +71,9 @@ void main() {
   test(
     'resolves supported language display names and falls back to raw code',
     () {
-      expect(entryListLanguageLabel('fr'), 'Francais');
+      expect(entryListLanguageLabel('fr'), 'français');
+      expect(entryListLanguageLabel('ru'), 'русский');
+      expect(entryListLanguageLabel('fr-FR'), 'français');
       expect(entryListLanguageLabel('zz-ZZ'), 'zz-ZZ');
     },
   );

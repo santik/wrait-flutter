@@ -52,18 +52,7 @@ String entryListPreviewText(Entry entry) {
 }
 
 String entryListLanguageLabel(String languageCode) {
-  final resolvedCode = resolveSupportedLanguageCode(languageCode);
-  if (resolvedCode == null) {
-    return languageCode;
-  }
-
-  for (final supportedLanguage in supportedLanguages) {
-    if (supportedLanguage.code == resolvedCode) {
-      return supportedLanguage.displayName;
-    }
-  }
-
-  return resolvedCode;
+  return supportedLanguageDisplayName(languageCode) ?? languageCode;
 }
 
 bool entryListIsAudioOnlyDraft(Entry entry) {

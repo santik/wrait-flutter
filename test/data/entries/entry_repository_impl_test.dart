@@ -96,7 +96,7 @@ void main() {
     expect(entry, isNotNull);
     expect(entry!.rawTranscript, 'bonjour monde');
     expect(entry.wordCount, 2);
-    expect(entry.language, 'fr-FR');
+    expect(entry.language, 'fr');
     expect(entry.audioPath, isNull);
     expect(entry.type, EntryType.draft);
   });
@@ -185,7 +185,7 @@ void main() {
 
     final entry = await repository!.getEntryById(id);
     expect(entry, isNotNull);
-    expect(entry!.language, 'fr-FR');
+    expect(entry!.language, 'fr');
   });
 
   test('rejects unsupported language values', () async {
@@ -328,7 +328,7 @@ void main() {
       expect(entries[0].id, isNot(100));
       expect(entries[1].id, isNot(99));
       expect(entries[1].cleanedText, 'saved cleaned');
-      expect(entries[1].language, 'fr-FR');
+      expect(entries[1].language, 'fr');
       expect(entries[1].audioPath, isNull);
       expect(entries[0].type, EntryType.draft);
       expect(entries[0].createdAt, _ts(2026, 6, 11));
