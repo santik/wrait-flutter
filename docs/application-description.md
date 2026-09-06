@@ -24,6 +24,46 @@ The current product scope centers on one launch path: cloud-backed recording,
 transcription, cleanup, and local entry persistence with retryable drafts when
 backend work cannot fully complete in one attempt.
 
+## Automatic language detection
+
+The configured wrait backend can automatically detect the following languages:
+
+1. Bulgarian (`bg`)
+2. Catalan (`ca`)
+3. Czech (`cs`)
+4. Danish (`da`)
+5. German (`de`)
+6. German (Switzerland) (`de-CH`)
+7. Greek (`el`)
+8. English (`en`)
+9. Spanish (`es`)
+10. Estonian (`et`)
+11. Finnish (`fi`)
+12. French (`fr`)
+13. Hindi (`hi`)
+14. Hungarian (`hu`)
+15. Indonesian (`id`)
+16. Italian (`it`)
+17. Japanese (`ja`)
+18. Korean (`ko`)
+19. Lithuanian (`lt`)
+20. Latvian (`lv`)
+21. Malay (`ms`)
+22. Dutch (`nl`)
+23. Flemish (`nl-BE`)
+24. Norwegian (`no`)
+25. Polish (`pl`)
+26. Portuguese (`pt`)
+27. Romanian (`ro`)
+28. Russian (`ru`)
+29. Slovak (`sk`)
+30. Swedish (`sv`)
+31. Thai (`th`)
+32. Turkish (`tr`)
+33. Ukrainian (`uk`)
+34. Vietnamese (`vi`)
+35. Chinese (`zh`)
+
 ## Current implementation scope
 
 At the moment, the Flutter app includes the shared project foundation, the core
