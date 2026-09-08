@@ -17,7 +17,6 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
-import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
 import 'package:wrait/presentation/feedback/feedback_providers.dart';
 import 'package:wrait/presentation/feedback/feedback_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
@@ -33,7 +32,6 @@ void main() {
   late _TestPreferencesRepository preferencesRepository;
   late _TestQuotaNotifier quotaNotifier;
   late FakeDisplayAwakeService displayAwakeService;
-  late _TestAppLockController appLockController;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
@@ -42,7 +40,6 @@ void main() {
     preferencesRepository = _TestPreferencesRepository(hasEverRecorded: true);
     quotaNotifier = _TestQuotaNotifier();
     displayAwakeService = FakeDisplayAwakeService();
-    appLockController = _TestAppLockController();
   });
 
   testWidgets(
@@ -657,37 +654,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('app lock release keep-awake while listening', (tester) async {
-    controller.setTestState(
-      RecordingControllerState(
-        recordingState: RecordingListening(
-          hardCapDeadlineElapsedRealtime: 120000,
-        ),
-      ),
-    );
-
-    await _pumpTestApp(
-      tester,
-      controller: controller,
-      entryRepository: entryRepository,
-      preferencesRepository: preferencesRepository,
-      quotaNotifier: quotaNotifier,
-      displayAwakeService: displayAwakeService,
-      appLockEnabled: true,
-      appLockController: appLockController,
-      settle: false,
-    );
-
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    await tester.pump();
-    appLockController.lock();
-    await tester.pump();
-    await tester.pump();
-
-    expect(displayAwakeService.requests, <bool>[true, false]);
-  });
-
   testWidgets(
     'failed enable retries on later state changes without breaking UI',
     (tester) async {
@@ -747,8 +713,6 @@ Future<void> _pumpTestApp(
     recordingHardCapMs: 120000,
   ),
   RecordingFeedbackDelays feedbackDelays = const RecordingFeedbackDelays(),
-  bool appLockEnabled = false,
-  _TestAppLockController? appLockController,
   FeedbackService? feedbackService,
   bool settle = true,
 }) async {
@@ -762,7 +726,7 @@ Future<void> _pumpTestApp(
       overrides: [
         appConfigProvider.overrideWithValue(appConfig),
         appRouterProvider.overrideWithValue(router),
-        appLockEnabledProvider.overrideWithValue(appLockEnabled),
+        appLockEnabledProvider.overrideWithValue(false),
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
         preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
         entryRepositoryProvider.overrideWithValue(entryRepository),
@@ -774,8 +738,6 @@ Future<void> _pumpTestApp(
         ),
         if (feedbackService != null)
           feedbackServiceProvider.overrideWithValue(feedbackService),
-        if (appLockController != null)
-          appLockControllerProvider.overrideWith(() => appLockController),
       ],
       child: const WraitApp(),
     ),
@@ -886,20 +848,6 @@ class _TestQuotaNotifier extends SessionRecordQuotaStateNotifier {
     _currentQuota = null;
     try {
       state = null;
-    } catch (_) {}
-  }
-}
-
-class _TestAppLockController extends AppLockController {
-  AppLockState _currentState = const AppLockState.unlocked();
-
-  @override
-  AppLockState build() => _currentState;
-
-  void lock() {
-    _currentState = const AppLockState.locked();
-    try {
-      state = _currentState;
     } catch (_) {}
   }
 }

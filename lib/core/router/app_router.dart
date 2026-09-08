@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/app_lock/entry_lock_scope.dart';
 import '../../presentation/entries/entry_detail_screen.dart';
 import '../../presentation/entries/entry_list_screen.dart';
 import '../../presentation/main/main_screen.dart';
@@ -10,23 +11,28 @@ GoRouter buildAppRouter({String? initialLocation}) {
     initialLocation: _resolveInitialLocation(initialLocation),
     routes: [
       GoRoute(path: '/', builder: (context, state) => const MainScreen()),
-      GoRoute(
-        path: '/entries',
-        builder: (context, state) => const EntryListScreen(),
-      ),
-      GoRoute(
-        path: '/entry/:id',
-        redirect: (context, state) {
-          return _parseEntryId(state) == null ? '/entries' : null;
-        },
-        builder: (context, state) {
-          final entryId = _parseEntryId(state);
-          if (entryId == null) {
-            return const EntryListScreen();
-          }
+      ShellRoute(
+        builder: (context, state, child) => EntryLockScope(child: child),
+        routes: [
+          GoRoute(
+            path: '/entries',
+            builder: (context, state) => const EntryListScreen(),
+          ),
+          GoRoute(
+            path: '/entry/:id',
+            redirect: (context, state) {
+              return _parseEntryId(state) == null ? '/entries' : null;
+            },
+            builder: (context, state) {
+              final entryId = _parseEntryId(state);
+              if (entryId == null) {
+                return const EntryListScreen();
+              }
 
-          return EntryDetailScreen(entryId: entryId);
-        },
+              return EntryDetailScreen(entryId: entryId);
+            },
+          ),
+        ],
       ),
     ],
   );

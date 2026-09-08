@@ -7,7 +7,6 @@ import 'package:wiredash/wiredash.dart';
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
 import 'domain/model/supported_language.dart';
-import 'presentation/app_lock/app_lock_gate.dart';
 import 'presentation/theme/wrait_theme.dart';
 
 final appConfigProvider = Provider<AppConfig>(
@@ -44,7 +43,7 @@ class WraitApp extends ConsumerWidget {
                 child: routerChild,
               )
             : routerChild;
-        return AppLockGate(child: feedbackChild);
+        return feedbackChild;
       },
     );
   }

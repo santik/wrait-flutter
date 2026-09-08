@@ -13,7 +13,6 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
-import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
@@ -128,7 +127,7 @@ void main() {
     },
   );
 
-  testWidgets('background and app lock release keep-awake while listening', (
+  testWidgets('enabled entries lock does not block main keep-awake behavior', (
     tester,
   ) async {
     final harness = await _createHarness(appLockEnabled: true);
@@ -155,16 +154,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    harness.appLockController.lock();
-    await tester.pump();
-    await tester.pump();
-
-    expect(harness.displayAwakeService.requests, <bool>[
-      true,
-      false,
-      true,
-      false,
-    ]);
+    expect(harness.displayAwakeService.requests, <bool>[true, false, true]);
   });
 }
 
@@ -172,13 +162,11 @@ class _Harness {
   _Harness({
     required this.app,
     required this.recordingController,
-    required this.appLockController,
     required this.displayAwakeService,
   });
 
   final Widget app;
   final _TestMainRecordingController recordingController;
-  final _TestAppLockController appLockController;
   final FakeDisplayAwakeService displayAwakeService;
 }
 
@@ -186,7 +174,6 @@ Future<_Harness> _createHarness({bool appLockEnabled = false}) async {
   SharedPreferences.setMockInitialValues(const <String, Object>{});
   final sharedPreferences = await SharedPreferences.getInstance();
   final recordingController = _TestMainRecordingController();
-  final appLockController = _TestAppLockController();
   final displayAwakeService = FakeDisplayAwakeService();
 
   final app = ProviderScope(
@@ -200,7 +187,6 @@ Future<_Harness> _createHarness({bool appLockEnabled = false}) async {
       ),
       appRouterProvider.overrideWithValue(buildAppRouter()),
       appLockEnabledProvider.overrideWithValue(appLockEnabled),
-      appLockControllerProvider.overrideWith(() => appLockController),
       sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       preferencesRepositoryProvider.overrideWithValue(
         _TestPreferencesRepository(),
@@ -215,7 +201,6 @@ Future<_Harness> _createHarness({bool appLockEnabled = false}) async {
   return _Harness(
     app: app,
     recordingController: recordingController,
-    appLockController: appLockController,
     displayAwakeService: displayAwakeService,
   );
 }
@@ -236,20 +221,6 @@ class _TestMainRecordingController extends MainRecordingController {
     _currentState = nextState;
     try {
       state = nextState;
-    } catch (_) {}
-  }
-}
-
-class _TestAppLockController extends AppLockController {
-  AppLockState _currentState = const AppLockState.unlocked();
-
-  @override
-  AppLockState build() => _currentState;
-
-  void lock() {
-    _currentState = const AppLockState.locked();
-    try {
-      state = _currentState;
     } catch (_) {}
   }
 }

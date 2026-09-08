@@ -1,19 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
 import 'package:wrait/presentation/main/recording_display_awake_coordinator.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 import '../../test_doubles/fake_display_awake_service.dart';
 
 void main() {
-  test('enables keep-awake while resumed, unlocked, and listening', () async {
+  test('enables keep-awake while resumed and listening', () async {
     final service = FakeDisplayAwakeService();
     RecordingDisplayAwakeCoordinator(
       service: service,
       recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     await service.flush();
@@ -26,7 +24,6 @@ void main() {
       service: service,
       recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     await service.flush();
@@ -42,7 +39,6 @@ void main() {
       service: service,
       recordingState: const RecordingIdle(),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     coordinator.updateRecordingState(const RecordingProcessing());
@@ -58,18 +54,20 @@ void main() {
     expect(service.requests, isEmpty);
   });
 
-  test('starts released when initialized outside the resumed lifecycle', () async {
-    final service = FakeDisplayAwakeService();
-    RecordingDisplayAwakeCoordinator(
-      service: service,
-      recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
-      lifecycleState: AppLifecycleState.inactive,
-      appLockState: const AppLockState.unlocked(),
-    );
+  test(
+    'starts released when initialized outside the resumed lifecycle',
+    () async {
+      final service = FakeDisplayAwakeService();
+      RecordingDisplayAwakeCoordinator(
+        service: service,
+        recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
+        lifecycleState: AppLifecycleState.inactive,
+      );
 
-    await service.flush();
-    expect(service.requests, isEmpty);
-  });
+      await service.flush();
+      expect(service.requests, isEmpty);
+    },
+  );
 
   test(
     'releases on lifecycle exit and reacquires on resume if still listening',
@@ -79,7 +77,6 @@ void main() {
         service: service,
         recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
         lifecycleState: AppLifecycleState.resumed,
-        appLockState: const AppLockState.unlocked(),
       );
 
       await service.flush();
@@ -92,34 +89,12 @@ void main() {
     },
   );
 
-  test(
-    'releases on app lock and reacquires after unlock if still listening',
-    () async {
-      final service = FakeDisplayAwakeService();
-      final coordinator = RecordingDisplayAwakeCoordinator(
-        service: service,
-        recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
-        lifecycleState: AppLifecycleState.resumed,
-        appLockState: const AppLockState.unlocked(),
-      );
-
-      await service.flush();
-      coordinator.updateAppLockState(const AppLockState.locked());
-      await service.flush();
-      coordinator.updateAppLockState(const AppLockState.unlocked());
-
-      await service.flush();
-      expect(service.requests, <bool>[true, false, true]);
-    },
-  );
-
   test('duplicate active and inactive transitions are idempotent', () async {
     final service = FakeDisplayAwakeService();
     final coordinator = RecordingDisplayAwakeCoordinator(
       service: service,
       recordingState: const RecordingIdle(),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     coordinator.updateRecordingState(
@@ -145,7 +120,6 @@ void main() {
         service: service,
         recordingState: const RecordingIdle(),
         lifecycleState: AppLifecycleState.resumed,
-        appLockState: const AppLockState.unlocked(),
       );
 
       coordinator.updateRecordingState(
@@ -166,7 +140,6 @@ void main() {
       service: service,
       recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     await service.flush();
@@ -183,7 +156,6 @@ void main() {
       service: service,
       recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     await service.flush();
@@ -210,7 +182,6 @@ void main() {
       service: service,
       recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     await service.flush();
@@ -230,7 +201,6 @@ void main() {
       service: service,
       recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
       lifecycleState: AppLifecycleState.resumed,
-      appLockState: const AppLockState.unlocked(),
     );
 
     await service.flush();
@@ -242,8 +212,6 @@ void main() {
       RecordingListening(hardCapDeadlineElapsedRealtime: 2),
     );
     coordinator.updateLifecycleState(AppLifecycleState.resumed);
-    coordinator.updateAppLockState(const AppLockState.unlocked());
-
     await service.flush();
     expect(service.requests, <bool>[true, false]);
   });

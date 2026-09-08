@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wrait/app.dart';
@@ -17,29 +18,126 @@ import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/app_lock/app_lock_test_keys.dart';
-import 'package:wrait/presentation/feedback/feedback_preparation_sheet.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
-import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('cold launch auto-unlocks on success', (tester) async {
+  testWidgets('main cold launch is usable without authentication', (
+    tester,
+  ) async {
+    final harness = await _buildHarness(authResults: const []);
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+    expect(find.byKey(appLockOverlayKey), findsNothing);
+    expect(harness.authenticator.authenticateCallCount, 0);
+  });
+
+  testWidgets('main remains usable after a foreground cycle without auth', (
+    tester,
+  ) async {
+    final harness = await _buildHarness(authResults: const []);
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+    expect(find.byKey(appLockOverlayKey), findsNothing);
+    expect(harness.authenticator.authenticateCallCount, 0);
+  });
+
+  testWidgets('entries stay locked until auth succeeds and share one visit', (
+    tester,
+  ) async {
     final harness = await _buildHarness(
-      authResults: <AppLockAuthResult>[AppLockAuthResult.success],
+      initialLocation: '/entries',
+      authResults: <AppLockAuthResult>[
+        AppLockAuthResult.canceled,
+        AppLockAuthResult.success,
+      ],
     );
 
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    expect(find.byKey(appLockOverlayKey), findsNothing);
-    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
     expect(harness.authenticator.authenticateCallCount, 1);
-    expect(find.byType(FlutterLogo), findsNothing);
+    expect(find.byKey(appLockOverlayKey), findsOneWidget);
+    expect(find.byKey(appLockBlurKey), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('entryCard-1')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
+    expect(harness.authenticator.authenticateCallCount, 1);
+
+    await tester.tap(find.byKey(appLockUnlockButtonKey));
+    await tester.pumpAndSettle();
+
+    expect(harness.authenticator.authenticateCallCount, 2);
+    expect(find.byKey(appLockOverlayKey), findsNothing);
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entryCard-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('synthetic entry text'), findsOneWidget);
+    expect(harness.authenticator.authenticateCallCount, 2);
   });
 
-  testWidgets('background and resume re-locks then auto-prompts again', (
+  testWidgets('a direct valid detail route starts locked', (tester) async {
+    final harness = await _buildHarness(
+      initialLocation: '/entry/1',
+      authResults: <AppLockAuthResult>[
+        AppLockAuthResult.canceled,
+        AppLockAuthResult.success,
+      ],
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    expect(harness.authenticator.authenticateCallCount, 1);
+    expect(find.byKey(appLockOverlayKey), findsOneWidget);
+    expect(find.byKey(appLockBlurKey), findsOneWidget);
+
+    await tester.tap(find.byKey(appLockUnlockButtonKey));
+    await tester.pumpAndSettle();
+
+    expect(harness.authenticator.authenticateCallCount, 2);
+    expect(find.byKey(appLockOverlayKey), findsNothing);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.text('synthetic entry text'), findsOneWidget);
+  });
+
+  testWidgets('an invalid direct detail route redirects to protected entries', (
+    tester,
+  ) async {
+    final harness = await _buildHarness(
+      initialLocation: '/entry/not-a-number',
+      authResults: <AppLockAuthResult>[AppLockAuthResult.canceled],
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    expect(harness.authenticator.authenticateCallCount, 1);
+    expect(find.byKey(appLockOverlayKey), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
+  });
+
+  testWidgets('returning from main starts a new protected entries visit', (
     tester,
   ) async {
     final harness = await _buildHarness(
@@ -51,6 +149,38 @@ void main() {
 
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
+
+    harness.router.go('/entries');
+    await tester.pumpAndSettle();
+    expect(harness.authenticator.authenticateCallCount, 1);
+    expect(find.byKey(appLockOverlayKey), findsNothing);
+
+    harness.router.go('/');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+
+    harness.router.go('/entries');
+    await tester.pumpAndSettle();
+
+    expect(harness.authenticator.authenticateCallCount, 2);
+    expect(find.byKey(appLockOverlayKey), findsOneWidget);
+    expect(find.text('still locked'), findsOneWidget);
+  });
+
+  testWidgets('foreground exit relocks entries but not main', (tester) async {
+    final harness = await _buildHarness(
+      authResults: <AppLockAuthResult>[
+        AppLockAuthResult.success,
+        AppLockAuthResult.canceled,
+      ],
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    harness.router.go('/entries');
+    await tester.pumpAndSettle();
+    expect(harness.authenticator.authenticateCallCount, 1);
     expect(find.byKey(appLockOverlayKey), findsNothing);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -59,16 +189,20 @@ void main() {
 
     expect(harness.authenticator.authenticateCallCount, 2);
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
-    expect(find.text('still locked'), findsOneWidget);
-    expect(find.byType(FlutterLogo), findsNothing);
+
+    harness.router.go('/');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+    expect(find.byKey(appLockOverlayKey), findsNothing);
   });
 
   testWidgets(
-    'inactive lifecycle churn during in-flight auth does not restart the prompt',
+    'inactive lifecycle churn during an entry auth prompt does not restart it',
     (tester) async {
       final completer = Completer<AppLockAuthResult>();
       final harness = await _buildHarness(
-        authResults: <AppLockAuthResult>[],
+        initialLocation: '/entries',
+        authResults: const [],
         authenticateCompleter: completer,
       );
 
@@ -76,6 +210,7 @@ void main() {
       await tester.pump();
 
       expect(harness.authenticator.authenticateCallCount, 1);
+      expect(find.byKey(appLockOverlayKey), findsOneWidget);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -88,33 +223,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(appLockOverlayKey), findsNothing);
+      expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
     },
   );
 
-  testWidgets('cancel keeps locked until retry succeeds', (tester) async {
+  testWidgets('no-security recovery remains limited to entries', (
+    tester,
+  ) async {
     final harness = await _buildHarness(
-      authResults: <AppLockAuthResult>[
-        AppLockAuthResult.canceled,
-        AppLockAuthResult.success,
-      ],
-    );
-
-    await tester.pumpWidget(harness.app);
-    await tester.pumpAndSettle();
-
-    expect(find.text('still locked'), findsOneWidget);
-    expect(find.byKey(appLockOverlayKey), findsOneWidget);
-    expect(find.byType(FlutterLogo), findsNothing);
-
-    await tester.tap(find.byKey(appLockUnlockButtonKey));
-    await tester.pumpAndSettle();
-
-    expect(harness.authenticator.authenticateCallCount, 2);
-    expect(find.byKey(appLockOverlayKey), findsNothing);
-  });
-
-  testWidgets('no-security offers settings and bypass', (tester) async {
-    final harness = await _buildHarness(
+      initialLocation: '/entries',
       authResults: <AppLockAuthResult>[AppLockAuthResult.noSecurityConfigured],
     );
 
@@ -125,7 +242,8 @@ void main() {
       find.text('set up device security to protect Wrait'),
       findsOneWidget,
     );
-    expect(find.byType(FlutterLogo), findsNothing);
+    expect(find.byKey(appLockSettingsButtonKey), findsOneWidget);
+    expect(find.byKey(appLockBypassButtonKey), findsOneWidget);
 
     await tester.tap(find.byKey(appLockSettingsButtonKey));
     await tester.pump();
@@ -134,12 +252,14 @@ void main() {
     await tester.tap(find.byKey(appLockBypassButtonKey));
     await tester.pumpAndSettle();
     expect(find.byKey(appLockOverlayKey), findsNothing);
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
   });
 
-  testWidgets('temporary unavailable stays locked and allows retry', (
+  testWidgets('temporary unavailability keeps entries locked until retry', (
     tester,
   ) async {
     final harness = await _buildHarness(
+      initialLocation: '/entries',
       authResults: <AppLockAuthResult>[
         AppLockAuthResult.temporarilyUnavailable,
         AppLockAuthResult.success,
@@ -151,81 +271,38 @@ void main() {
 
     expect(find.text('unlock unavailable · try again'), findsOneWidget);
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
-    expect(find.byType(FlutterLogo), findsNothing);
 
     await tester.tap(find.byKey(appLockUnlockButtonKey));
     await tester.pumpAndSettle();
 
     expect(harness.authenticator.authenticateCallCount, 2);
     expect(find.byKey(appLockOverlayKey), findsNothing);
+    expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
   });
-
-  testWidgets(
-    'app lock covers an open feedback surface after foreground exit',
-    (tester) async {
-      final harness = await _buildHarness(
-        authResults: <AppLockAuthResult>[
-          AppLockAuthResult.success,
-          AppLockAuthResult.canceled,
-          AppLockAuthResult.success,
-        ],
-      );
-
-      await tester.pumpWidget(harness.app);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(mainFeedbackButtonKey));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
-      await tester.tap(find.text('Idea'));
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(appLockOverlayKey), findsOneWidget);
-      expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
-
-      await tester.tap(
-        find.byKey(feedbackSubmitButtonKey),
-        warnIfMissed: false,
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(feedbackPrivacyCopyKey), findsOneWidget);
-
-      await tester.tap(find.byKey(appLockUnlockButtonKey));
-      await tester.pumpAndSettle();
-      expect(find.byKey(appLockOverlayKey), findsNothing);
-
-      await tester.tap(find.text('cancel'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(feedbackPrivacyCopyKey), findsNothing);
-    },
-  );
 }
 
 class _Harness {
   const _Harness({
     required this.app,
+    required this.router,
     required this.authenticator,
     required this.settingsOpener,
   });
 
   final Widget app;
+  final GoRouter router;
   final _FakeAppLockAuthenticator authenticator;
   final _FakeDeviceSecuritySettingsOpener settingsOpener;
 }
 
 Future<_Harness> _buildHarness({
   required List<AppLockAuthResult> authResults,
+  String initialLocation = '/',
   Completer<AppLockAuthResult>? authenticateCompleter,
 }) async {
   SharedPreferences.setMockInitialValues(const <String, Object>{});
   final sharedPreferences = await SharedPreferences.getInstance();
+  final router = buildAppRouter(initialLocation: initialLocation);
   final authenticator = _FakeAppLockAuthenticator(
     authResults,
     authenticateCompleter: authenticateCompleter,
@@ -241,7 +318,8 @@ Future<_Harness> _buildHarness({
           recordingHardCapMs: 120000,
         ),
       ),
-      appRouterProvider.overrideWithValue(buildAppRouter()),
+      appRouterProvider.overrideWithValue(router),
+      appLockEnabledProvider.overrideWithValue(true),
       sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       appLockAuthenticatorProvider.overrideWithValue(authenticator),
       deviceSecuritySettingsOpenerProvider.overrideWithValue(settingsOpener),
@@ -256,6 +334,7 @@ Future<_Harness> _buildHarness({
 
   return _Harness(
     app: app,
+    router: router,
     authenticator: authenticator,
     settingsOpener: settingsOpener,
   );
@@ -265,7 +344,7 @@ class _FakeAppLockAuthenticator implements AppLockAuthenticator {
   _FakeAppLockAuthenticator(
     List<AppLockAuthResult> authResults, {
     this.authenticateCompleter,
-  }) : _authResults = authResults;
+  }) : _authResults = List<AppLockAuthResult>.from(authResults);
 
   final List<AppLockAuthResult> _authResults;
   Completer<AppLockAuthResult>? authenticateCompleter;
@@ -329,13 +408,15 @@ class _TestEntryRepository implements EntryRepository {
 
   @override
   Stream<List<Entry>> watchAllEntries() =>
-      Stream<List<Entry>>.value(const <Entry>[]);
+      Stream<List<Entry>>.value(const <Entry>[_syntheticEntry]);
 
   @override
-  Stream<Entry?> watchEntryById(int id) => const Stream<Entry?>.empty();
+  Stream<Entry?> watchEntryById(int id) =>
+      Stream<Entry?>.value(id == _syntheticEntry.id ? _syntheticEntry : null);
 
   @override
-  Future<Entry?> getEntryById(int id) async => null;
+  Future<Entry?> getEntryById(int id) async =>
+      id == _syntheticEntry.id ? _syntheticEntry : null;
 
   @override
   Future<void> importEntries(List<Entry> entries) async {}
@@ -394,6 +475,16 @@ class _TestEntryRepository implements EntryRepository {
   @override
   Future<void> deleteStaleDrafts({int daysOld = 7}) async {}
 }
+
+const _syntheticEntry = Entry(
+  id: 1,
+  rawTranscript: 'synthetic entry text',
+  cleanedText: 'synthetic entry text',
+  type: EntryType.saved,
+  language: 'en-US',
+  createdAt: 1781341200000,
+  wordCount: 3,
+);
 
 class _TestPreferencesRepository implements PreferencesRepository {
   const _TestPreferencesRepository();

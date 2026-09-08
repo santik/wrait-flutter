@@ -7,12 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app.dart';
-import '../../data/auth/app_lock_providers.dart';
 import '../../data/api/backend_providers.dart';
 import '../../data/audio/audio_recording_providers.dart';
 import '../../data/display/display_awake_service.dart';
 import '../../data/preferences/preferences_providers.dart';
-import '../app_lock/app_lock_controller.dart';
 import '../feedback/feedback_providers.dart';
 import '../feedback/feedback_service.dart';
 import '../theme/design_tokens.dart';
@@ -59,7 +57,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
       recordingState: ref.read(mainRecordingControllerProvider).recordingState,
       lifecycleState:
           WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.inactive,
-      appLockState: _readEffectiveAppLockState(),
     );
     _loadHasEverRecorded();
   }
@@ -160,15 +157,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
         previous?.recordingState,
         next.recordingState,
       );
-    });
-    ref.listen<bool>(appLockEnabledProvider, (previous, next) {
-      _displayAwakeCoordinator.updateAppLockState(_readEffectiveAppLockState());
-    });
-    ref.listen<AppLockState>(appLockControllerProvider, (previous, next) {
-      if (!ref.read(appLockEnabledProvider)) {
-        return;
-      }
-      _displayAwakeCoordinator.updateAppLockState(next);
     });
 
     final controllerState = ref.watch(mainRecordingControllerProvider);
@@ -429,13 +417,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
         _measuredPulseDiameter = measuredPulseDiameter;
       });
     });
-  }
-
-  AppLockState _readEffectiveAppLockState() {
-    if (!ref.read(appLockEnabledProvider)) {
-      return const AppLockState.unlocked();
-    }
-    return ref.read(appLockControllerProvider);
   }
 
   void _handleControllerTransition(

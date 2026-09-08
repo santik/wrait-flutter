@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../data/display/display_awake_service.dart';
-import '../app_lock/app_lock_controller.dart';
 import 'recording_state.dart';
 
 class RecordingDisplayAwakeCoordinator {
@@ -11,7 +10,6 @@ class RecordingDisplayAwakeCoordinator {
     required this._service,
     required this._recordingState,
     required this._lifecycleState,
-    required this._appLockState,
   }) : _desiredAwake = false,
        _appliedAwake = false {
     _recompute();
@@ -20,7 +18,6 @@ class RecordingDisplayAwakeCoordinator {
   final DisplayAwakeService _service;
   RecordingState _recordingState;
   AppLifecycleState _lifecycleState;
-  AppLockState _appLockState;
   bool _desiredAwake;
   bool _appliedAwake;
   Future<void> _operationQueue = Future<void>.value();
@@ -48,17 +45,6 @@ class RecordingDisplayAwakeCoordinator {
     _recompute();
   }
 
-  void updateAppLockState(AppLockState appLockState) {
-    if (_isDisposed) {
-      return;
-    }
-    if (_appLockState == appLockState && !_needsSync) {
-      return;
-    }
-    _appLockState = appLockState;
-    _recompute();
-  }
-
   void dispose() {
     if (_isDisposed) {
       return;
@@ -74,7 +60,6 @@ class RecordingDisplayAwakeCoordinator {
     }
     final shouldKeepAwake =
         _lifecycleState == AppLifecycleState.resumed &&
-        !_appLockState.isLocked &&
         _recordingState is RecordingListening;
     if (_desiredAwake == shouldKeepAwake && !_needsSync) {
       return;
