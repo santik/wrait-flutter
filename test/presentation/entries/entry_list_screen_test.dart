@@ -51,6 +51,31 @@ void main() {
     expect(find.byKey(const ValueKey('entryListImportButton')), findsOneWidget);
   });
 
+  testWidgets('uses a compact single-row entry-list header', (tester) async {
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+
+    final backRect = tester.getRect(
+      find.byKey(const ValueKey('entryListBackButton')),
+    );
+    final searchRect = tester.getRect(
+      find.byKey(const ValueKey('entryListSearchField')),
+    );
+    final importRect = tester.getRect(
+      find.byKey(const ValueKey('entryListImportButton')),
+    );
+    final exportRect = tester.getRect(
+      find.byKey(const ValueKey('entryListExportButton')),
+    );
+    final screenWidth = tester.getSize(find.byType(Scaffold)).width;
+
+    expect(backRect.left, lessThanOrEqualTo(4));
+    expect(searchRect.left, greaterThan(backRect.right));
+    expect(searchRect.right, lessThan(importRect.left));
+    expect(searchRect.center.dy, closeTo(backRect.center.dy, 0.01));
+    expect(importRect.right, closeTo(exportRect.left, 0.01));
+    expect(exportRect.right, greaterThan(screenWidth - 8));
+  });
+
   testWidgets('renders populated entries newest first with language labels', (
     tester,
   ) async {

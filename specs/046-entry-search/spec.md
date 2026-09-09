@@ -15,6 +15,7 @@
 | 2026-09-08 | Approved | Codex | Finalized spec approved for planning. |
 | 2026-09-08 | In Progress | Codex | Analysis approved; implementation started on `codex/feat/entry-list-search`. |
 | 2026-09-08 | Awaiting External Review | Codex | Implementation and planned validation completed; waiting for externally authored review. |
+| 2026-09-09 | Awaiting External Review | Codex | User-requested compact one-row header refinement implemented and revalidated; external review remains deferred until the feature is considered correctly implemented. |
 
 ---
 
@@ -42,6 +43,9 @@ fuzzy matching, metadata filters, or semantic search.
 
 - [x] The entries list contains an accessible search field labelled
       `Search entries`.
+- [x] The search field sits in a compact single header row between Back on the
+      leading edge and Import/Export on the trailing edge, without reducing
+      either action's tap target.
 - [x] With an empty or whitespace-only query, the list shows all existing
       entries in the current newest-first order.
 - [x] The query is trimmed and split at whitespace. Each remaining term is a
@@ -93,8 +97,9 @@ raw-transcript values.
 ## UX / design references
 
 No external design reference is required for the first version. The search
-control should follow the existing entries-screen spacing, typography, colors,
-and accessibility conventions.
+control should follow the existing entries-screen typography, colors, and
+accessibility conventions while sharing a compact top row with Back and the
+Import/Export actions.
 
 ## Non-functional requirements
 
@@ -128,7 +133,7 @@ and accessibility conventions.
 
 ## Test strategy
 
-- Widget coverage will verify the initial unfiltered list, whitespace-only and
+- Widget coverage will verify the compact header geometry, initial unfiltered list, whitespace-only and
   multi-term queries, matching across cleaned and raw text, saved and draft
   results, audio-only draft behavior, newest-first ordering, no-results and
   clear-search behavior, semantics, and no automatic keyboard focus.

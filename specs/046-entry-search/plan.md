@@ -11,8 +11,8 @@
 
 Keep the existing reactive, newest-first entry list as the source collection
 and add a screen-local query that filters that collection in the presentation
-layer. The entries screen will render a non-autofocused text field beneath its
-existing navigation and import/export controls, show either the filtered rows,
+layer. The entries screen will render a non-autofocused text field between its
+Back and Import/Export controls in a compact single header row, show either the filtered rows,
 the established empty state, or a clearable no-results state, and continue to
 use the unfiltered collection for export. The implementation deliberately adds
 no persistence, API, database, or dependency change; it is the smallest path
@@ -29,7 +29,7 @@ replace the local matching implementation.
 | Matching execution | Filter immediately on query changes; do not debounce | Filtering the collection already displayed by the screen is synchronous and local. Debouncing adds state, timing edge cases, and test complexity without a user-visible need in this intentionally small version. |
 | Sorting | Sort first through the existing provider, then preserve that order while filtering | It maintains the established newest-first list behavior rather than introducing relevance ranking. |
 | Screen ownership | Convert `EntryListScreen` to a `ConsumerStatefulWidget` with a text controller used only by the field | A controller makes the clear action reset both the visible field and query state reliably. It is disposed with the screen, and `autofocus` remains disabled. |
-| UI layout | Place the existing back/import/export controls and the search field in a normal top section above an expanded list area | This prevents the field, keyboard, and list content from competing in the current overlay layout, while retaining existing navigation and action controls. |
+| UI layout | Put Back, an expanded search field, Import, and Export in one compact top row above an expanded list area | Four-pixel horizontal header insets move Back toward the leading edge and Import/Export toward the trailing edge. The adjacent 48dp IconButton targets preserve accessible action size while avoiding a visually excessive gap. The list retains its normal content insets. |
 | Export scope | Keep `allEntries` separate from `filteredEntries` and pass only `allEntries` to export | Export must remain a full collection export even when the visible list is filtered. The explicit separation prevents an accidental behavior change. |
 | Storage/search index | No database search index, schema migration, or model change | The spec explicitly excludes storage changes. An indexed full-text implementation would introduce migration and cross-platform database validation beyond this first version. |
 | Privacy/diagnostics | Do not add query/content logging | Search terms and entries are private journal data; the feature needs no observability beyond existing sanitized error handling. |
@@ -118,7 +118,7 @@ underlying collection.
 | Blank and whitespace-only queries retain every incoming entry in newest-first order | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
 | Case-insensitive all-term filtering matches terms in cleaned text, raw transcript, or a combination of both and preserves source order | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
 | Saved/draft text entries can match, while an audio-only draft only appears for an empty query | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
-| The field is visible, does not autofocus, filters as text changes, supports keyboard input, and has labelled search/clear semantics | Widget/accessibility | `test/presentation/entries/entry_list_screen_test.dart` |
+| The compact header keeps Back leading, search between the actions, and adjacent Import/Export actions trailing; the field is visible, does not autofocus, filters as text changes, supports keyboard input, and has labelled search/clear semantics | Widget/accessibility | `test/presentation/entries/entry_list_screen_test.dart` |
 | A non-empty unmatched query shows `No matching entries`; clearing restores the full list | Widget | `test/presentation/entries/entry_list_screen_test.dart` |
 | Matching readable rows still open, matching rows can still be deleted, and stream-driven import/edit/delete changes refresh visible results | Widget | `test/presentation/entries/entry_list_screen_test.dart` |
 | Export includes nonmatching entries while a query is active; import continues to operate on the full collection and matching imports appear reactively | Widget | `test/presentation/entries/entry_list_screen_test.dart` |
@@ -206,7 +206,7 @@ entries exist.
 | --- | --- | --- | --- |
 | A filtered list is accidentally passed to export | Medium | High | Keep explicit `allEntries` and `filteredEntries` values in the screen and assert a nonmatching entry is exported in widget and integration coverage. |
 | The query survives leaving `/entries` | Low | Medium | Use an auto-disposed provider, screen-owned controller, and widget/runtime coverage that re-enters the list unfiltered. |
-| The new field crowds existing controls or becomes obscured by the keyboard | Medium | Medium | Use a dedicated header/list layout instead of competing positioned overlays; verify focus, semantics, and keyboard use on both platforms. |
+| The new field crowds existing controls or becomes obscured by the keyboard | Medium | Medium | Use a compact single header row with an expanded field and normal-sized action targets; verify header geometry, focus, semantics, and keyboard use on both platforms. |
 | A reactive import, edit, or deletion leaves stale visible results | Low | Medium | Derive filtered rows solely from the existing entry stream plus current query; cover stream-driven changes in widget and integration tests. |
 | Filtering becomes slow for a much larger journal | Low for the current first-version scope | Medium | Reuse the already materialized list now and retain the functional contract for a future indexed-search story if usage demonstrates a need. |
 | Query or journal text appears in logs | Low | High | Add no search logging and keep test/runtime evidence synthetic. |

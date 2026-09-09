@@ -45,120 +45,139 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
       child: Scaffold(
         body: SafeArea(
           child: Padding(
-            padding: WraitDesignTokens.screenPadding,
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Semantics(
-                      button: true,
-                      label: 'Back to main screen',
-                      child: IconButton(
-                        key: const ValueKey('entryListBackButton'),
-                        onPressed: () => _navigateBack(context),
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        tooltip: 'Back',
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: WraitSpacingTokens.lg,
+                    left: WraitSpacingTokens.xs,
+                    right: WraitSpacingTokens.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Semantics(
+                        button: true,
+                        label: 'Back to main screen',
+                        child: IconButton(
+                          key: const ValueKey('entryListBackButton'),
+                          onPressed: () => _navigateBack(context),
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          tooltip: 'Back',
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    Semantics(
-                      button: !controllerState.isImporting,
-                      enabled: !controllerState.isImporting,
-                      label: controllerState.isImporting
-                          ? 'Importing entries'
-                          : 'Import entries',
-                      liveRegion: controllerState.isImporting,
-                      child: IconButton(
-                        key: const ValueKey('entryListImportButton'),
-                        onPressed: controllerState.isImporting
-                            ? null
-                            : () => _importEntries(context),
-                        icon: controllerState.isImporting
-                            ? Semantics(
-                                label: 'Importing entries',
-                                child: const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                      const SizedBox(width: WraitSpacingTokens.xs),
+                      Expanded(
+                        child: TextField(
+                          key: const ValueKey('entryListSearchField'),
+                          controller: _searchController,
+                          autofocus: false,
+                          onChanged: (query) {
+                            ref
+                                .read(entryListSearchQueryProvider.notifier)
+                                .update(query);
+                          },
+                          textInputAction: TextInputAction.search,
+                          decoration: InputDecoration(
+                            labelText: 'Search entries',
+                            hintText: 'Search entries',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            suffixIcon: searchQuery.isEmpty
+                                ? null
+                                : Semantics(
+                                    button: true,
+                                    label: 'Clear search',
+                                    child: IconButton(
+                                      key: const ValueKey(
+                                        'entryListClearSearchButton',
+                                      ),
+                                      onPressed: _clearSearch,
+                                      icon: const Icon(Icons.close_rounded),
+                                      tooltip: 'Clear search',
+                                    ),
                                   ),
-                                ),
-                              )
-                            : const Icon(Icons.file_upload_outlined),
-                        tooltip: controllerState.isImporting
-                            ? 'Importing CSV'
-                            : 'Import CSV',
-                      ),
-                    ),
-                    Semantics(
-                      button: !controllerState.isExporting,
-                      enabled: !controllerState.isExporting,
-                      label: controllerState.isExporting
-                          ? 'Exporting entries'
-                          : 'Export entries',
-                      liveRegion: controllerState.isExporting,
-                      child: IconButton(
-                        key: const ValueKey('entryListExportButton'),
-                        onPressed: controllerState.isExporting
-                            ? null
-                            : () => _exportEntries(context, allEntries),
-                        icon: controllerState.isExporting
-                            ? Semantics(
-                                label: 'Exporting entries',
-                                child: const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.file_download_outlined),
-                        tooltip: controllerState.isExporting
-                            ? 'Exporting CSV'
-                            : 'Export CSV',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: WraitSpacingTokens.md),
-                TextField(
-                  key: const ValueKey('entryListSearchField'),
-                  controller: _searchController,
-                  autofocus: false,
-                  onChanged: (query) {
-                    ref
-                        .read(entryListSearchQueryProvider.notifier)
-                        .update(query);
-                  },
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    labelText: 'Search entries',
-                    hintText: 'Search entries',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: searchQuery.isEmpty
-                        ? null
-                        : Semantics(
-                            button: true,
-                            label: 'Clear search',
-                            child: IconButton(
-                              key: const ValueKey('entryListClearSearchButton'),
-                              onPressed: _clearSearch,
-                              icon: const Icon(Icons.close_rounded),
-                              tooltip: 'Clear search',
-                            ),
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: WraitSpacingTokens.xs),
+                      Semantics(
+                        button: !controllerState.isImporting,
+                        enabled: !controllerState.isImporting,
+                        label: controllerState.isImporting
+                            ? 'Importing entries'
+                            : 'Import entries',
+                        liveRegion: controllerState.isImporting,
+                        child: IconButton(
+                          key: const ValueKey('entryListImportButton'),
+                          onPressed: controllerState.isImporting
+                              ? null
+                              : () => _importEntries(context),
+                          icon: controllerState.isImporting
+                              ? Semantics(
+                                  label: 'Importing entries',
+                                  child: const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(Icons.file_upload_outlined),
+                          tooltip: controllerState.isImporting
+                              ? 'Importing CSV'
+                              : 'Import CSV',
+                        ),
+                      ),
+                      Semantics(
+                        button: !controllerState.isExporting,
+                        enabled: !controllerState.isExporting,
+                        label: controllerState.isExporting
+                            ? 'Exporting entries'
+                            : 'Export entries',
+                        liveRegion: controllerState.isExporting,
+                        child: IconButton(
+                          key: const ValueKey('entryListExportButton'),
+                          onPressed: controllerState.isExporting
+                              ? null
+                              : () => _exportEntries(context, allEntries),
+                          icon: controllerState.isExporting
+                              ? Semantics(
+                                  label: 'Exporting entries',
+                                  child: const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(Icons.file_download_outlined),
+                          tooltip: controllerState.isExporting
+                              ? 'Exporting CSV'
+                              : 'Export CSV',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: WraitSpacingTokens.md),
                 Expanded(
-                  child: _buildEntriesContent(
-                    context,
-                    theme: theme,
-                    allEntries: allEntries,
-                    filteredEntries: filteredEntries,
-                    hasActiveQuery: hasActiveQuery,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      WraitSpacingTokens.lg,
+                      0,
+                      WraitSpacingTokens.lg,
+                      WraitSpacingTokens.lg,
+                    ),
+                    child: _buildEntriesContent(
+                      context,
+                      theme: theme,
+                      allEntries: allEntries,
+                      filteredEntries: filteredEntries,
+                      hasActiveQuery: hasActiveQuery,
+                    ),
                   ),
                 ),
               ],

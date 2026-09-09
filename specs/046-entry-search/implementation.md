@@ -27,8 +27,11 @@ backend, API, CSV, dependency, or migration change.
   those two fields.
 - Converted the entries screen to a stateful Riverpod consumer so it owns and
   disposes its text controller. The Search entries field does not autofocus.
-- Kept the top navigation/import/export controls, placed the field below them,
-  and used the filtered collection only for visible rows.
+- Refined the header into one compact row: Back sits at the leading edge, the
+  expanded Search entries field sits between the actions, and adjacent
+  normal-sized Import/Export actions sit at the trailing edge. The list keeps
+  its normal content insets, and only the filtered collection drives visible
+  rows.
 - Added a clear icon and a distinct No matching entries state with a second
   accessible Clear search action.
 - Preserved the real all-entries collection for export, so a query never
@@ -54,11 +57,17 @@ backend, API, CSV, dependency, or migration change.
     matching, source order, drafts, and audio-only drafts.
 - test/presentation/entries/entry_list_screen_test.dart
   - Added field semantics/focus, live filtering, no-results, clear, reactive
-    update, route-reset, deletion, import, and export-scope coverage.
+    update, route-reset, deletion, import, export-scope, and compact-header
+    geometry coverage.
 - integration_test/entry_list_flow_test.dart
   - Added a persisted-entry flow that searches synthetic records, verifies
     export scope while filtered, re-enters unfiltered, deletes a match, clears
     a no-results state, and verifies a matching import is visible.
+- integration_test/orientation_lock_flow_test.dart
+  - Replaced its invalid direct paused-to-resumed lifecycle jump with the
+    platform-valid inactive, hidden, paused, hidden, inactive, resumed
+    sequence. The new search field exposed this latent test-fixture issue
+    because Flutter EditableText registers an AppLifecycleListener.
 
 ## Privacy and data outcome
 
@@ -70,7 +79,7 @@ unchanged.
 
 ## Validation evidence
 
-All commands were run from the repository root on 2026-09-08.
+Commands were run from the repository root on 2026-09-08 and 2026-09-09.
 
 ### Static and host-side validation
 
@@ -80,11 +89,29 @@ All commands were run from the repository root on 2026-09-08.
 - flutter analyze passed with no issues.
 - flutter test passed: 463 tests.
 - git diff --check passed.
+- Post-implementation regression correction on 2026-09-09:
+
+    flutter test -d 4A181FDJH0030G integration_test/orientation_lock_flow_test.dart
+
+  passed on the same Android phone that originally reported the failure.
+  This change affects only the integration test's lifecycle simulation; it
+  does not modify production search behavior.
+- Compact-header refinement on 2026-09-09:
+
+    dart format lib/presentation/entries/entry_list_screen.dart test/presentation/entries/entry_list_screen_test.dart
+    flutter test test/presentation/entries/entry_list_controller_test.dart test/presentation/entries/entry_list_screen_test.dart
+    flutter analyze
+
+  all passed; the targeted test command completed 40 tests.
 
 ### Android emulator
 
 - flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
   passed: 17 of 17 flows.
+- The compact-header refinement reran the same Android entry-list flow on
+  2026-09-09 and passed all 17 flows. The first post-change emulator attempt
+  stalled before Flutter rendered a frame; after an emulator restart, the
+  rerun installed normally and completed all assertions.
 - flutter build apk --debug completed successfully.
 - Launcher-style cold start of the actual debug identity succeeded:
 
@@ -123,6 +150,7 @@ future work rather than limitations of this approved first version.
 
 ## Review status
 
-Implementation and required automated/device validation are complete. The
-feature is awaiting an externally authored review.md. No review artifact has
-been created or pre-filled.
+Implementation and required automated/device validation are complete. The user
+explicitly deferred external review while the compact-header refinement was
+implemented; it remains outstanding. No review artifact has been created or
+pre-filled.

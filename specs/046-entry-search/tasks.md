@@ -33,7 +33,7 @@
 
 - [x] Convert the entries list to own and dispose a text controller, retain the
   current back/import/export behaviors, and lay out a non-autofocused search
-  field below the top actions without obscuring the scrollable content —
+  field without obscuring the scrollable content —
   `lib/presentation/entries/entry_list_screen.dart`
   - Depends on: Group 1 filtering contract
 - [x] Render filtered rows while preserving the established `no entries yet`
@@ -47,6 +47,11 @@
   continue to derive the current visible list —
   `lib/presentation/entries/entry_list_screen.dart`
   - Depends on: Group 1 filtering contract
+- [x] Refine the header into one compact row: move Back toward the leading
+  edge, fit the expanded search field between the controls, move Import/Export
+  toward the trailing edge, and keep their normal adjacent tap targets —
+  `lib/presentation/entries/entry_list_screen.dart`,
+  `test/presentation/entries/entry_list_screen_test.dart`
 
 ### Group 3: Automated coverage
 
@@ -95,6 +100,9 @@
   evidence with completed automated and dual-platform results —
   `specs/046-entry-search/spec.md`, `specs/046-entry-search/tasks.md`
   - Depends on: all previous validation tasks
+- [x] Revalidate the compact one-row header with geometry widget coverage,
+  targeted tests, static analysis, and the Android entry-list integration flow
+  — `test/presentation/entries/entry_list_screen_test.dart`
 
 ### Group 5: Implementation record and external review
 
@@ -104,7 +112,8 @@
   `specs/046-entry-search/implementation.md`
   - Depends on: Group 4
 - [ ] Stop and wait for an externally authored
-  `specs/046-entry-search/review.md`, unless the user explicitly skips review.
+  `specs/046-entry-search/review.md`. The user deferred review on 2026-09-09
+  while the requested compact-header refinement was completed.
 - [ ] When `review.md` arrives, read it and prepare a finding-by-finding
   remediation plan without changing files. Present that plan and wait for
   explicit approval before any remediation.
@@ -154,6 +163,19 @@ knowledge-capture gate is completed.
   the expected system iPhone passcode prompt before Wrait UI; no unsupported
   security bypass was attempted. The native document picker remains outside
   the integration harness on both platforms.
+- Post-implementation regression correction, 2026-09-09:
+  flutter test -d 4A181FDJH0030G integration_test/orientation_lock_flow_test.dart
+  passed after replacing its invalid direct paused-to-resumed lifecycle jump
+  with the platform-valid sequence.
+- Compact-header refinement, 2026-09-09:
+  dart format lib/presentation/entries/entry_list_screen.dart
+  test/presentation/entries/entry_list_screen_test.dart passed;
+  flutter test test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart passed: 40 tests;
+  flutter analyze passed with no issues; and
+  flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
+  passed: 17 of 17 flows after restarting an emulator runtime that had stalled
+  before rendering a Flutter frame.
 ```
 
 ## Notes
