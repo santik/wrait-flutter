@@ -243,6 +243,98 @@ void main() {
     expect(container.read(entryListControllerProvider).isImporting, isFalse);
     expect(reader.callCount, 1);
   });
+
+  test('search query updates and clears without persistence', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final subscription = container.listen<String>(
+      entryListSearchQueryProvider,
+      (previous, next) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    final notifier = container.read(entryListSearchQueryProvider.notifier);
+    notifier.update('  Project notes  ');
+
+    expect(container.read(entryListSearchQueryProvider), '  Project notes  ');
+
+    notifier.clear();
+
+    expect(container.read(entryListSearchQueryProvider), isEmpty);
+  });
+
+  test('empty and whitespace-only queries retain the incoming list', () {
+    final entries = [
+      _entry(id: 2, createdAt: DateTime(2026, 6, 15)),
+      _entry(id: 1, createdAt: DateTime(2026, 6, 14)),
+    ];
+
+    expect(EntryListController.filterEntries(entries, ''), same(entries));
+    expect(EntryListController.filterEntries(entries, ' \n\t '), same(entries));
+  });
+
+  test('filters every case-insensitive term across cleaned and raw text', () {
+    final entries = [
+      _entry(
+        id: 3,
+        rawTranscript: 'Monday walk through the park',
+        cleanedText: 'Project notes for Monday',
+      ),
+      _entry(
+        id: 2,
+        rawTranscript: 'Project update only',
+        cleanedText: 'No matching day',
+      ),
+      _entry(
+        id: 1,
+        rawTranscript: 'A quiet Monday',
+        cleanedText: 'No matching topic',
+      ),
+    ];
+
+    final matches = EntryListController.filterEntries(
+      entries,
+      '  PROJECT\n monday ',
+    );
+
+    expect(matches.map((entry) => entry.id), [3]);
+  });
+
+  test('preserves source ordering and does not match across text fields', () {
+    final entries = [
+      _entry(id: 3, rawTranscript: 'budget review', cleanedText: 'today'),
+      _entry(id: 2, rawTranscript: 'budget ideas', cleanedText: 'tomorrow'),
+      _entry(id: 1, rawTranscript: 'text', cleanedText: 'clean'),
+    ];
+
+    final orderedMatches = EntryListController.filterEntries(entries, 'budget');
+    final boundaryMatches = EntryListController.filterEntries(entries, 'ntex');
+
+    expect(orderedMatches.map((entry) => entry.id), [3, 2]);
+    expect(boundaryMatches, isEmpty);
+  });
+
+  test('includes saved and text drafts but excludes audio-only drafts', () {
+    final entries = [
+      _entry(id: 1, rawTranscript: 'weekly reflection'),
+      _entry(id: 2, type: EntryType.draft, rawTranscript: 'weekly draft'),
+      Entry(
+        id: 3,
+        rawTranscript: '',
+        cleanedText: null,
+        type: EntryType.draft,
+        language: 'en-US',
+        createdAt: DateTime(2026, 6, 15).millisecondsSinceEpoch,
+        wordCount: 0,
+        audioPath: '/tmp/pending.m4a',
+      ),
+    ];
+
+    final matches = EntryListController.filterEntries(entries, 'weekly');
+
+    expect(matches.map((entry) => entry.id), [1, 2]);
+  });
 }
 
 class _FakeEntryRepository implements EntryRepository {
@@ -401,11 +493,13 @@ Entry _entry({
   required int id,
   DateTime? createdAt,
   EntryType type = EntryType.saved,
+  String? rawTranscript,
+  String? cleanedText,
 }) {
   return Entry(
     id: id,
-    rawTranscript: 'entry $id',
-    cleanedText: null,
+    rawTranscript: rawTranscript ?? 'entry $id',
+    cleanedText: cleanedText,
     type: type,
     language: 'en-US',
     createdAt: (createdAt ?? DateTime(2026, 6, 15)).millisecondsSinceEpoch,
