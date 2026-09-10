@@ -78,6 +78,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                 .read(entryListSearchQueryProvider.notifier)
                                 .update(query);
                           },
+                          onSubmitted: (_) => FocusScope.of(context).unfocus(),
                           textInputAction: TextInputAction.search,
                           decoration: InputDecoration(
                             labelText: 'Search entries',

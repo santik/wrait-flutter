@@ -139,6 +139,32 @@ void main() {
     },
   );
 
+  testWidgets('search action dismisses the keyboard and preserves results', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 1, rawTranscript: 'target entry'),
+      _entry(id: 2, rawTranscript: 'other entry'),
+    ]);
+
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+    final searchField = find.byKey(const ValueKey('entryListSearchField'));
+
+    await tester.enterText(searchField, 'target');
+    await tester.pumpAndSettle();
+
+    final editableText = tester.widget<EditableText>(find.byType(EditableText));
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(editableText.focusNode.hasFocus, isFalse);
+    expect(find.byKey(const ValueKey('entryRow-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryRow-2')), findsNothing);
+    expect(tester.widget<TextField>(searchField).controller?.text, 'target');
+  });
+
   testWidgets('shows clearable no results and updates from entry changes', (
     tester,
   ) async {

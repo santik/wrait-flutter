@@ -156,7 +156,7 @@ class EntryListController extends Notifier<EntryListControllerState> {
         .trim()
         .split(RegExp(r'\s+'))
         .where((term) => term.isNotEmpty)
-        .map((term) => term.toLowerCase())
+        .map(_normalizeForSearch)
         .toList(growable: false);
     if (terms.isEmpty) {
       return entries;
@@ -164,13 +164,20 @@ class EntryListController extends Notifier<EntryListControllerState> {
 
     return entries
         .where((entry) {
-          final cleanedText = entry.cleanedText?.toLowerCase() ?? '';
-          final rawTranscript = entry.rawTranscript.toLowerCase();
+          final cleanedText = _normalizeForSearch(entry.cleanedText ?? '');
+          final rawTranscript = _normalizeForSearch(entry.rawTranscript);
           return terms.every(
             (term) =>
                 cleanedText.contains(term) || rawTranscript.contains(term),
           );
         })
         .toList(growable: false);
+  }
+
+  static String _normalizeForSearch(String value) {
+    // TODO(US-046): Adopt locale-aware Unicode case folding only with an
+    // approved internationalized search contract. This first version uses
+    // Dart's default case conversion for literal local matching.
+    return value.toLowerCase();
   }
 }

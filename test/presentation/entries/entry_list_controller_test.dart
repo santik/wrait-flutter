@@ -301,6 +301,38 @@ void main() {
     expect(matches.map((entry) => entry.id), [3]);
   });
 
+  test(
+    'treats special and SQL-like input as literal repeated search terms',
+    () {
+      final entries = [
+        _entry(
+          id: 1,
+          rawTranscript: 'Café ☕ C++ notes',
+          cleanedText: 'Weekly review',
+        ),
+        _entry(
+          id: 2,
+          rawTranscript: 'ordinary entry',
+          cleanedText: 'unrelated text',
+        ),
+      ];
+
+      final specialMatches = EntryListController.filterEntries(
+        entries,
+        ' C++ café ☕ C++ ',
+      );
+      final sqlLikeMatches = EntryListController.filterEntries(
+        entries,
+        "' OR 1=1 --",
+      );
+      final longQuery = List<String>.filled(512, 'x').join();
+
+      expect(specialMatches.map((entry) => entry.id), [1]);
+      expect(sqlLikeMatches, isEmpty);
+      expect(EntryListController.filterEntries(entries, longQuery), isEmpty);
+    },
+  );
+
   test('preserves source ordering and does not match across text fields', () {
     final entries = [
       _entry(id: 3, rawTranscript: 'budget review', cleanedText: 'today'),

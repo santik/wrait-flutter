@@ -246,6 +246,13 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   Wrait-produced CSV files. Import is strictly additive, preserves draft vs
   saved state exactly as exported, ignores CSV ids, forces `audioPath` null,
   and must not update or delete existing entries.
+- Entry-list text search is presentation-only: keep the query in
+  `EntryListSearchQuery`/`EntryListController.filterEntries` over the existing
+  materialized list. Do not pass it to a DAO, SQL/Drift predicate, backend, or
+  logs. The current literal all-term matching uses Dart's default case
+  conversion rather than locale-aware/full Unicode case folding; an indexed or
+  internationalized search change requires a future approved story and fresh
+  Android/iOS validation.
 - The current Wrait CSV contract is exactly
   `type,created_at,language,word_count,raw_transcript,cleaned_text`. Do not
   reintroduce `id` or `created_at_epoch_ms` compatibility unless a future

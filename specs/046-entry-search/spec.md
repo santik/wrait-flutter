@@ -1,7 +1,7 @@
 # Feature Specification: Entry list text search
 
 > **Feature number:** 046
-> **Status:** Awaiting External Review
+> **Status:** Complete
 > **Author:** Codex
 > **Date:** 2026-09-08
 > **Work item:** Not assigned
@@ -16,6 +16,8 @@
 | 2026-09-08 | In Progress | Codex | Analysis approved; implementation started on `codex/feat/entry-list-search`. |
 | 2026-09-08 | Awaiting External Review | Codex | Implementation and planned validation completed; waiting for externally authored review. |
 | 2026-09-09 | Awaiting External Review | Codex | User-requested compact one-row header refinement implemented and revalidated; external review remains deferred until the feature is considered correctly implemented. |
+| 2026-09-09 | Awaiting Finalization Approval | Codex | External review was read; the user-approved remediation and Android/iOS validation are complete. Awaiting the durable-documentation decision. |
+| 2026-09-10 | Complete | Codex | User approved and received the durable search documentation updates; implementation, review remediation, validation, and finalization are complete. |
 
 ---
 
@@ -65,6 +67,8 @@ fuzzy matching, metadata filters, or semantic search.
       screen.
 - [x] Search input does not open the on-screen keyboard automatically when the
       user first enters the entries list.
+- [x] Pressing the keyboard Search action dismisses the keyboard while keeping
+      the current query and filtered results visible.
 - [x] The query is screen-local: leaving the entries list and opening it again
       starts with the complete, unfiltered list.
 - [x] Filtering does not modify, delete, or reorder stored entries beyond the
@@ -75,6 +79,8 @@ fuzzy matching, metadata filters, or semantic search.
       entry collection rather than silently changing their data scope because
       a search query is active.
 - [x] Search text remains local to the device and is not sent to the backend.
+- [x] Search text is filtered in memory and is never incorporated into a SQL
+      statement or other database query.
 - [x] The search field and clear action expose meaningful semantics labels and
       remain usable with the on-screen keyboard and assistive technologies.
 
@@ -107,7 +113,9 @@ Import/Export actions.
   the expected local entry volume and must not make the list unusable while the
   keyboard is open.
 - **Security:** Search must not transmit entry text or the query to any
-  external service. Existing local-data protection remains unchanged.
+  external service. It filters the already loaded local collection in memory,
+  never constructs SQL from query text, and leaves existing local-data
+  protection unchanged.
 - **Reliability:** Blank input, repeated edits, clearing, imports, edits, and
   deletions must leave the displayed results consistent with the stored entry
   collection.
@@ -124,6 +132,8 @@ Import/Export actions.
 - Fuzzy, typo-tolerant, phonetic, or semantic search.
 - Accent-insensitive matching, language-aware stemming, and special query
   syntax such as quoted phrases or boolean operators.
+- Locale-aware or full Unicode case folding. This first version uses Dart's
+  default case conversion for literal matching.
 - Search by date, language, draft/saved status, word count, or other metadata.
 - Search history, saved searches, or query persistence across app launches.
 - Match highlighting or custom search-result snippets.
@@ -133,10 +143,13 @@ Import/Export actions.
 
 ## Test strategy
 
-- Widget coverage will verify the compact header geometry, initial unfiltered list, whitespace-only and
-  multi-term queries, matching across cleaned and raw text, saved and draft
-  results, audio-only draft behavior, newest-first ordering, no-results and
-  clear-search behavior, semantics, and no automatic keyboard focus.
+- Widget coverage will verify the compact header geometry, initial unfiltered
+  list, whitespace-only and multi-term queries, matching across cleaned and
+  raw text, saved and draft results, audio-only draft behavior, newest-first
+  ordering, no-results and clear-search behavior, Search-key keyboard
+  dismissal, semantics, and no automatic keyboard focus.
+- Unit coverage will verify literal punctuation, emoji, repeated terms,
+  SQL-shaped text, and a long query without introducing query syntax.
 - Entry-list integration coverage will verify navigating to the list, filtering
   records, opening a matching readable record, deleting a matching record,
   returning to the complete list, and keeping import/export behavior scoped to

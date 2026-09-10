@@ -117,6 +117,18 @@ void main() {
       expect(find.byKey(ValueKey('entryRow-$matchingId')), findsOneWidget);
       expect(find.byKey(ValueKey('entryRow-$otherId')), findsNothing);
 
+      final editableText = tester.widget<EditableText>(
+        find.byType(EditableText),
+      );
+      expect(editableText.focusNode.hasFocus, isTrue);
+
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      expect(editableText.focusNode.hasFocus, isFalse);
+      expect(find.byKey(ValueKey('entryRow-$matchingId')), findsOneWidget);
+      expect(find.byKey(ValueKey('entryRow-$otherId')), findsNothing);
+
       await tester.tap(find.byKey(const ValueKey('entryListExportButton')));
       await tester.pumpAndSettle();
 

@@ -12,12 +12,14 @@
 Keep the existing reactive, newest-first entry list as the source collection
 and add a screen-local query that filters that collection in the presentation
 layer. The entries screen will render a non-autofocused text field between its
-Back and Import/Export controls in a compact single header row, show either the filtered rows,
-the established empty state, or a clearable no-results state, and continue to
-use the unfiltered collection for export. The implementation deliberately adds
-no persistence, API, database, or dependency change; it is the smallest path
-that fulfils the approved search contract while preserving a future option to
-replace the local matching implementation.
+Back and Import/Export controls in a compact single header row, show either the
+filtered rows, the established empty state, or a clearable no-results state,
+and continue to use the unfiltered collection for export. Pressing the keyboard
+Search action dismisses focus without changing the active query or result set.
+The implementation deliberately adds no persistence, API, database, or
+dependency change; it is the smallest path that fulfils the approved search
+contract while preserving a future option to replace the local matching
+implementation.
 
 ## Architecture decisions
 
@@ -25,12 +27,13 @@ replace the local matching implementation.
 | --- | --- | --- |
 | Search data source | Filter the existing `entryListEntriesProvider` output in the presentation layer | The list already receives every current entry and applies newest-first ordering there. Reusing it avoids a new repository method, database migration, or duplicate reactive data path. |
 | Query lifetime | An auto-disposed Riverpod string state scoped to the entries screen | The finalized spec requires the query to reset after leaving `/entries`. Auto-disposal supplies that behavior without persisting user text or adding reset lifecycle code. |
-| Matching contract | Split trimmed input on whitespace; lower-case each term and each searchable field; retain an entry only when every term occurs in cleaned text, raw transcript, or both | This directly implements the agreed literal, case-insensitive all-term behavior without allowing a term to span the boundary between the two fields. Punctuation keeps no special meaning. |
-| Matching execution | Filter immediately on query changes; do not debounce | Filtering the collection already displayed by the screen is synchronous and local. Debouncing adds state, timing edge cases, and test complexity without a user-visible need in this intentionally small version. |
+| Matching contract | Split trimmed input on whitespace; apply Dart default case conversion to each term and searchable field; retain an entry only when every term occurs in cleaned text, raw transcript, or both | This directly implements the agreed literal, case-insensitive all-term behavior without allowing a term to span the boundary between the two fields. Punctuation keeps no special meaning. Locale-aware/full Unicode case folding remains a later internationalization decision. |
+| Matching execution | Filter immediately on query changes; do not debounce | Filtering the collection already displayed by the screen is synchronous and local. Debouncing adds state, timing edge cases, and test complexity without a user-visible need in this intentionally small version. Reassess only when measured jank or product-supported entry volumes demonstrate a need for an indexed or debounced approach. |
 | Sorting | Sort first through the existing provider, then preserve that order while filtering | It maintains the established newest-first list behavior rather than introducing relevance ranking. |
 | Screen ownership | Convert `EntryListScreen` to a `ConsumerStatefulWidget` with a text controller used only by the field | A controller makes the clear action reset both the visible field and query state reliably. It is disposed with the screen, and `autofocus` remains disabled. |
 | UI layout | Put Back, an expanded search field, Import, and Export in one compact top row above an expanded list area | Four-pixel horizontal header insets move Back toward the leading edge and Import/Export toward the trailing edge. The adjacent 48dp IconButton targets preserve accessible action size while avoiding a visually excessive gap. The list retains its normal content insets. |
 | Export scope | Keep `allEntries` separate from `filteredEntries` and pass only `allEntries` to export | Export must remain a full collection export even when the visible list is filtered. The explicit separation prevents an accidental behavior change. |
+| SQL injection boundary | Keep the query out of the data layer and filter the materialized `List<Entry>` with Dart string operations | The query never becomes SQL, a Drift expression, a database parameter, or a backend request. The DAO retains its fixed all-entries stream. |
 | Storage/search index | No database search index, schema migration, or model change | The spec explicitly excludes storage changes. An indexed full-text implementation would introduce migration and cross-platform database validation beyond this first version. |
 | Privacy/diagnostics | Do not add query/content logging | Search terms and entries are private journal data; the feature needs no observability beyond existing sanitized error handling. |
 
@@ -38,11 +41,11 @@ replace the local matching implementation.
 
 | File | Action | Description |
 | --- | --- | --- |
-| `lib/presentation/entries/entry_list_controller.dart` | Modify | Add the auto-disposed search-query and filtered-entry providers plus pure whitespace-token, case-insensitive filtering that preserves incoming ordering. |
-| `lib/presentation/entries/entry_list_screen.dart` | Modify | Add the screen-local text controller, non-autofocused accessible search field, clear control, no-results state, constrained header/list layout, and full-collection export input. |
-| `test/presentation/entries/entry_list_controller_test.dart` | Modify | Cover query normalization and pure filtering behavior, including both text fields, drafts, audio-only drafts, all-term matching, and ordering. |
-| `test/presentation/entries/entry_list_screen_test.dart` | Modify | Cover field rendering/focus, live filtering, no-results/clear behavior, semantics, reactive list changes, matching-row navigation/deletion, and full-scope export while filtered. |
-| `integration_test/entry_list_flow_test.dart` | Modify | Exercise the real local entry store and entries route for search, clear, matching-row interaction, no-result recovery, and import/export scope under an active query. |
+| `lib/presentation/entries/entry_list_controller.dart` | Modify | Add the auto-disposed search-query and filtered-entry providers plus pure whitespace-token filtering that preserves incoming ordering and documents the case-folding limitation. |
+| `lib/presentation/entries/entry_list_screen.dart` | Modify | Add the screen-local text controller, non-autofocused accessible search field, Search-key focus dismissal, clear control, no-results state, constrained header/list layout, and full-collection export input. |
+| `test/presentation/entries/entry_list_controller_test.dart` | Modify | Cover query normalization and pure filtering behavior, including both text fields, drafts, audio-only drafts, all-term matching, ordering, special/SQL-shaped input, and long queries. |
+| `test/presentation/entries/entry_list_screen_test.dart` | Modify | Cover field rendering/focus, Search-key dismissal, live filtering, no-results/clear behavior, semantics, reactive list changes, matching-row navigation/deletion, and full-scope export while filtered. |
+| `integration_test/entry_list_flow_test.dart` | Modify | Exercise the real local entry store and entries route for Search-key dismissal, search, clear, matching-row interaction, no-result recovery, and import/export scope under an active query. |
 | `specs/046-entry-search/spec.md` | Modify | Record the approved specification status. |
 | `specs/046-entry-search/plan.md` | Modify | Record the approved implementation approach and validation plan. |
 
@@ -71,6 +74,10 @@ EntryListController.filterEntries(entries, query) -> ordered matching entries
 4. Return an entry only when every term occurs in at least one of those two
    searchable text values; a term must not match by spanning their boundary.
 5. Retain source ordering and never mutate the source list or entry values.
+
+The default case conversion is intentionally not locale-aware/full Unicode case
+folding. Search text remains in the presentation layer: it is not passed to a
+DAO, raw SQL, a Drift predicate, or a backend request.
 
 No parsing syntax, phrase operator, fuzzy matching, accent normalization,
 ranking, logging, backend request, or user-visible error state is introduced.
@@ -118,11 +125,12 @@ underlying collection.
 | Blank and whitespace-only queries retain every incoming entry in newest-first order | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
 | Case-insensitive all-term filtering matches terms in cleaned text, raw transcript, or a combination of both and preserves source order | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
 | Saved/draft text entries can match, while an audio-only draft only appears for an empty query | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
-| The compact header keeps Back leading, search between the actions, and adjacent Import/Export actions trailing; the field is visible, does not autofocus, filters as text changes, supports keyboard input, and has labelled search/clear semantics | Widget/accessibility | `test/presentation/entries/entry_list_screen_test.dart` |
+| Punctuation, emoji, repeated terms, SQL-shaped text, and a long query remain literal local input | Unit/provider | `test/presentation/entries/entry_list_controller_test.dart` |
+| The compact header keeps Back leading, search between the actions, and adjacent Import/Export actions trailing; the field is visible, does not autofocus, filters as text changes, dismisses focus on Search, and has labelled search/clear semantics | Widget/accessibility | `test/presentation/entries/entry_list_screen_test.dart` |
 | A non-empty unmatched query shows `No matching entries`; clearing restores the full list | Widget | `test/presentation/entries/entry_list_screen_test.dart` |
 | Matching readable rows still open, matching rows can still be deleted, and stream-driven import/edit/delete changes refresh visible results | Widget | `test/presentation/entries/entry_list_screen_test.dart` |
 | Export includes nonmatching entries while a query is active; import continues to operate on the full collection and matching imports appear reactively | Widget | `test/presentation/entries/entry_list_screen_test.dart` |
-| Real `/entries` flow filters persisted saved/draft entries, opens/deletes a match, clears a no-result query, and retains full import/export scope | Integration | `integration_test/entry_list_flow_test.dart` |
+| Real `/entries` flow filters persisted saved/draft entries, dismisses focus on Search, opens/deletes a match, clears a no-result query, and retains full import/export scope | Integration | `integration_test/entry_list_flow_test.dart` |
 | Existing entry-list, entry-detail, import/export, and main-to-entries navigation coverage remains green | Regression | Existing entry presentation tests and integration flows |
 
 All automated entries use synthetic text. No test or runtime evidence may log
@@ -138,7 +146,8 @@ real journal content.
    feature validation.
 2. Open `/entries`, verify the field is visible but the keyboard stays closed,
    then enter synthetic multi-term queries that exercise raw-text, cleaned-text,
-   draft, audio-only-draft, and no-result behavior.
+   draft, audio-only-draft, and no-result behavior. Press Search and confirm it
+   dismisses the keyboard while retaining the result.
 3. With the keyboard open, clear the query, open a matching entry, return to
    the list, delete a matching row, and verify the list remains responsive and
    newest-first.
@@ -153,7 +162,7 @@ real journal content.
 
 1. Build and launch the app on the configured iOS simulator and open
    `/entries` through the existing integration harness or normal navigation.
-2. Repeat the Android search, keyboard, no-result, clear, matching-row
+2. Repeat the Android search, keyboard, Search-key dismissal, no-result, clear, matching-row
    navigation, and deletion checks using synthetic entries.
 3. Verify the search field and top controls remain usable with the iOS keyboard
    visible, and that returning to the entries list after leaving it starts
@@ -170,15 +179,16 @@ approval.
 
 ## Review and finalization
 
-- `review.md` will be externally authored if review occurs.
-- After reading `review.md`, no files may be changed until the remediation plan
-  is explicitly approved.
-- The implementation will stop after `implementation.md` is complete and wait
-  for the external review unless the user explicitly skips it.
-- The initial expectation is that this presentation-only feature will not need
-  durable updates to `AGENTS.md`, `docs/application-description.md`, or
-  `docs/agent-findings.md`. That decision will be re-evaluated after approved
-  implementation and review.
+- The externally authored `review.md` was read on 2026-09-09. No files changed
+  until the user approved the finding-by-finding remediation plan.
+- The approved remediation documents the Unicode limitation and immediate
+  filtering decision, adds Search-key dismissal and boundary coverage, retains
+  the user-approved orientation-fixture correction, and records the
+  SQL-injection boundary.
+- On 2026-09-10, the user approved durable updates to `AGENTS.md`,
+  `docs/application-description.md`, and `docs/agent-findings.md`. They record
+  the local no-SQL search boundary, the Unicode limitation, and the visible
+  Search-key behavior.
 
 ## Integration notes
 
@@ -209,6 +219,8 @@ entries exist.
 | The new field crowds existing controls or becomes obscured by the keyboard | Medium | Medium | Use a compact single header row with an expanded field and normal-sized action targets; verify header geometry, focus, semantics, and keyboard use on both platforms. |
 | A reactive import, edit, or deletion leaves stale visible results | Low | Medium | Derive filtered rows solely from the existing entry stream plus current query; cover stream-driven changes in widget and integration tests. |
 | Filtering becomes slow for a much larger journal | Low for the current first-version scope | Medium | Reuse the already materialized list now and retain the functional contract for a future indexed-search story if usage demonstrates a need. |
+| Locale-specific case variants do not match as users expect | Medium for affected languages | Medium | Document the default-case-conversion limitation and defer full Unicode case folding until an internationalization search contract is approved. |
+| Query text is accidentally incorporated into SQL in a later implementation | Low | High | Keep the provider-to-Dart-filter boundary explicit, document it, and add a literal SQL-shaped-input regression test. |
 | Query or journal text appears in logs | Low | High | Add no search logging and keep test/runtime evidence synthetic. |
 
 ## Open items from spec

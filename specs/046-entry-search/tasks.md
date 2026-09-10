@@ -77,6 +77,14 @@
   and verify import/export scope while filtered using synthetic content —
   `integration_test/entry_list_flow_test.dart`
   - Depends on: Groups 1–2
+- [x] Add approved review-remediation coverage for literal punctuation, emoji,
+  repeated terms, SQL-shaped text, and a long query —
+  `test/presentation/entries/entry_list_controller_test.dart`
+- [x] Add approved review-remediation coverage for Search-key focus dismissal
+  while retaining the active query and filtered result on widget and real
+  Android/iOS integration surfaces —
+  `test/presentation/entries/entry_list_screen_test.dart`,
+  `integration_test/entry_list_flow_test.dart`
 
 ### Group 4: Automated and device validation
 
@@ -103,6 +111,10 @@
 - [x] Revalidate the compact one-row header with geometry widget coverage,
   targeted tests, static analysis, and the Android entry-list integration flow
   — `test/presentation/entries/entry_list_screen_test.dart`
+- [x] Revalidate approved review remediation with formatting, targeted and full
+  Flutter tests, static analysis, and the entry-list integration flow on both
+  Android and iOS simulators —
+  `specs/046-entry-search/implementation.md`
 
 ### Group 5: Implementation record and external review
 
@@ -111,25 +123,25 @@
   the no-migration/no-backend outcome —
   `specs/046-entry-search/implementation.md`
   - Depends on: Group 4
-- [ ] Stop and wait for an externally authored
-  `specs/046-entry-search/review.md`. The user deferred review on 2026-09-09
-  while the requested compact-header refinement was completed.
-- [ ] When `review.md` arrives, read it and prepare a finding-by-finding
-  remediation plan without changing files. Present that plan and wait for
-  explicit approval before any remediation.
-- [ ] Implement only approved remediation, refresh artifacts/code/tests and
-  validation evidence when scope, approach, or behavior changes, and repeat
-  the review/fix loop if the same review file is updated.
+- [x] Receive and read the externally authored
+  `specs/046-entry-search/review.md` after the user made it available on
+  2026-09-09.
+- [x] Prepare a finding-by-finding remediation plan, receive explicit approval,
+  and make no changes before that approval.
+- [x] Implement the approved remediation: document the Unicode limitation and
+  immediate-filtering decision; dismiss focus on Search; add boundary tests;
+  retain the user-approved orientation-fixture correction; and record the
+  SQL-injection assessment. Refresh artifacts, code, tests, and validation
+  evidence. Repeat the review/fix loop if the same review file is updated.
 
 ### Group 6: Finalization
 
-- [ ] Decide whether the completed feature creates durable product or
-  architecture guidance. If so, propose exact updates to `AGENTS.md`,
-  `docs/application-description.md`, and/or `docs/agent-findings.md`; wait for
-  explicit approval before editing them.
-- [ ] Record the approved documentation outcome (updates or explicit no-update
-  decision), mark the feature complete only after review and finalization are
-  handled, and update the final status/history —
+- [x] Propose durable product and implementation guidance; receive explicit
+  approval before editing `AGENTS.md`, `docs/application-description.md`, and
+  `docs/agent-findings.md`.
+- [x] Apply the approved durable documentation updates, record the outcome,
+  mark the feature complete after review and finalization, and update the final
+  status/history —
   `specs/046-entry-search/spec.md`, `specs/046-entry-search/tasks.md`
 
 ## Completion criteria
@@ -176,6 +188,18 @@ knowledge-capture gate is completed.
   flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
   passed: 17 of 17 flows after restarting an emulator runtime that had stalled
   before rendering a Flutter frame.
+- Approved review remediation, 2026-09-09:
+  dart format lib/presentation/entries/entry_list_controller.dart
+  lib/presentation/entries/entry_list_screen.dart
+  test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart
+  integration_test/entry_list_flow_test.dart passed;
+  flutter test test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart passed: 42 tests;
+  flutter analyze passed with no issues; flutter test passed: 466 tests; and
+  flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
+  plus flutter test -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156
+  integration_test/entry_list_flow_test.dart each passed: 17 of 17 flows.
 ```
 
 ## Notes
