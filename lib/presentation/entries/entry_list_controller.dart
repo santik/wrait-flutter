@@ -17,6 +17,32 @@ final entryListEntriesProvider = StreamProvider<List<Entry>>((ref) {
       .map(EntryListController.sortEntriesNewestFirst);
 });
 
+final entryListSearchQueryProvider =
+    NotifierProvider.autoDispose<EntryListSearchQuery, String>(
+      EntryListSearchQuery.new,
+    );
+
+final entryListFilteredEntriesProvider = Provider.autoDispose<List<Entry>>((
+  ref,
+) {
+  final entries = ref.watch(entryListEntriesProvider).value ?? const [];
+  final query = ref.watch(entryListSearchQueryProvider);
+  return EntryListController.filterEntries(entries, query);
+});
+
+class EntryListSearchQuery extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void update(String query) {
+    state = query;
+  }
+
+  void clear() {
+    state = '';
+  }
+}
+
 typedef EntryListWarningLogger =
     void Function(String message, {Object? error, StackTrace? stackTrace});
 
@@ -123,5 +149,35 @@ class EntryListController extends Notifier<EntryListControllerState> {
       (left, right) => right.createdAt.compareTo(left.createdAt),
     );
     return sortedEntries;
+  }
+
+  static List<Entry> filterEntries(List<Entry> entries, String query) {
+    final terms = query
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((term) => term.isNotEmpty)
+        .map(_normalizeForSearch)
+        .toList(growable: false);
+    if (terms.isEmpty) {
+      return entries;
+    }
+
+    return entries
+        .where((entry) {
+          final cleanedText = _normalizeForSearch(entry.cleanedText ?? '');
+          final rawTranscript = _normalizeForSearch(entry.rawTranscript);
+          return terms.every(
+            (term) =>
+                cleanedText.contains(term) || rawTranscript.contains(term),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  static String _normalizeForSearch(String value) {
+    // TODO(US-046): Adopt locale-aware Unicode case folding only with an
+    // approved internationalized search contract. This first version uses
+    // Dart's default case conversion for literal local matching.
+    return value.toLowerCase();
   }
 }

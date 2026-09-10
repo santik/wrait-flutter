@@ -51,6 +51,31 @@ void main() {
     expect(find.byKey(const ValueKey('entryListImportButton')), findsOneWidget);
   });
 
+  testWidgets('uses a compact single-row entry-list header', (tester) async {
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+
+    final backRect = tester.getRect(
+      find.byKey(const ValueKey('entryListBackButton')),
+    );
+    final searchRect = tester.getRect(
+      find.byKey(const ValueKey('entryListSearchField')),
+    );
+    final importRect = tester.getRect(
+      find.byKey(const ValueKey('entryListImportButton')),
+    );
+    final exportRect = tester.getRect(
+      find.byKey(const ValueKey('entryListExportButton')),
+    );
+    final screenWidth = tester.getSize(find.byType(Scaffold)).width;
+
+    expect(backRect.left, lessThanOrEqualTo(4));
+    expect(searchRect.left, greaterThan(backRect.right));
+    expect(searchRect.right, lessThan(importRect.left));
+    expect(searchRect.center.dy, closeTo(backRect.center.dy, 0.01));
+    expect(importRect.right, closeTo(exportRect.left, 0.01));
+    expect(exportRect.right, greaterThan(screenWidth - 8));
+  });
+
   testWidgets('renders populated entries newest first with language labels', (
     tester,
   ) async {
@@ -71,6 +96,157 @@ void main() {
     expect(firstRowTop, lessThan(secondRowTop));
     expect(find.text('draft'), findsOneWidget);
     expect(find.text('English'), findsNWidgets(2));
+  });
+
+  testWidgets(
+    'renders a non-autofocused accessible search field and filters all terms',
+    (tester) async {
+      final semanticsHandle = tester.ensureSemantics();
+      entryRepository.emitEntries([
+        _entry(
+          id: 3,
+          rawTranscript: 'Monday morning reflection',
+          cleanedText: 'Project planning notes',
+        ),
+        _entry(
+          id: 2,
+          rawTranscript: 'Project update',
+          cleanedText: 'Tuesday work',
+        ),
+        _entry(
+          id: 1,
+          rawTranscript: 'Monday walk',
+          cleanedText: 'Personal reflection',
+        ),
+      ]);
+
+      await _pumpEntryListApp(tester, entryRepository: entryRepository);
+
+      final searchField = find.byKey(const ValueKey('entryListSearchField'));
+      final textField = tester.widget<TextField>(searchField);
+      expect(textField.autofocus, isFalse);
+      expect(find.bySemanticsLabel('Search entries'), findsOneWidget);
+
+      await tester.enterText(searchField, ' PROJECT\n monday ');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('entryRow-3')), findsOneWidget);
+      expect(find.byKey(const ValueKey('entryRow-2')), findsNothing);
+      expect(find.byKey(const ValueKey('entryRow-1')), findsNothing);
+      expect(find.bySemanticsLabel('Clear search'), findsOneWidget);
+
+      semanticsHandle.dispose();
+    },
+  );
+
+  testWidgets('search action dismisses the keyboard and preserves results', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 1, rawTranscript: 'target entry'),
+      _entry(id: 2, rawTranscript: 'other entry'),
+    ]);
+
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+    final searchField = find.byKey(const ValueKey('entryListSearchField'));
+
+    await tester.enterText(searchField, 'target');
+    await tester.pumpAndSettle();
+
+    final editableText = tester.widget<EditableText>(find.byType(EditableText));
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(editableText.focusNode.hasFocus, isFalse);
+    expect(find.byKey(const ValueKey('entryRow-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryRow-2')), findsNothing);
+    expect(tester.widget<TextField>(searchField).controller?.text, 'target');
+  });
+
+  testWidgets('shows clearable no results and updates from entry changes', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 1, rawTranscript: 'existing record'),
+    ]);
+
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+    final searchField = find.byKey(const ValueKey('entryListSearchField'));
+
+    await tester.enterText(searchField, 'target');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('entryListNoSearchResults')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('entryListNoResultsClearButton')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('entryListEmptyState')), findsNothing);
+
+    entryRepository.emitEntries([
+      _entry(id: 1, rawTranscript: 'target record'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryRow-1')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('entryListNoSearchResults')),
+      findsNothing,
+    );
+
+    entryRepository.emitEntries([
+      _entry(id: 1, rawTranscript: 'updated record'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('entryListNoSearchResults')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('entryListNoResultsClearButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryRow-1')), findsOneWidget);
+    expect(tester.widget<TextField>(searchField).controller?.text, isEmpty);
+  });
+
+  testWidgets('resets search after leaving and reopening the entries list', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 2, rawTranscript: 'target entry'),
+      _entry(id: 1, rawTranscript: 'other entry'),
+    ]);
+
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+    final searchField = find.byKey(const ValueKey('entryListSearchField'));
+    await tester.enterText(searchField, 'target');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entryCard-2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entryDetailBackButton')));
+    await tester.pumpAndSettle();
+
+    final reopenedSearchField = find.byKey(
+      const ValueKey('entryListSearchField'),
+    );
+    expect(
+      tester.widget<TextField>(reopenedSearchField).controller?.text,
+      isEmpty,
+    );
+    expect(find.byKey(const ValueKey('entryRow-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryRow-1')), findsOneWidget);
   });
 
   testWidgets('row tap navigates to entry detail', (tester) async {
@@ -197,6 +373,43 @@ void main() {
     expect(find.byKey(const ValueKey('entryListView')), findsOneWidget);
   });
 
+  testWidgets('deleting a matching row refreshes the active search results', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 2, rawTranscript: 'target entry'),
+      _entry(id: 1, rawTranscript: 'other entry'),
+    ]);
+
+    await _pumpEntryListApp(tester, entryRepository: entryRepository);
+    await tester.enterText(
+      find.byKey(const ValueKey('entryListSearchField')),
+      'target',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const ValueKey('entryCard-2')),
+      const Offset(120, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entryDeleteConfirmButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryRow-2')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('entryListNoSearchResults')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('entryListNoResultsClearButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryRow-1')), findsOneWidget);
+  });
+
   testWidgets('delete dialog exposes destructive semantics labels', (
     tester,
   ) async {
@@ -260,6 +473,39 @@ void main() {
     );
     expect(exportFileWriter.lastContents, contains('draft,'));
     expect(exportFileWriter.lastContents, isNot(contains('audioPath')));
+  });
+
+  testWidgets('export includes nonmatching entries while search is active', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 2, rawTranscript: 'matching record'),
+      _entry(id: 1, rawTranscript: 'outside record'),
+    ]);
+
+    await _pumpEntryListApp(
+      tester,
+      entryRepository: entryRepository,
+      exportService: EntryExportService(
+        fileWriter: exportFileWriter,
+        now: () => DateTime.utc(2026, 6, 30, 12),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entryListSearchField')),
+      'matching',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entryRow-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryRow-1')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('entryListExportButton')));
+    await tester.pumpAndSettle();
+
+    expect(exportFileWriter.lastContents, contains('matching record'));
+    expect(exportFileWriter.lastContents, contains('outside record'));
   });
 
   testWidgets('export failure shows an error and keeps the list visible', (
@@ -378,6 +624,49 @@ void main() {
       expect(find.text('imported draft entry'), findsOneWidget);
     },
   );
+
+  testWidgets('import refreshes matching results while a query is active', (
+    tester,
+  ) async {
+    entryRepository.emitEntries([
+      _entry(id: 1, rawTranscript: 'existing entry'),
+    ]);
+
+    await _pumpEntryListApp(
+      tester,
+      entryRepository: entryRepository,
+      importService: EntryImportService(
+        fileReader: _TestImportFileReader(
+          result: EntryImportFileReadResult(
+            fileName: 'import.csv',
+            contents: _validImportCsv(),
+          ),
+        ),
+        entryRepository: entryRepository,
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entryListSearchField')),
+      'imported',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('entryListNoSearchResults')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entryListImportButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('entryListNoSearchResults')),
+      findsNothing,
+    );
+    expect(find.text('clean entry 21'), findsOneWidget);
+    expect(find.text('imported draft entry'), findsOneWidget);
+    expect(find.text('existing entry'), findsNothing);
+  });
 
   testWidgets(
     'import cancellation shows no snackbar and keeps the list unchanged',
@@ -676,11 +965,13 @@ Entry _entry({
   required int id,
   DateTime? createdAt,
   EntryType type = EntryType.saved,
+  String? rawTranscript,
+  String? cleanedText,
 }) {
   return Entry(
     id: id,
-    rawTranscript: 'entry $id',
-    cleanedText: 'clean entry $id',
+    rawTranscript: rawTranscript ?? 'entry $id',
+    cleanedText: cleanedText ?? 'clean entry $id',
     type: type,
     language: 'en-US',
     createdAt: (createdAt ?? DateTime(2026, 6, 15, 9)).millisecondsSinceEpoch,

@@ -1,0 +1,211 @@
+# Tasks: Entry list text search
+
+> **Feature number:** 046
+> **Plan:** [`plan.md`](plan.md)
+> **Author:** Codex
+> **Date:** 2026-09-08
+
+---
+
+## Legend
+
+- `[ ]` — not started
+- `[x]` — complete
+- `[P]` — can be parallelized with other `[P]` tasks in the same group
+- `[B]` — blocked (note the blocker)
+
+## Task groups
+
+### Group 1: Feature setup and filtering contract
+
+- [x] Create or confirm the feature branch using the repository/Codex naming
+  convention; preserve unrelated worktree changes. Update the feature status to
+  `In Progress` only when implementation starts —
+  `specs/046-entry-search/spec.md`
+- [x] Add the screen-local auto-disposed query provider and the derived
+  filtered-entry provider. Add pure filtering helpers that trim/split
+  whitespace, compare every lower-cased literal term against cleaned/raw text
+  fields independently, require every term, preserve source ordering, and
+  never log query/content —
+  `lib/presentation/entries/entry_list_controller.dart`
+
+### Group 2: Entries-screen search UI
+
+- [x] Convert the entries list to own and dispose a text controller, retain the
+  current back/import/export behaviors, and lay out a non-autofocused search
+  field without obscuring the scrollable content —
+  `lib/presentation/entries/entry_list_screen.dart`
+  - Depends on: Group 1 filtering contract
+- [x] Render filtered rows while preserving the established `no entries yet`
+  state for an actually empty collection. For a non-empty collection with no
+  matches, render `No matching entries` and an accessible `Clear search`
+  action. Add stable keys and meaningful semantics for the field and clear
+  controls — `lib/presentation/entries/entry_list_screen.dart`
+  - Depends on: Group 1 filtering contract
+- [x] Keep `allEntries` distinct from `filteredEntries`, pass only the former to
+  the existing export action, and ensure reactive import/edit/delete changes
+  continue to derive the current visible list —
+  `lib/presentation/entries/entry_list_screen.dart`
+  - Depends on: Group 1 filtering contract
+- [x] Refine the header into one compact row: move Back toward the leading
+  edge, fit the expanded search field between the controls, move Import/Export
+  toward the trailing edge, and keep their normal adjacent tap targets —
+  `lib/presentation/entries/entry_list_screen.dart`,
+  `test/presentation/entries/entry_list_screen_test.dart`
+
+### Group 3: Automated coverage
+
+- [x] [P] Add unit/provider coverage for blank/whitespace queries,
+  case-insensitive all-term matching, cleaned/raw cross-field matching,
+  saved/draft inclusion, audio-only-draft exclusion under a non-empty query,
+  and preserved newest-first ordering —
+  `test/presentation/entries/entry_list_controller_test.dart`
+  - Depends on: Group 1 filtering contract
+- [x] [P] Add widget/accessibility coverage for visible non-autofocused search,
+  typing and clear behavior, no-results state, keyboard-safe rendering,
+  query reset after leaving/re-entering the screen, matching-row
+  navigation/deletion, and reactive result updates —
+  `test/presentation/entries/entry_list_screen_test.dart`
+  - Depends on: Groups 1–2
+- [x] [P] Add widget coverage proving an active query never narrows the
+  existing export payload and that a matching import becomes visible while a
+  query remains active —
+  `test/presentation/entries/entry_list_screen_test.dart`
+  - Depends on: Groups 1–2
+- [x] Add the persisted-entry integration flow: seed saved/draft entries, run
+  a multi-term query, open/delete a matching record, clear a no-result query,
+  and verify import/export scope while filtered using synthetic content —
+  `integration_test/entry_list_flow_test.dart`
+  - Depends on: Groups 1–2
+- [x] Add approved review-remediation coverage for literal punctuation, emoji,
+  repeated terms, SQL-shaped text, and a long query —
+  `test/presentation/entries/entry_list_controller_test.dart`
+- [x] Add approved review-remediation coverage for Search-key focus dismissal
+  while retaining the active query and filtered result on widget and real
+  Android/iOS integration surfaces —
+  `test/presentation/entries/entry_list_screen_test.dart`,
+  `integration_test/entry_list_flow_test.dart`
+
+### Group 4: Automated and device validation
+
+- [x] Run `dart format` on all changed Dart files and confirm no unintended
+  generated, database, API, CSV, or native-platform files were changed.
+- [x] Run the targeted entry-list unit/widget suite, the updated
+  `integration_test/entry_list_flow_test.dart`, `flutter analyze`, and the
+  appropriate broader regression suite. Record exact commands and outcomes in
+  the validation evidence.
+  - Depends on: Group 3
+- [x] Verify on the Android emulator: launcher-style cold start; non-focused
+  field; keyboard open/close; raw/cleaned/draft/audio-only/no-result cases;
+  clear; matching-row navigation/deletion; and full-scope export. Use synthetic
+  records and document that the system document picker itself is not automated.
+  - Depends on: Group 3
+- [x] Verify the equivalent flow on the iOS simulator, including keyboard
+  layout, re-entering `/entries` unfiltered, row interaction, and full-scope
+  export. Use synthetic records and document the native document-picker limit.
+  - Depends on: Group 3
+- [x] Update acceptance-criteria checkboxes, task statuses, and validation
+  evidence with completed automated and dual-platform results —
+  `specs/046-entry-search/spec.md`, `specs/046-entry-search/tasks.md`
+  - Depends on: all previous validation tasks
+- [x] Revalidate the compact one-row header with geometry widget coverage,
+  targeted tests, static analysis, and the Android entry-list integration flow
+  — `test/presentation/entries/entry_list_screen_test.dart`
+- [x] Revalidate approved review remediation with formatting, targeted and full
+  Flutter tests, static analysis, and the entry-list integration flow on both
+  Android and iOS simulators —
+  `specs/046-entry-search/implementation.md`
+
+### Group 5: Implementation record and external review
+
+- [x] Create `implementation.md` describing the final design, modified files,
+  validation commands/results, Android/iOS evidence, known limitations, and
+  the no-migration/no-backend outcome —
+  `specs/046-entry-search/implementation.md`
+  - Depends on: Group 4
+- [x] Receive and read the externally authored
+  `specs/046-entry-search/review.md` after the user made it available on
+  2026-09-09.
+- [x] Prepare a finding-by-finding remediation plan, receive explicit approval,
+  and make no changes before that approval.
+- [x] Implement the approved remediation: document the Unicode limitation and
+  immediate-filtering decision; dismiss focus on Search; add boundary tests;
+  retain the user-approved orientation-fixture correction; and record the
+  SQL-injection assessment. Refresh artifacts, code, tests, and validation
+  evidence. Repeat the review/fix loop if the same review file is updated.
+
+### Group 6: Finalization
+
+- [x] Propose durable product and implementation guidance; receive explicit
+  approval before editing `AGENTS.md`, `docs/application-description.md`, and
+  `docs/agent-findings.md`.
+- [x] Apply the approved durable documentation updates, record the outcome,
+  mark the feature complete after review and finalization, and update the final
+  status/history —
+  `specs/046-entry-search/spec.md`, `specs/046-entry-search/tasks.md`
+
+## Completion criteria
+
+All implementation and validation tasks are checked, validation evidence is
+recorded, external review is handled or explicitly skipped, and the final
+knowledge-capture gate is completed.
+
+## Validation evidence
+
+```text
+2026-09-08 implementation and validation evidence:
+
+- dart format was run on all five changed Dart files.
+- flutter test test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart passed: 39 tests.
+- flutter analyze passed with no issues.
+- flutter test passed: 463 tests.
+- flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
+  passed: 17 of 17 flows.
+- flutter test -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156
+  integration_test/entry_list_flow_test.dart passed: 17 of 17 flows.
+- Android emulator: the freshly built debug app cold-started successfully as
+  com.wrait.flutter.dev; the initial field was unfocused and labelled Search
+  entries, a harmless query produced Clear search with the IME-visible layout,
+  and clearing restored the empty query state. Synthetic persisted-data
+  behavior and full-scope export/import were covered by the passed integration
+  flow.
+- iOS simulator: the passed real-simulator integration flow covers the
+  synthetic persisted-data path. A normal simulator launch additionally reached
+  the expected system iPhone passcode prompt before Wrait UI; no unsupported
+  security bypass was attempted. The native document picker remains outside
+  the integration harness on both platforms.
+- Post-implementation regression correction, 2026-09-09:
+  flutter test -d 4A181FDJH0030G integration_test/orientation_lock_flow_test.dart
+  passed after replacing its invalid direct paused-to-resumed lifecycle jump
+  with the platform-valid sequence.
+- Compact-header refinement, 2026-09-09:
+  dart format lib/presentation/entries/entry_list_screen.dart
+  test/presentation/entries/entry_list_screen_test.dart passed;
+  flutter test test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart passed: 40 tests;
+  flutter analyze passed with no issues; and
+  flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
+  passed: 17 of 17 flows after restarting an emulator runtime that had stalled
+  before rendering a Flutter frame.
+- Approved review remediation, 2026-09-09:
+  dart format lib/presentation/entries/entry_list_controller.dart
+  lib/presentation/entries/entry_list_screen.dart
+  test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart
+  integration_test/entry_list_flow_test.dart passed;
+  flutter test test/presentation/entries/entry_list_controller_test.dart
+  test/presentation/entries/entry_list_screen_test.dart passed: 42 tests;
+  flutter analyze passed with no issues; flutter test passed: 466 tests; and
+  flutter test -d emulator-5554 integration_test/entry_list_flow_test.dart
+  plus flutter test -d 491CD949-D3C0-4C4C-A6B9-15BAB1859156
+  integration_test/entry_list_flow_test.dart each passed: 17 of 17 flows.
+```
+
+## Notes
+
+- No validation exception has been requested. Android emulator and iOS
+  simulator verification are both required before final approval.
+- The first version intentionally does not add a database full-text index,
+  fuzzy matching, relevance ranking, metadata filters, query persistence, or
+  backend search.

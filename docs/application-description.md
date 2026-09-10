@@ -201,6 +201,9 @@ upcoming feature work:
   each entry row
 - entry-list previews derived from cleaned text first, then raw transcript,
   with audio-only drafts shown as `pending · will retry`
+- local entry-list text search across cleaned text and raw transcripts for
+  saved entries and drafts, with whitespace-separated literal all-term matching
+  performed only on the device
 - manual CSV export from the entries screen, covering saved and draft entries,
   excluding retained audio files, database ids, and duplicate timestamp
   fields, and writing to an automatic local platform destination

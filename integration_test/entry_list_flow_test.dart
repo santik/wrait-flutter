@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,6 +81,104 @@ void main() {
     expect(find.text('draft'), findsOneWidget);
     expect(find.text('English'), findsNWidgets(2));
   });
+
+  testWidgets(
+    'filters persisted entries and preserves export scope while searching',
+    (tester) async {
+      final exportWriter = _CapturingExportFileWriter();
+      final harness = await _createHarness(exportWriter: exportWriter);
+      addTearDown(harness.dispose);
+
+      final repository = harness.container.read(entryRepositoryProvider);
+      final matchingId = await repository.saveEntry(
+        'Monday planning session',
+        'en-US',
+      );
+      await repository.updateEditedCleanedText(matchingId, 'Project agenda');
+      harness.entryClock.advance(const Duration(days: 1));
+      final otherId = await repository.saveEntry('unrelated record', 'en-US');
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: const WraitApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('entryListSearchField')),
+        ' PROJECT\n monday ',
+      );
+      await tester.pumpAndSettle();
+      await _prepareScreenshots(binding, tester);
+      await binding.takeScreenshot('entry-list-search-match');
+
+      expect(find.byKey(ValueKey('entryRow-$matchingId')), findsOneWidget);
+      expect(find.byKey(ValueKey('entryRow-$otherId')), findsNothing);
+
+      final editableText = tester.widget<EditableText>(
+        find.byType(EditableText),
+      );
+      expect(editableText.focusNode.hasFocus, isTrue);
+
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      expect(editableText.focusNode.hasFocus, isFalse);
+      expect(find.byKey(ValueKey('entryRow-$matchingId')), findsOneWidget);
+      expect(find.byKey(ValueKey('entryRow-$otherId')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('entryListExportButton')));
+      await tester.pumpAndSettle();
+
+      expect(exportWriter.contents, contains('Monday planning session'));
+      expect(exportWriter.contents, contains('unrelated record'));
+
+      await tester.tap(find.byKey(ValueKey('entryCard-$matchingId')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('entryDetailBackButton')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('entryListSearchField')),
+            )
+            .controller
+            ?.text,
+        isEmpty,
+      );
+      expect(find.byKey(ValueKey('entryRow-$matchingId')), findsOneWidget);
+      expect(find.byKey(ValueKey('entryRow-$otherId')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('entryListSearchField')),
+        'project',
+      );
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(ValueKey('entryCard-$matchingId')),
+        const Offset(120, 0),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('entryDeleteConfirmButton')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('entryListNoSearchResults')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('entryListNoResultsClearButton')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(ValueKey('entryRow-$otherId')), findsOneWidget);
+    },
+  );
 
   testWidgets('row tap navigates to the detail route', (tester) async {
     final harness = await _createHarness();
@@ -336,6 +434,11 @@ void main() {
         container: harness.container,
         child: const WraitApp(),
       ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entryListSearchField')),
+      'imported',
     );
     await tester.pumpAndSettle();
     await _prepareScreenshots(binding, tester);

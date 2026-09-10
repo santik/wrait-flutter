@@ -294,6 +294,12 @@ this file as supporting implementation memory.
   tests wherever practical.
 - The `/entries` route includes finalized and draft entries, ordered newest
   first in the presentation/controller layer.
+- Entry-list search is presentation-only: `entryListSearchQueryProvider` feeds
+  `EntryListController.filterEntries` over the materialized entry list. Keep
+  search text out of the DAO, SQL/Drift predicates, backend, and logs.
+- Search splits whitespace-separated literal all terms and uses Dart's default
+  case conversion, not locale-aware/full Unicode case folding. The keyboard
+  Search action unfocuses the field while retaining the query and results.
 - Audio-only draft rows remain visible as pending retry state and should not
   navigate to `/entry/:id`.
 - Keep row preview, timestamp, and language-label derivation in
