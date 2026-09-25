@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +35,172 @@ void main() {
   tearDown(() async {
     await entryRepository.dispose();
   });
+
+  for (final variant in <String, String?>{
+    'cleaned text': 'clean text',
+    'raw transcript fallback': null,
+    'very long cleaned text': List.filled(
+      400,
+      'A long journal entry preserves every word and line.',
+    ).join('\n'),
+  }.entries) {
+    final cleaned = variant.value;
+    testWidgets(
+      'body tap matches Edit and supports re-entry (${variant.key})',
+      (tester) async {
+        entryRepository.seedEntries([
+          _entry(id: 1, rawTranscript: 'raw text', cleanedText: cleaned),
+        ]);
+        await _pumpEntryDetailApp(
+          tester,
+          entryRepository: entryRepository,
+          shareService: shareService,
+        );
+        final body = find.byKey(const ValueKey('entryDetailReadText'));
+        final activate = tester.widget<SelectableText>(body).onTap!;
+        // Tap visible text even when the body extends beyond the viewport.
+        await tester.tapAt(tester.getTopLeft(body) + const Offset(20, 10));
+        // Repeated activation before the read-mode widget is rebuilt must not
+        // run the shared toggle's Done branch.
+        activate();
+        await tester.pumpAndSettle();
+        final editor = find.byKey(const ValueKey('entryDetailEditor'));
+        var field = tester.widget<TextField>(editor);
+        expect(field.controller!.text, cleaned ?? 'raw text');
+        expect(field.focusNode!.hasFocus, isTrue);
+        expect(
+          find.byKey(const ValueKey('entryDetailDoneButton')),
+          findsOneWidget,
+        );
+        final selection = field.controller!.selection;
+        await tester.tap(find.byKey(const ValueKey('entryDetailDoneButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('entryDetailEditButton')));
+        await tester.pumpAndSettle();
+        field = tester.widget<TextField>(editor);
+        expect(field.controller!.text, cleaned ?? 'raw text');
+        expect(field.controller!.selection, selection);
+        expect(field.focusNode!.hasFocus, isTrue);
+        await tester.enterText(editor, 'changed text');
+        await tester.tap(find.byKey(const ValueKey('entryDetailDoneButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(body);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(editor).controller!.text,
+          'changed text',
+        );
+        await tester.tap(editor);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('entryDetailDoneButton')),
+          findsOneWidget,
+        );
+      },
+    );
+  }
+
+  testWidgets('scrolling and metadata taps remain in reading mode', (
+    tester,
+  ) async {
+    entryRepository.seedEntries([
+      _entry(
+        id: 1,
+        rawTranscript: 'raw',
+        cleanedText: List.filled(80, 'Long entry line').join('\n'),
+      ),
+    ]);
+    await _pumpEntryDetailApp(
+      tester,
+      entryRepository: entryRepository,
+      shareService: shareService,
+    );
+    for (final key in [
+      'entryDetailWeekday',
+      'entryDetailDate',
+      'entryDetailWordCount',
+    ]) {
+      await tester.tap(find.byKey(ValueKey(key)));
+    }
+    await tester.drag(
+      find.byKey(const ValueKey('entryDetailScrollView')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailEditor')), findsNothing);
+  });
+
+  testWidgets('body semantic action exposes text and starts editing', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    entryRepository.seedEntries([
+      _entry(id: 1, rawTranscript: 'raw', cleanedText: 'accessible text'),
+    ]);
+    await _pumpEntryDetailApp(
+      tester,
+      entryRepository: entryRepository,
+      shareService: shareService,
+    );
+    final action = find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics && widget.properties.hint == 'Tap to edit entry',
+    );
+    expect(action, findsOneWidget);
+    final node = tester.getSemantics(action);
+    expect(node.getSemanticsData().value, 'accessible text');
+    node.owner!.performAction(node.id, SemanticsAction.tap);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('entryDetailEditor')))
+          .focusNode!
+          .hasFocus,
+      isTrue,
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('loading has no body edit action', (tester) async {
+    entryRepository.holdEntryLoading = true;
+    await _pumpEntryDetailApp(
+      tester,
+      entryRepository: entryRepository,
+      shareService: shareService,
+      settle: false,
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('entryDetailLoading')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
+  });
+
+  for (final action in ['entryDetailDoneButton', 'entryDetailBackButton']) {
+    testWidgets('failed save after body tap keeps editing on $action', (
+      tester,
+    ) async {
+      entryRepository.throwOnEdit = true;
+      entryRepository.seedEntries([
+        _entry(id: 1, rawTranscript: 'raw', cleanedText: 'original'),
+      ]);
+      await _pumpEntryDetailApp(
+        tester,
+        entryRepository: entryRepository,
+        shareService: shareService,
+      );
+      await tester.tap(find.byKey(const ValueKey('entryDetailReadText')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('entryDetailEditor')),
+        'changed',
+      );
+      await tester.tap(find.byKey(ValueKey(action)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('entryDetailEditor')), findsOneWidget);
+      expect(find.text('Could not save your changes.'), findsWidgets);
+      expect((await entryRepository.getEntryById(1))!.cleanedText, 'original');
+    });
+  }
 
   testWidgets('renders cleaned text, metadata, and word count', (tester) async {
     entryRepository.seedEntries([
@@ -308,6 +475,7 @@ Future<void> _pumpEntryDetailApp(
   required _TestEntryShareService shareService,
   String initialLocation = '/entry/1',
   Duration autoSaveDelay = const Duration(milliseconds: 1),
+  bool settle = true,
 }) async {
   final sharedPreferences = await SharedPreferences.getInstance();
 
@@ -341,7 +509,7 @@ Future<void> _pumpEntryDetailApp(
     ),
   );
 
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
 }
 
 class _TestMainRecordingController extends MainRecordingController {
@@ -362,6 +530,7 @@ class _TestEntryRepository implements EntryRepository {
       StreamController<List<Entry>>.broadcast();
   final Map<int, Entry> _entriesById = <int, Entry>{};
   bool throwOnEdit = false;
+  bool holdEntryLoading = false;
   bool throwOnDelete = false;
 
   void seedEntries(List<Entry> entries) {
@@ -381,6 +550,10 @@ class _TestEntryRepository implements EntryRepository {
 
   @override
   Stream<Entry?> watchEntryById(int id) async* {
+    if (holdEntryLoading) {
+      yield* const Stream<Entry?>.empty();
+      return;
+    }
     yield _entriesById[id];
     yield* _entriesController.stream.map((_) => _entriesById[id]);
   }

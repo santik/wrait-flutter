@@ -75,11 +75,32 @@ void main() {
         .getTopLeft(find.byKey(const ValueKey('entryDetailReadText')))
         .dy;
     expect(afterScroll, lessThan(beforeScroll));
+    expect(find.byKey(const ValueKey('entryDetailEditor')), findsNothing);
+    for (final key in [
+      'entryDetailWeekday',
+      'entryDetailDate',
+      'entryDetailWordCount',
+    ]) {
+      await tester.tap(find.byKey(ValueKey(key)));
+    }
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entryDetailEditor')), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
     await tester.pumpAndSettle();
 
     expect(harness.shareService.sharedTexts, [_expectedShareText(_longText())]);
+    expect(_longText().length, greaterThan(10000));
+    final viewport = tester.getRect(
+      find.byKey(const ValueKey('entryDetailScrollView')),
+    );
+    await tester.tapAt(viewport.topLeft + const Offset(25, 25));
+    await tester.pumpAndSettle();
+    final editor = tester.widget<TextField>(
+      find.byKey(const ValueKey('entryDetailEditor')),
+    );
+    expect(editor.controller!.text, _longText());
+    expect(editor.focusNode!.hasFocus, isTrue);
   });
 
   testWidgets('opens detail from an entry-list row and shares short text', (
@@ -157,6 +178,16 @@ void main() {
       expect(harness.shareService.sharedTexts, [
         _expectedShareText('raw fallback text'),
       ]);
+      await tester.tap(find.byKey(const ValueKey('entryDetailReadText')));
+      await tester.pumpAndSettle();
+      final editor = tester.widget<TextField>(
+        find.byKey(const ValueKey('entryDetailEditor')),
+      );
+      expect(editor.controller!.text, 'raw fallback text');
+      expect(editor.focusNode!.hasFocus, isTrue);
+      await tester.tap(find.byKey(const ValueKey('entryDetailDoneButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
     },
   );
 
@@ -242,8 +273,15 @@ void main() {
       harness.go('/entry/$id');
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('entryDetailEditButton')));
+      await repository.updateEditedCleanedText(id, 'initial cleaned text');
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('entryDetailReadText')));
+      await tester.pumpAndSettle();
+      final initialEditor = tester.widget<TextField>(
+        find.byKey(const ValueKey('entryDetailEditor')),
+      );
+      expect(initialEditor.controller!.text, 'initial cleaned text');
+      expect(initialEditor.focusNode!.hasFocus, isTrue);
       await _prepareScreenshots(binding, tester);
       await binding.takeScreenshot('entry-detail-edit-mode');
 
@@ -253,6 +291,19 @@ void main() {
       );
       await tester.pump();
       await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('entryDetailDoneButton')));
+      await tester.pumpAndSettle();
+      expect(
+        (await repository.getEntryById(id))!.cleanedText,
+        'edited cleaned text for sharing',
+      );
+      await tester.tap(find.byKey(const ValueKey('entryDetailEditButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('entryDetailDoneButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('entryDetailReadText')));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('entryDetailShareButton')));
       await tester.pumpAndSettle();
@@ -341,8 +392,9 @@ Future<void> _prepareScreenshots(
 
 String _longText() {
   return List<String>.generate(
-    40,
-    (index) => 'line ${index.toString().padLeft(2, '0')}',
+    400,
+    (index) =>
+        'line ${index.toString().padLeft(2, '0')} preserves every word in this long journal entry.',
   ).join('\n');
 }
 
