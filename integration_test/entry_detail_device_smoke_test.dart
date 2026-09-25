@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -51,11 +51,24 @@ void main() {
 
     expect(find.byKey(const ValueKey('entryDetailReadText')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('entryDetailEditButton')));
+    await tester.tap(find.byKey(const ValueKey('entryDetailReadText')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.bySemanticsLabel('Edit entry text'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('entryDetailEditor')))
+          .focusNode!
+          .hasFocus,
+      isTrue,
+    );
+    // Focus is the app contract. Visible IME insets also depend on hardware
+    // keyboard and lockscreen state, so require them only in a controlled
+    // emulator/simulator run with the software keyboard enabled.
+    if (const bool.fromEnvironment('VERIFY_ENTRY_SOFTWARE_KEYBOARD')) {
+      await _expectSoftwareKeyboardVisible(tester);
+    }
 
     await tester.enterText(
       find.byKey(const ValueKey('entryDetailEditor')),
@@ -84,6 +97,21 @@ void main() {
     expect(savedEntry!.cleanedText, 'edited detail text on device');
     expect(savedEntry.rawTranscript, 'original raw transcript');
     expect(savedEntry.wordCount, 5);
+    await tester.pumpAndSettle();
+    harness.go('/entry/$id');
+    await tester.pumpAndSettle();
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('entryDetailReadText')),
+    );
+    expect(
+      tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('entryDetailReadText')),
+          )
+          .data,
+      'edited detail text on device',
+    );
   });
 
   testWidgets('invalid detail route redirects safely to entries', (
@@ -105,6 +133,89 @@ void main() {
     expect(find.byKey(const ValueKey('entryListEmptyState')), findsOneWidget);
     expect(find.byKey(const ValueKey('entryDetailReadText')), findsNothing);
   });
+
+  testWidgets('read selection and accessible edit preserve editor gestures', (
+    tester,
+  ) async {
+    final harness = await _createHarness();
+    addTearDown(harness.dispose);
+    final semantics = tester.ensureSemantics();
+    final repository = harness.container.read(entryRepositoryProvider);
+    final id = await repository.saveEntry(
+      'Selection remains available here',
+      'en-US',
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const WraitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    harness.go('/entry/$id');
+    await tester.pumpAndSettle();
+    final body = find.byKey(const ValueKey('entryDetailReadText'));
+    await tester.longPressAt(tester.getTopLeft(body) + const Offset(25, 10));
+    await tester.pumpAndSettle();
+    expect(body, findsOneWidget);
+    expect(
+      tester
+          .widget<EditableText>(find.byType(EditableText))
+          .controller
+          .selection
+          .isCollapsed,
+      isFalse,
+    );
+    final action = find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics && widget.properties.hint == 'Tap to edit entry',
+    );
+    final node = tester.getSemantics(action);
+    expect(node.getSemanticsData().value, 'Selection remains available here');
+    node.owner!.performAction(node.id, SemanticsAction.tap);
+    await tester.pumpAndSettle();
+    final editor = find.byKey(const ValueKey('entryDetailEditor'));
+    expect(tester.widget<TextField>(editor).focusNode!.hasFocus, isTrue);
+    await tester.tapAt(tester.getTopLeft(editor) + const Offset(25, 15));
+    await tester.pumpAndSettle();
+    var selection = tester.widget<TextField>(editor).controller!.selection;
+    expect(selection.isValid, isTrue);
+    expect(selection.isCollapsed, isTrue);
+    expect(
+      selection.baseOffset,
+      lessThan('Selection remains available here'.length),
+    );
+    final wordPosition = tester.getTopLeft(editor) + const Offset(25, 15);
+    await tester.tapAt(wordPosition);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(wordPosition);
+    await tester.pumpAndSettle();
+    selection = tester.widget<TextField>(editor).controller!.selection;
+    expect(selection.isCollapsed, isFalse);
+    expect(find.byKey(const ValueKey('entryDetailDoneButton')), findsOneWidget);
+    semantics.dispose();
+  });
+}
+
+Future<void> _expectSoftwareKeyboardVisible(
+  WidgetTester tester, {
+  Duration timeout = const Duration(seconds: 3),
+  Duration pollInterval = const Duration(milliseconds: 100),
+}) async {
+  assert(timeout > Duration.zero && pollInterval > Duration.zero);
+  for (
+    var elapsed = Duration.zero;
+    elapsed < timeout && tester.view.viewInsets.bottom == 0;
+    elapsed += pollInterval
+  ) {
+    await tester.pump(pollInterval);
+  }
+  expect(
+    tester.view.viewInsets.bottom,
+    greaterThan(0),
+    reason:
+        'Body tap must open the software keyboard within $timeout before text injection; run this check with the software keyboard enabled',
+  );
 }
 
 Future<void> _pumpUntilFound(

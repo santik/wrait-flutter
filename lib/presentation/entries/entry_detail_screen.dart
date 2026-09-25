@@ -176,10 +176,15 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                                   style: Theme.of(context).textTheme.bodyLarge,
                                 ),
                               )
-                            : SelectableText(
-                                displayText,
-                                key: const ValueKey('entryDetailReadText'),
-                                style: Theme.of(context).textTheme.bodyLarge,
+                            : Semantics(
+                                hint: 'Tap to edit entry',
+                                onTap: () => _handleBodyTap(displayText),
+                                child: SelectableText(
+                                  displayText,
+                                  key: const ValueKey('entryDetailReadText'),
+                                  onTap: () => _handleBodyTap(displayText),
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
                               ),
                       ),
                     ),
@@ -290,6 +295,20 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
       }
       detailController.syncFromEntry(displayText);
     });
+  }
+
+  void _handleBodyTap(String displayText) {
+    final state = ref.read(entryDetailControllerProvider(widget.entryId));
+    if (state.isEditing) {
+      return;
+    }
+    unawaited(
+      _handleEditToggle(
+        ref.read(entryDetailControllerProvider(widget.entryId).notifier),
+        state,
+        displayText,
+      ),
+    );
   }
 
   Future<void> _handleEditToggle(

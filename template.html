@@ -1,0 +1,118 @@
+<!--
+  templateType: email
+  isAvailableForNewContent: true
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>{{ content.name }}</title>
+    <!--[if mso]>
+    <xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+    <![endif]-->
+    <!--[if !mso]><!-->
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!--<![endif]-->
+    <style>
+        body{margin:0;padding:0;background-color:#F1F1F3}table{border-collapse:collapse}a{color:#1F202E}a:hover{color:#585965}@media only screen and (max-width:620px){.m11-shell{width:100%!important}.m11-pad{padding-left:24px!important;padding-right:24px!important}.m11-h1{font-size:32px!important;line-height:38px!important}.m11-story-h{font-size:19px!important;line-height:25px!important}.m11-folio{font-size:9px!important;letter-spacing:0.12em!important}}
+    </style>
+    {{ standard_header_includes }}
+</head>
+<body style="margin:0;padding:0;background-color:#F1F1F3;">
+<!-- PREVIEW TEXT TAG -->
+<span style="display:none !important;visibility:hidden;mso-hide:all;font-size:1px;color:#F1F1F3;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+  {% if content.preview_text %}{{ content.preview_text }}{% endif %}
+</span>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#F1F1F3" style="background-color:#F1F1F3">
+    <tr><td align="center" style="padding:30px 12px 34px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="m11-shell" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background-color:#FFFFFF">
+
+            <!-- HEADER TOP -->
+            <tr><td class="m11-pad" style="padding:24px 40px 18px">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                        <td align="left" style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:500;letter-spacing:0.34em;color:#1F202E;line-height:18px;mso-line-height-rule:exactly">
+                            {% module "top_header_left" path="@hubspot/rich_text", html="M11&nbsp;PUBLIC&nbsp;MARKETS" %}
+                        </td>
+                        <td align="right" class="m11-folio" style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;font-weight:500;letter-spacing:0.16em;color:#585965;line-height:18px;mso-line-height-rule:exactly">
+                            {% module "top_header_right" path="@hubspot/rich_text", html="LTF FACTSHEET &nbsp;·&nbsp; [MONTH YEAR]" %}
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+
+            <tr><td class="m11-pad" style="padding:0 40px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td height="1" bgcolor="#DEDFE3" style="height:1px;font-size:0;line-height:0;background-color:#DEDFE3">&nbsp;</td></tr></table></td></tr>
+
+            <!-- BANNER -->
+            <tr><td class="m11-pad" bgcolor="#F4F3EE" style="padding:46px 40px 44px;background-color:#F4F3EE;background-image:radial-gradient(125% 150% at 90% -25%,#91BBDB 0%,rgba(227,216,233,0.92) 26%,rgba(251,229,225,0.6) 50%,rgba(244,243,238,0) 76%);border-bottom:2px solid #1F202E">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr><td class="m11-h1" style="font-family:'Chakra Petch','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:40px;font-weight:400;letter-spacing:-0.01em;color:#1F202E;line-height:46px;mso-line-height-rule:exactly">
+                        {% module "banner_title" path="@hubspot/rich_text", html="M11 Liquid Token Fund<br>Factsheet [Month Year]" %}
+                    </td></tr>
+                </table>
+            </td></tr>
+
+            <!-- TEXT BOX BEFORE BUTTON -->
+            <tr><td class="m11-pad" style="padding:36px 40px 0">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr><td style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:400;color:#1F202E;line-height:26px;mso-line-height-rule:exactly">
+                        {% module "intro_text" path="@hubspot/rich_text", html="Dear {{ contact.firstname|default('Sir/Madam') }},<br><br>Please find attached the [Month Year] factsheet for the <strong>M11 Liquid Token Fund (LTF)</strong>, which returned <strong>[7.7]% net</strong> in [Month].<br><br>A short but important note before you read it. As communicated earlier, we have been working on structural improvements to LTF in terms of set-up, portfolio management and operations. These have been in place since 1 May and results to date have been encouraging. With this foundation in place, we are seeing new subscriptions coming into LTF.<br><br>We will continue to keep you as closely informed as possible as we improve performance and operations." %}
+                    </td></tr>
+                </table>
+            </td></tr>
+
+            <!-- DOWNLOAD BUTTON -->
+            <tr><td class="m11-pad" align="left" style="padding:32px 40px 32px">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="left">
+                    <tr><td bgcolor="#1F202E" align="center" style="border-radius:4px;background-color:#1F202E">
+                        {% module "cta_button" path="@hubspot/rich_text", html='<a href="#" style="display:block;padding:13px 24px;font-family:\'Hanken Grotesk\',\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:14px;font-weight:500;color:#FFFFFF;text-decoration:none;line-height:18px;mso-line-height-rule:exactly">Download the Factsheet</a>' %}
+                    </td></tr>
+                </table>
+            </td></tr>
+
+            <!-- TEXT BOX AFTER BUTTON -->
+            <tr><td class="m11-pad" style="padding:0 40px 36px">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr><td style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:400;color:#1F202E;line-height:26px;mso-line-height-rule:exactly">
+                        {% module "outro_text" path="@hubspot/rich_text", html="As always, if you have any questions do not hesitate to reach out.<br><br>Kind regards,<br><strong>M11 Public Markets Investor Relations</strong>" %}
+                    </td></tr>
+                </table>
+            </td></tr>
+
+            <!-- FOOTER -->
+            <tr><td bgcolor="#1F202E" class="m11-pad" align="center" style="background-color:#1F202E;padding:32px 40px 24px">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                        <td width="50%" valign="top" style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;color:#9FA0AB;line-height:20px;mso-line-height-rule:exactly;padding-right:12px">
+                            <strong style="color:#FFFFFF;font-weight:500">M11 Public Markets</strong><br>
+                            Industriestrasse 2<br>
+                            FL- 9487 Gamprin- Bendern<br>
+                            Liechtenstein
+                        </td>
+                        <td width="50%" valign="top" style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;color:#9FA0AB;line-height:20px;mso-line-height-rule:exactly;padding-left:12px">
+                            In cooperation with M11<br>
+                            Herengracht 136, 1015 BV, Amsterdam<br>
+                            The Netherlands
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+
+            <!-- PREFERENCE & UNSUBSCRIBE LINKS -->
+            <tr><td bgcolor="#1F202E" class="m11-pad" align="center" style="background-color:#1F202E;padding:0 40px 28px">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr><td align="center" style="font-family:'Hanken Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;font-weight:400;color:#757680;line-height:18px;mso-line-height-rule:exactly">
+                        <a href="https://hs-8627956.s.hubspotemail.net/hs/preferences-center/en/direct?data=W2nXS-N30h-MRW3bcGBX4tfyj-W24TyTB1Vjg4SW2WwRT_41rT3GW45Cdrl1Szwq3W30k9-D4kltnsW36xd7w4kMbr_W41Qp7F3P6fPkW1BDLkC47nPQzW2xFTCh21j9jXW3XP1kv1NkK9kW30qhFn4rnmJDW2nT5_53Hbh5vW2-GPzL1Zfhf0W2KCc043NGjVRW36y7zg38hzpvW41rv7y3bdq8JW2CvCT22sT-RkW1LBBRW2TrYwWW364B6j1NkdWyW3yL3vF3g263TW4tf-YF2qTj2_W2PPDrD34FNH4W2KnCwz34zxQVW1Svnrv3Y1GsrW32hMPp2qWRH9W2zvNyw2TM_5nW2CLXrb3z9_kRW2PmlbG1VxFDBW45ykFz2z_0YHW36jG7k2CFVDcW1Sx2Bh3NRVR0W2YKYFl1Xc170W43VqYr4pBlpxW1BJTBF3F989QW4ppqlP2PPd_2W2KXkrf1Scq2vW43Pp2f1SpQyVW2FK0wg2zKnt2W1V7qZl2q-zwgW3P98MW2TNKJpW4tt-7t4mFXnwW2CtLZB3BLJxFW3V-df32TgjL5W2sL4ZL1ZcJ6lW3_R6ns2RDhqJ0&utm_campaign=M11%20Funds%20Campaign%20Factsheet&utm_source=hs_email&utm_medium=email&_hsenc=p2ANqtz-9rjbmoJYQPYDEcrz39Q042zYwVFLxBgbqNhkPZ0RdSk8Ys-l1SFv_nID4BggfsKQ-G0u9O" style="color:#757680;text-decoration:underline">Unsubscribe</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="https://hs-8627956.s.hubspotemail.net/hs/preferences-center/en/page?data=W2nXS-N30h-MRW3bcGBX4tfyj-W24TyTB1Vjg4SW2WwRT_41rT3GW45Cdrl1Szwq3W30k9-D4kltnsW36xd7w4kMbr_W41Qp7F3P6fPkW1BDLkC47nPQzW2xFTCh21j9jXW3XP1kv1NkK9kW30qhFn4rnmJDW2nT5_53Hbh5vW2-GPzL1Zfhf0W2KCc043NGjVRW36y7zg38hzpvW41rv7y3bdq8JW2CvCT22sT-RkW1LBBRW2TrYwWW364B6j1NkdWyW3yL3vF3g263TW4tf-YF2qTj2_W2PPDrD34FNH4W2KnCwz34zxQVW1Svnrv3Y1GsrW32hMPp2qWRH9W2zvNyw2TM_5nW2CLXrb3z9_kRW2PmlbG1VxFDBW45ykFz2z_0YHW36jG7k2CFVDcW1Sx2Bh3NRVR0W2YKYFl1Xc170W43VqYr4pBlpxW1BJTBF3F989QW4ppqlP2PPd_2W2KXkrf1Scq2vW43Pp2f1SpQyVW2FK0wg2zKnt2W1V7qZl2q-zwgW3P98MW2TNKJpW4tt-7t4mFXnwW2CtLZB3BLJxFW3V-df32TgjL5W2sL4ZL1ZcJ6lW3_R6ns2RDhqJ0&utm_campaign=M11%20Funds%20Campaign%20Factsheet&utm_source=hs_email&utm_medium=email&_hsenc=p2ANqtz-9rjbmoJYQPYDEcrz39Q042zYwVFLxBgbqNhkPZ0RdSk8Ys-l1SFv_nID4BggfsKQ-G0u9O" style="color:#757680;text-decoration:underline">Manage preferences</a>
+                    </td></tr>
+                </table>
+            </td></tr>
+
+        </table>
+    </td></tr>
+</table>
+</body>
+</html>
