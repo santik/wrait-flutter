@@ -7,11 +7,15 @@ import '../audio/audio_recording_service.dart';
 import '../api/backend_results.dart' as backend;
 import 'transcription_service.dart';
 
-typedef TranscribeAudioCallback =
-    Future<backend.TranscriptionResult> Function(File audioFile);
+typedef TranscribeAudioCallback = Future<backend.TranscriptionResult> Function(
+  File audioFile,
+);
 typedef LiveRecordingPathFactory = Future<String> Function();
-typedef TranscriptionWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef TranscriptionWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 class CloudTranscriptionService implements TranscriptionService {
   CloudTranscriptionService({
@@ -208,7 +212,7 @@ class CloudTranscriptionService implements TranscriptionService {
   }) async {
     try {
       final backendResult = await transcribeAudio(File(audioPath));
-      return switch (backendResult) {
+      return await switch (backendResult) {
         backend.TranscriptionSuccess() => _handleSuccessResult(
           backendResult,
           audioPath: audioPath,

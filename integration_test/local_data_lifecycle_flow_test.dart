@@ -44,6 +44,11 @@ const _platformRawDeviceId = 'us030-platform-device';
 const _savedRawTranscript = 'raw transcript seed';
 const _savedCleanedText = 'cleaned transcript seed';
 const _draftLanguage = 'en-US';
+const _textDraftTranscript = 'preserved text draft';
+const _draftAudioContents = 'draft audio bytes';
+const _platformSecureStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(resetOnError: true),
+);
 const _savedLanguage = 'en-US';
 const _deviceIdSalt = 'wrait-v1';
 const _seededStatePrefsPrefix = 'us030.seeded_state.';
@@ -239,6 +244,12 @@ void _registerPlatformUpdateRetryVerifyScenario() {
       final cleanupCallbackHolder = _CleanupCallbackHolder();
       cleanupCallbackHolder
           .callback = ({required transcript, required language}) async {
+        if (transcript == _textDraftTranscript) {
+          expect(language, _draftLanguage);
+          return const backend.CleanupSuccess(
+            cleanedText: 'Recovered text draft',
+          );
+        }
         expect(transcript, _retriedRawTranscript);
         expect(language, _retriedDetectedLanguage);
         return const backend.CleanupSuccess(cleanedText: _retriedCleanedText);
@@ -291,6 +302,11 @@ void _registerPlatformUpdateRetryVerifyScenario() {
           expected.draftEntryId,
         );
 
+        final recoveredText = await runtime.container
+            .read(entryRepositoryProvider)
+            .getEntryById(expected.textDraftEntryId);
+        expect(recoveredText!.type, EntryType.saved);
+        expect(recoveredText.cleanedText, 'Recovered text draft');
         expect(finalizedEntry, isNotNull);
         expect(finalizedEntry!.type, EntryType.saved);
         expect(finalizedEntry.rawTranscript, _retriedRawTranscript);
@@ -366,6 +382,7 @@ class _SeededLifecycleState {
   const _SeededLifecycleState({
     required this.savedEntryId,
     required this.draftEntryId,
+    required this.textDraftEntryId,
     required this.storedDraftAudioReference,
     required this.savedCreatedAt,
     required this.draftCreatedAt,
@@ -380,6 +397,7 @@ class _SeededLifecycleState {
 
   final int savedEntryId;
   final int draftEntryId;
+  final int textDraftEntryId;
   final String storedDraftAudioReference;
   final int savedCreatedAt;
   final int draftCreatedAt;
@@ -452,10 +470,28 @@ Future<_LifecycleRuntime> _createIsolatedRuntime({
 }
 
 Future<_LifecycleRuntime> _createPlatformRuntime({
-  Clock clock = const SystemClock(),
+  Clock? clock,
   Iterable overrides = const [],
 }) async {
-  final database = await bootstrapLocalEntryDatabase();
+  final validationClock = clock ?? _MutableClock(DateTime(2026, 6, 20, 14));
+  // Verify the old key before bootstrap can create a replacement on an error.
+  if (_scenario.startsWith('platform-update')) {
+    final prefs = await SharedPreferences.getInstance();
+    final expectedDigest = prefs.getString(
+      '${_seededStatePrefsPrefix}keyDigest',
+    );
+    final key = await _platformSecureStorage.read(
+      key: DatabaseKeyStore.storageKey,
+    );
+    expect(
+      expectedDigest != null &&
+          key != null &&
+          sha256.convert(utf8.encode(key)).toString() == expectedDigest,
+      isTrue,
+      reason: 'The original database key must survive the app update',
+    );
+  }
+  final database = await bootstrapLocalEntryDatabase(clock: validationClock);
   final sharedPreferences = await SharedPreferences.getInstance();
 
   final container = createAppContainer(
@@ -464,7 +500,7 @@ Future<_LifecycleRuntime> _createPlatformRuntime({
     sharedPreferences: sharedPreferences,
     overrides: [
       appLockEnabledProvider.overrideWithValue(false),
-      clockProvider.overrideWithValue(clock),
+      clockProvider.overrideWithValue(validationClock),
       appRouterProvider.overrideWithValue(
         buildAppRouter(initialLocation: '/entries'),
       ),
@@ -489,7 +525,7 @@ Future<_SeededLifecycleState> _seedLifecycleState({
     await draftAudioFile.delete();
   }
   await draftAudioFile.parent.create(recursive: true);
-  await draftAudioFile.writeAsString('draft audio bytes');
+  await draftAudioFile.writeAsString(_draftAudioContents);
 
   final savedEntryId = await repository.saveEntry(
     _savedRawTranscript,
@@ -504,6 +540,10 @@ Future<_SeededLifecycleState> _seedLifecycleState({
     draftAudioFile.path,
     _draftLanguage,
   );
+  final textDraftEntryId = await repository.saveDraft(
+    _textDraftTranscript,
+    _draftLanguage,
+  );
   final rawDraftEntry = await database.entryDao.getEntryById(draftEntryId);
   expect(rawDraftEntry, isNotNull);
   await preferencesRepository.setHasEverRecorded(true);
@@ -512,6 +552,7 @@ Future<_SeededLifecycleState> _seedLifecycleState({
   return _SeededLifecycleState(
     savedEntryId: savedEntryId,
     draftEntryId: draftEntryId,
+    textDraftEntryId: textDraftEntryId,
     storedDraftAudioReference: rawDraftEntry!.audioPath!,
     savedCreatedAt: savedEntry!.createdAt,
     draftCreatedAt: (await repository.getEntryById(draftEntryId))!.createdAt,
@@ -527,6 +568,18 @@ Future<_SeededLifecycleState> _seedLifecycleState({
 
 Future<void> _persistPlatformExpectedState(_SeededLifecycleState state) async {
   final sharedPreferences = await SharedPreferences.getInstance();
+  final key = await _platformSecureStorage.read(
+    key: DatabaseKeyStore.storageKey,
+  );
+  expect(key != null && key.isNotEmpty, isTrue);
+  await sharedPreferences.setString(
+    '${_seededStatePrefsPrefix}keyDigest',
+    sha256.convert(utf8.encode(key!)).toString(),
+  );
+  await sharedPreferences.setInt(
+    '${_seededStatePrefsPrefix}textDraftEntryId',
+    state.textDraftEntryId,
+  );
   await sharedPreferences.setInt(
     '${_seededStatePrefsPrefix}savedEntryId',
     state.savedEntryId,
@@ -597,6 +650,7 @@ Future<_SeededLifecycleState> _loadPlatformExpectedState() async {
   return _SeededLifecycleState(
     savedEntryId: requireInt('savedEntryId'),
     draftEntryId: requireInt('draftEntryId'),
+    textDraftEntryId: requireInt('textDraftEntryId'),
     storedDraftAudioReference: requireString('storedDraftAudioReference'),
     savedCreatedAt: requireInt('savedCreatedAt'),
     draftCreatedAt: requireInt('draftCreatedAt'),
@@ -628,7 +682,14 @@ Future<void> _expectLifecycleState({
     (entry) => entry.id == expected.draftEntryId,
   );
 
-  expect(entries, hasLength(2));
+  expect(entries, hasLength(3));
+  final textDraft = entries.singleWhere(
+    (entry) => entry.id == expected.textDraftEntryId,
+  );
+  expect(textDraft.type, EntryType.draft);
+  expect(textDraft.rawTranscript, _textDraftTranscript);
+  expect(textDraft.language, _draftLanguage);
+  expect(textDraft.audioPath, isNull);
   expect(savedEntry.type, EntryType.saved);
   expect(savedEntry.rawTranscript, expected.savedRawTranscript);
   expect(savedEntry.cleanedText, expected.savedCleanedText);
@@ -643,7 +704,7 @@ Future<void> _expectLifecycleState({
   expect(draftEntry.language, expected.draftLanguage);
   expect(draftEntry.createdAt, expected.draftCreatedAt);
   expect(draftEntry.audioPath, expected.draftAudioPath);
-  expect(await File(draftEntry.audioPath!).exists(), isTrue);
+  expect(await File(draftEntry.audioPath!).readAsString(), _draftAudioContents);
   expect(rawDraftEntry!.audioPath, expected.storedDraftAudioReference);
   expect(rawDraftEntry.audioPath, startsWith(DraftAudioPathCodec.cacheScheme));
 

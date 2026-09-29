@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:wrait/app.dart';
 import 'package:wrait/core/config/app_config.dart';
+import 'package:wrait/core/time/monotonic_clock.dart';
+import 'package:wrait/data/audio/microphone_permission_service.dart';
 import 'package:wrait/data/audio/audio_recording_providers.dart';
 import 'package:wrait/data/audio/audio_recording_service.dart';
 import 'package:wrait/data/audio/record_audio_recording_service.dart';
@@ -13,6 +15,37 @@ import '../test/test_doubles/fake_monotonic_clock.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('native recorder produces a nonempty AAC/M4A file', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp(
+        'wrait-native-audio',
+      );
+      final service = RecordAudioRecordingService(
+        recorder: AudioRecorderAdapter(),
+        microphonePermissionService:
+            PermissionHandlerMicrophonePermissionService(),
+        monotonicClock: StopwatchMonotonicClock(),
+        hardCap: const Duration(seconds: 30),
+      );
+      try {
+        final output = '${directory.path}/native.m4a';
+        await service.startRecording(output);
+        expect(service.isRecording, isTrue);
+        await Future<void>.delayed(const Duration(seconds: 6));
+        expect(await service.stopRecording(), output);
+        expect(service.isRecording, isFalse);
+        final bytes = await File(output).readAsBytes();
+        expect(bytes.length, greaterThan(32));
+        expect(String.fromCharCodes(bytes.sublist(4, 8)), 'ftyp');
+      } finally {
+        await service.dispose();
+        await directory.delete(recursive: true);
+      }
+    });
+  });
 
   testWidgets(
     'provider graph supports start and valid stop with a completed file path',

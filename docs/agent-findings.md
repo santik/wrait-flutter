@@ -379,17 +379,25 @@ this file as supporting implementation memory.
 - For dependency refreshes, validate generated backend package compatibility
   with at least `flutter pub get` and `flutter analyze` under
   `tool/openapi-generator/output/backend_api`.
-- Current dependency exceptions:
-  - `record` is pinned to `7.0.0`; `7.1.0` pulled `record_android 2.1.2`,
-    which failed Android Kotlin compilation with unresolved `AdtsContainer`
-    references.
-  - `drift_dev` stays on `2.34.0`; `2.34.1+1` requires `analyzer ^13.0.0`,
-    conflicting with the Flutter `3.44.3` test/analyzer family.
+- US-049 retired the historic record/drift_dev pins using Flutter 3.47.5 /
+  Dart 3.13.4, record 7.1.1 and drift_dev 2.35.0. Six upstream transitive
+  constraints remain documented in specs/049-dependency-refresh/evidence/
+  dependency-blockers.md (September 28, 2026 audit).
+- Root generation isolation is verified by comparing backend generated-part
+  hashes before and after build_runner. Keep tool output outside the root
+  build.yaml source allowlist; run generated-client checks separately.
+- US-049 completed Android native verification but waived remaining iOS work.
+  Before iOS release, complete the final-graph rerun and native checks listed
+  in AGENTS.md's dependency guidance. The 28-byte iOS recording result is a
+  baseline-reproduced unresolved limitation, not a passing recording check.
 - Android emulator recording validation has a known split:
   `integration_test/main_recording_controller_flow_test.dart` passes on
   `emulator-5554`, while
   `integration_test/audio_recording_service_flow_test.dart` can stall on a
   provider-graph start/stop case and report `did not complete`.
+  US-049 subsequently passed the isolated audio-service suite, including actual
+  AAC/M4A file validation, on emulator-5556 with Flutter 3.47.5. Retain the older
+  emulator-5554 failure as historical evidence, not a current blanket failure.
 - iOS simulator validation for the recording pulse currently has a known
   combined-run flake: `integration_test/main_screen_flow_test.dart` can fail
   intermittently when run in the same command as the touched entry integration
@@ -399,5 +407,10 @@ this file as supporting implementation memory.
 - Screenshot-heavy integration coverage works well on emulator/simulator, but
   physical Android verification may need screenshot-free smoke tests for
   timing-sensitive entry detail flows.
+- Entry-detail smoke tests always verify editor focus before text injection.
+  Require visible software-keyboard insets only in controlled runs using
+  `--dart-define=VERIFY_ENTRY_SOFTWARE_KEYBOARD=true`. Zero insets in a general
+  device/deploy suite do not by themselves prove a focus failure; software
+  keyboard visibility also depends on device and lockscreen configuration.
 - Direct emulator bring-up is often more reliable than `flutter emulators`:
   `/Users/alexander/Library/Android/sdk/emulator/emulator -avd Pixel_8_emulator -no-snapshot-load`.

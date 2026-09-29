@@ -763,7 +763,16 @@ class $$EntryRecordsTableTableManager
                 audioPath: audioPath,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$EntryRecordsTable, EntryRecord>(table),
+                  BaseReferences<
+                    _$LocalEntryDatabase,
+                    $EntryRecordsTable,
+                    EntryRecord
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),

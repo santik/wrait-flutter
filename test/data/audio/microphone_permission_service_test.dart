@@ -42,6 +42,50 @@ void main() {
     },
   );
 
+  test('Android uses the request result to detect permanent denial', () async {
+    final client = _FakeMicrophonePermissionClient(
+      status: PermissionStatus.denied,
+      requestResult: PermissionStatus.permanentlyDenied,
+    );
+    final service = PermissionHandlerMicrophonePermissionService(
+      permissionClient: client,
+      isIosPlatform: () => false,
+    );
+
+    expect(await service.getMicrophoneAccess(), MicrophoneAccessState.denied);
+    expect(
+      await service.requestMicrophoneAccess(),
+      MicrophoneAccessState.permanentlyDenied,
+    );
+    expect(client.requestCount, 1);
+  });
+
+  test(
+    'Android Ask every time remains requestable after a denied status',
+    () async {
+      final client = _FakeMicrophonePermissionClient(
+        status: PermissionStatus.denied,
+        requestResult: PermissionStatus.granted,
+      );
+      final service = PermissionHandlerMicrophonePermissionService(
+        permissionClient: client,
+        isIosPlatform: () => false,
+      );
+
+      expect(
+        await service.requestMicrophoneAccess(),
+        MicrophoneAccessState.granted,
+      );
+      client._status = PermissionStatus.denied;
+      expect(await service.getMicrophoneAccess(), MicrophoneAccessState.denied);
+      expect(
+        await service.requestMicrophoneAccess(),
+        MicrophoneAccessState.granted,
+      );
+      expect(client.requestCount, 2);
+    },
+  );
+
   test('Android denied request result stays retryable', () async {
     final client = _FakeMicrophonePermissionClient(
       status: PermissionStatus.denied,
@@ -67,12 +111,14 @@ class _FakeMicrophonePermissionClient implements MicrophonePermissionClient {
 
   PermissionStatus _status;
   final PermissionStatus requestResult;
+  int requestCount = 0;
 
   @override
   Future<bool> openSettings() async => true;
 
   @override
   Future<PermissionStatus> requestAccess() async {
+    requestCount += 1;
     _status = requestResult;
     return requestResult;
   }
