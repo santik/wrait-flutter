@@ -379,17 +379,21 @@ backend client.
 
 ## Dependency maintenance guidance
 
-US-034 refreshed the Flutter/dependency baseline and left two intentional
-exceptions that should be re-evaluated on future maintenance passes:
+US-049 establishes Flutter 3.47.5 / Dart 3.13.4 as the validated baseline.
+Use an SDK matching pubspec.yaml; the maintenance run used a separate SDK and
+did not upgrade the machine's global installation.
 
-- `record` is pinned to `7.0.0` because `record 7.1.0` pulls
-  `record_android 2.1.2`, which failed Android debug/profile Kotlin
-  compilation with unresolved `AdtsContainer` references in
-  `AacFormat.kt`.
-- `drift_dev` stays on `2.34.0` because `2.34.1+1` requires
-  `analyzer ^13.0.0`, which conflicts with the Flutter `3.44.3`
-  `flutter_test` dependency family.
-
-Future dependency-refresh stories should treat those as explicit checkpoints:
-retry them after a Flutter stable upgrade or when upstream plugin/analyzer
-constraints change, and record the result in the story artifacts.
+- The historic record 7.0.0 and drift_dev 2.34.0 exceptions are retired:
+  record 7.1.1 and drift_dev 2.35.0 passed the approved Android validation.
+- Six transitive blockers remain in the September 28, 2026 audit. Refer to
+  specs/049-dependency-refresh/evidence/dependency-blockers.md and re-evaluate
+  their upstream constraints during future refreshes; do not force overrides.
+- Keep the root build.yaml source allowlist. When changing generation tooling,
+  verify backend generated parts survive root build_runner execution and run
+  generated-package resolution/analysis separately.
+- The US-049 iOS validation exception applies only to that maintenance story.
+  Before any iOS release, verify the final dependency graph and complete native
+  recording, permission, picker/share, authentication, feedback keyboard-layout
+  and active-capture checks. The simulator's 28-byte recording outcome reproduced
+  with both old and new dependencies and must be resolved and verified before
+  release. Approved minimum iOS support is 15.

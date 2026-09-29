@@ -50,7 +50,8 @@ if (requiresReleaseSigning && !hasReleaseSigning) {
 
 android {
     namespace = "com.wrait.flutter"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android 14 requires API 37 at compile time.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

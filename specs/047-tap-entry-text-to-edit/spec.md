@@ -1,7 +1,7 @@
 # Feature Specification: Tap Entry Text To Edit
 
 > **Feature number:** 047
-> **Status:** Awaiting Finalization Approval
+> **Status:** Complete
 > **Author:** Codex
 > **Date:** 2026-09-23
 > **Work item:** Not assigned
@@ -18,6 +18,7 @@
 | 2026-09-24 | Awaiting External Review | Codex | Implementation, 25 focused tests, clean analysis, and 10 integration flows per platform completed. Awaiting externally authored review.md. |
 | 2026-09-24 | In Progress | Codex | External review assessed; user approved fixes for findings 6, 7, and 10, the documented no-change dispositions, and deferral of localization/manual screen-reader testing. Revalidation underway. |
 | 2026-09-25 | Awaiting Finalization Approval | Codex | Review fixes validated: 26 focused tests, clean analyzer, and 10 integration tests on each platform with software-keyboard verification enabled. Durable documentation proposals await approval. |
+| 2026-09-25 | Complete | Codex | User approved finalization and durable documentation updates; application description and agent findings updated. All SDD gates handled. |
 
 ---
 

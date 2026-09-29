@@ -221,7 +221,9 @@ upcoming feature work:
 - entry detail text display derived from cleaned text first, then raw
   transcript fallback
 - entry detail metadata showing localized weekday/date plus stored word count
-- selectable entry-detail read mode and explicit edit mode
+- selectable entry-detail read mode; tapping the displayed body or the Edit
+  button enters the same edit mode. Initial cursor placement follows the Edit
+  button behavior, and Done returns to read mode
 - automatic entry-detail edit persistence to `cleanedText` and `wordCount`
   without mutating the original `rawTranscript`
 - entry-detail share action through the platform share surface
@@ -326,3 +328,7 @@ Current runtime behavior on top of that generated client:
 - Android developers can also build the debug APK manually with
   `flutter build apk --debug --dart-define=PROXY_SECRET=...` and install
   `build/app/outputs/flutter-apk/app-debug.apk` directly through `adb`
+
+Supported iOS versions start at iOS 15. US-049's dependency refresh completed
+Android verification; iOS release remains subject to the outstanding native
+validation recorded in specs/049-dependency-refresh/implementation.md.

@@ -50,3 +50,8 @@ app.*.map.json
 /android/app/release
 /wrait-android
 /codebase-analysis-docs/
+specs/**/plan.md
+specs/**/implementation.md
+specs/**/review.md
+specs/**/tasks.md
+
