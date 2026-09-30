@@ -14,6 +14,7 @@ import 'package:wrait/data/auth/device_security_settings_opener.dart';
 import 'package:wrait/data/entries/entry_providers.dart';
 import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
+import 'package:wrait/domain/repository/app_lock_preferences_repository.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/app_lock/app_lock_test_keys.dart';
@@ -395,8 +396,15 @@ class _TestEntryRepository implements EntryRepository {
   Future<void> deleteStaleDrafts({int daysOld = 7}) async {}
 }
 
-class _TestPreferencesRepository implements PreferencesRepository {
+class _TestPreferencesRepository
+    implements PreferencesRepository, AppLockPreferencesRepository {
   const _TestPreferencesRepository();
+
+  @override
+  Future<bool> getAppLockEnabled() async => true;
+
+  @override
+  Future<void> setAppLockEnabled(bool value) async {}
 
   @override
   Future<String> getDeviceId() async => 'device-id';

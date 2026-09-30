@@ -58,6 +58,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+      expect(find.byKey(mainSettingsButtonKey), findsOneWidget);
+      expect(find.byKey(mainFeedbackButtonKey), findsOneWidget);
       expect(
         tester.getSize(find.byKey(const ValueKey('statusLineSlot'))).height,
         WraitStatusLineTokens.reservedHeight,

@@ -15,6 +15,7 @@ import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
+import 'package:wrait/presentation/settings/settings_test_keys.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,15 @@ void main() {
 
     expect(find.byKey(mainActionButtonKey), findsOneWidget);
     expect(find.byKey(mainStatusLineSlotKey), findsOneWidget);
+
+    await tester.tap(find.byKey(mainSettingsButtonKey));
+    await tester.pumpAndSettle();
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('App lock'), findsOneWidget);
+
+    await tester.tap(find.byKey(settingsBackButtonKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(mainActionButtonKey), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const ValueKey('statsLineButton')));
     await tester.tap(find.byKey(const ValueKey('statsLineButton')));

@@ -6,3 +6,4 @@ const mainActionButtonKey = ValueKey<String>('actionButton');
 const mainActionButtonLabelKey = ValueKey<String>('actionButtonLabel');
 const mainStatusLineSlotKey = ValueKey<String>('statusLineSlot');
 const mainFeedbackButtonKey = ValueKey<String>('mainFeedbackButton');
+const mainSettingsButtonKey = ValueKey<String>('mainSettingsButton');

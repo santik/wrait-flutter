@@ -7,10 +7,46 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/data/auth/app_lock_authenticator.dart';
 import 'package:wrait/data/auth/app_lock_providers.dart';
 import 'package:wrait/data/auth/device_security_settings_opener.dart';
+import 'package:wrait/data/preferences/preferences_providers.dart';
+import 'package:wrait/domain/repository/app_lock_preferences_repository.dart';
+import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/app_lock/app_lock_gate.dart';
 import 'package:wrait/presentation/app_lock/app_lock_test_keys.dart';
 
 void main() {
+  testWidgets('loading preference never paints or exposes protected content', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = _PendingPreferencesRepository();
+    var paintCount = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          preferencesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          home: AppLockGate(
+            child: Semantics(
+              label: 'protected content',
+              child: CustomPaint(
+                painter: _PaintCounter(() => paintCount += 1),
+                size: const Size(40, 40),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(appLockPreferenceCoverKey), findsOneWidget);
+    expect(find.bySemanticsLabel('protected content'), findsNothing);
+    expect(paintCount, 0);
+
+    semantics.dispose();
+  });
+
   testWidgets('disabled app lock shows child without overlay', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -37,6 +73,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          preferencesRepositoryProvider.overrideWithValue(
+            const _TestPreferencesRepository(),
+          ),
           appLockAuthenticatorProvider.overrideWithValue(authenticator),
           deviceSecuritySettingsOpenerProvider.overrideWithValue(
             _TestSettingsOpener(),
@@ -64,7 +103,7 @@ void main() {
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
     expect(find.byKey(appLockBlurKey), findsOneWidget);
 
-    await tester.tap(find.text('secret action'));
+    await tester.tap(find.text('secret action'), warnIfMissed: false);
     await tester.pump();
     expect(tapCount, 0);
   });
@@ -79,6 +118,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          preferencesRepositoryProvider.overrideWithValue(
+            const _TestPreferencesRepository(),
+          ),
           appLockAuthenticatorProvider.overrideWithValue(authenticator),
           deviceSecuritySettingsOpenerProvider.overrideWithValue(
             _TestSettingsOpener(),
@@ -96,6 +138,33 @@ void main() {
     expect(find.text('still locked'), findsOneWidget);
   });
 
+  testWidgets('preference read failure obscures content and retry recovers', (
+    tester,
+  ) async {
+    final repository = _RetryPreferencesRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          preferencesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(
+          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(appLockPreferenceCoverKey), findsOneWidget);
+    expect(find.byKey(appLockPreferenceRetryKey), findsOneWidget);
+
+    repository.fail = false;
+    await tester.tap(find.byKey(appLockPreferenceRetryKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(appLockPreferenceCoverKey), findsNothing);
+    expect(find.text('secret content'), findsOneWidget);
+  });
+
   testWidgets('background and resume re-locks and re-prompts', (tester) async {
     final authenticator = _TestGateAuthenticator(
       nextResults: [AppLockAuthResult.success, AppLockAuthResult.canceled],
@@ -104,6 +173,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          preferencesRepositoryProvider.overrideWithValue(
+            const _TestPreferencesRepository(),
+          ),
           appLockAuthenticatorProvider.overrideWithValue(authenticator),
           deviceSecuritySettingsOpenerProvider.overrideWithValue(
             _TestSettingsOpener(),
@@ -135,6 +207,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          preferencesRepositoryProvider.overrideWithValue(
+            const _TestPreferencesRepository(),
+          ),
           appLockAuthenticatorProvider.overrideWithValue(authenticator),
           deviceSecuritySettingsOpenerProvider.overrideWithValue(
             _TestSettingsOpener(),
@@ -165,6 +240,47 @@ void main() {
     expect(find.byKey(appLockOverlayKey), findsNothing);
   });
 
+  testWidgets(
+    'rebuild and resumed callbacks keep authentication single-flight',
+    (tester) async {
+      final authenticator = _TestGateAuthenticator()
+        ..authenticateCompleter = Completer<AppLockAuthResult>();
+      late StateSetter rebuildParent;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            preferencesRepositoryProvider.overrideWithValue(
+              const _TestPreferencesRepository(),
+            ),
+            appLockAuthenticatorProvider.overrideWithValue(authenticator),
+          ],
+          child: MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                rebuildParent = setState;
+                return const AppLockGate(
+                  child: Scaffold(body: Text('secret content')),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(authenticator.authenticateCallCount, 1);
+
+      rebuildParent(() {});
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(authenticator.authenticateCallCount, 1);
+      authenticator.authenticateCompleter!.complete(AppLockAuthResult.success);
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('no-security state offers settings and bypass actions', (
     tester,
   ) async {
@@ -176,6 +292,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          preferencesRepositoryProvider.overrideWithValue(
+            const _TestPreferencesRepository(),
+          ),
           appLockAuthenticatorProvider.overrideWithValue(authenticator),
           deviceSecuritySettingsOpenerProvider.overrideWithValue(
             settingsOpener,
@@ -216,6 +335,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          preferencesRepositoryProvider.overrideWithValue(
+            const _TestPreferencesRepository(),
+          ),
           appLockAuthenticatorProvider.overrideWithValue(authenticator),
           deviceSecuritySettingsOpenerProvider.overrideWithValue(
             _TestSettingsOpener(),
@@ -275,6 +397,85 @@ class _TestGateAuthenticator implements AppLockAuthenticator {
   Future<void> cancel() async {
     cancelCallCount += 1;
   }
+}
+
+class _TestPreferencesRepository
+    implements PreferencesRepository, AppLockPreferencesRepository {
+  const _TestPreferencesRepository();
+
+  @override
+  Future<bool> getAppLockEnabled() async => true;
+
+  @override
+  Future<void> setAppLockEnabled(bool value) async {}
+
+  @override
+  Future<String> getDeviceId() async => 'device-id';
+
+  @override
+  Future<bool> getHasEverRecorded() async => false;
+
+  @override
+  Future<void> setHasEverRecorded(bool value) async {}
+}
+
+class _RetryPreferencesRepository
+    implements PreferencesRepository, AppLockPreferencesRepository {
+  bool fail = true;
+
+  @override
+  Future<bool> getAppLockEnabled() async {
+    if (fail) {
+      throw StateError('read failed');
+    }
+    return false;
+  }
+
+  @override
+  Future<void> setAppLockEnabled(bool value) async {}
+
+  @override
+  Future<String> getDeviceId() async => 'device-id';
+
+  @override
+  Future<bool> getHasEverRecorded() async => false;
+
+  @override
+  Future<void> setHasEverRecorded(bool value) async {}
+}
+
+class _PendingPreferencesRepository
+    implements PreferencesRepository, AppLockPreferencesRepository {
+  final Completer<bool> read = Completer<bool>();
+
+  @override
+  Future<bool> getAppLockEnabled() => read.future;
+
+  @override
+  Future<void> setAppLockEnabled(bool value) async {}
+
+  @override
+  Future<String> getDeviceId() async => 'device-id';
+
+  @override
+  Future<bool> getHasEverRecorded() async => false;
+
+  @override
+  Future<void> setHasEverRecorded(bool value) async {}
+}
+
+class _PaintCounter extends CustomPainter {
+  const _PaintCounter(this.onPaint);
+
+  final VoidCallback onPaint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    onPaint();
+  }
+
+  @override
+  bool shouldRepaint(covariant _PaintCounter oldDelegate) => false;
 }
 
 class _TestSettingsOpener implements DeviceSecuritySettingsOpener {

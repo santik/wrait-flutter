@@ -7,3 +7,5 @@ const appLockUnlockButtonKey = ValueKey<String>('appLockUnlockButton');
 const appLockSettingsButtonKey = ValueKey<String>('appLockSettingsButton');
 const appLockBypassButtonKey = ValueKey<String>('appLockBypassButton');
 const appLockProgressKey = ValueKey<String>('appLockProgress');
+const appLockPreferenceCoverKey = ValueKey<String>('appLockPreferenceCover');
+const appLockPreferenceRetryKey = ValueKey<String>('appLockPreferenceRetry');

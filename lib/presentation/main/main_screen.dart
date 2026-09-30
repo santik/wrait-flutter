@@ -144,9 +144,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
       return;
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -342,6 +341,23 @@ class _MainScreenState extends ConsumerState<MainScreen>
                     ),
                   );
                 },
+              ),
+              Positioned(
+                top: WraitSpacingTokens.xs,
+                left: WraitSpacingTokens.sm,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Settings',
+                  child: IconButton(
+                    key: mainSettingsButtonKey,
+                    tooltip: 'Settings',
+                    onPressed: controllerState.isActive
+                        ? null
+                        : () => context.push('/settings'),
+                    icon: const Icon(Icons.settings_outlined),
+                  ),
+                ),
               ),
               Positioned(
                 top: WraitSpacingTokens.xs,
