@@ -24,6 +24,63 @@ void main() {
     await expectLater(repository.getHasEverRecorded(), completion(isFalse));
   });
 
+  test('app lock defaults to false when unset', () async {
+    await expectLater(repository.getAppLockEnabled(), completion(isFalse));
+  });
+
+  test('app lock persists explicit true and false values', () async {
+    await repository.setAppLockEnabled(true);
+    expect(await repository.getAppLockEnabled(), isTrue);
+
+    await repository.setAppLockEnabled(false);
+    final recreated = PreferencesRepositoryImpl(
+      preferencesStore: preferencesStore,
+      deviceIdProvider: _FakePlatformDeviceIdProvider(null),
+    );
+    expect(await recreated.getAppLockEnabled(), isFalse);
+  });
+
+  test('app lock rejects a stored value of the wrong type', () async {
+    preferencesStore.stringValues[PreferencesRepositoryImpl.appLockEnabledKey] =
+        'true';
+
+    await expectLater(repository.getAppLockEnabled(), throwsStateError);
+  });
+
+  test(
+    'failed app-lock write retains the confirmed value and reloads',
+    () async {
+      expect(await repository.getAppLockEnabled(), isFalse);
+      preferencesStore.failBoolWrites = true;
+      preferencesStore.mutateCacheBeforeFailedBoolWrite = true;
+
+      await expectLater(repository.setAppLockEnabled(true), throwsStateError);
+
+      expect(preferencesStore.reloadCount, 1);
+      expect(await repository.getAppLockEnabled(), isFalse);
+      final recreated = PreferencesRepositoryImpl(
+        preferencesStore: preferencesStore,
+        deviceIdProvider: _FakePlatformDeviceIdProvider(null),
+      );
+      expect(await recreated.getAppLockEnabled(), isFalse);
+    },
+  );
+
+  test(
+    'failed cache reload still retains the confirmed app-lock value',
+    () async {
+      expect(await repository.getAppLockEnabled(), isFalse);
+      preferencesStore
+        ..failBoolWrites = true
+        ..mutateCacheBeforeFailedBoolWrite = true
+        ..failReload = true;
+
+      await expectLater(repository.setAppLockEnabled(true), throwsStateError);
+
+      expect(await repository.getAppLockEnabled(), isFalse);
+    },
+  );
+
   test('hasEverRecorded persists true across repository re-creation', () async {
     await repository.setHasEverRecorded(true);
 
@@ -80,53 +137,45 @@ void main() {
     },
   );
 
-  test(
-    'getDeviceId stores and reuses a hashed platform value when available first',
-    () async {
-      final first = await repository.getDeviceId();
-      final recreated = PreferencesRepositoryImpl(
-        preferencesStore: preferencesStore,
-        deviceIdProvider: _FakePlatformDeviceIdProvider(null),
-      );
-      final second = await recreated.getDeviceId();
+  test('getDeviceId stores and reuses a hashed platform value when available first', () async {
+    final first = await repository.getDeviceId();
+    final recreated = PreferencesRepositoryImpl(
+      preferencesStore: preferencesStore,
+      deviceIdProvider: _FakePlatformDeviceIdProvider(null),
+    );
+    final second = await recreated.getDeviceId();
 
-      expect(first, matches(hashedDeviceIdPattern));
-      expect(first, isNot('device-id-001'));
-      expect(second, first);
-      expect(
-        preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey],
-        first,
-      );
-      expect(deviceIdProvider.callCount, 1);
-    },
-  );
+    expect(first, matches(hashedDeviceIdPattern));
+    expect(first, isNot('device-id-001'));
+    expect(second, first);
+    expect(
+      preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey],
+      first,
+    );
+    expect(deviceIdProvider.callCount, 1);
+  });
 
-  test(
-    'getDeviceId generates, hashes, stores, and reuses a fallback when platform is unavailable',
-    () async {
-      final fallbackRepository = PreferencesRepositoryImpl(
-        preferencesStore: preferencesStore,
-        deviceIdProvider: _FakePlatformDeviceIdProvider(null),
-        random: _DeterministicRandom(),
-      );
-      final first = await fallbackRepository.getDeviceId();
-      final recreated = PreferencesRepositoryImpl(
-        preferencesStore: preferencesStore,
-        deviceIdProvider: _FakePlatformDeviceIdProvider(
-          'platform-now-available',
-        ),
-      );
-      final second = await recreated.getDeviceId();
+  test('getDeviceId generates, hashes, stores, and reuses a fallback when platform is unavailable', () async {
+    final fallbackRepository = PreferencesRepositoryImpl(
+      preferencesStore: preferencesStore,
+      deviceIdProvider: _FakePlatformDeviceIdProvider(null),
+      random: _DeterministicRandom(),
+    );
+    final first = await fallbackRepository.getDeviceId();
+    final recreated = PreferencesRepositoryImpl(
+      preferencesStore: preferencesStore,
+      deviceIdProvider: _FakePlatformDeviceIdProvider('platform-now-available'),
+    );
+    final second = await recreated.getDeviceId();
 
-      expect(first, matches(hashedDeviceIdPattern));
-      expect(first, isNot('00112233445566778899aabbccddeeff'));
-      expect(second, first);
-      expect(
-        preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey],
-        first,
-      );
-    },
-  );
+    expect(first, matches(hashedDeviceIdPattern));
+    expect(first, isNot('00112233445566778899aabbccddeeff'));
+    expect(second, first);
+    expect(
+      preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey],
+      first,
+    );
+  });
 
   test('getDeviceId caches the first resolved value in memory', () async {
     final first = await repository.getDeviceId();
@@ -159,18 +208,15 @@ void main() {
     },
   );
 
-  test(
-    'getDeviceId preserves a preexisting stored value unchanged even if it is not backend-compatible',
-    () async {
-      preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey] =
-          'legacy-device-id';
+  test('getDeviceId preserves a preexisting stored value unchanged even if it is not backend-compatible', () async {
+    preferencesStore.stringValues[PreferencesRepositoryImpl.deviceIdKey] =
+        'legacy-device-id';
 
-      final resolved = await repository.getDeviceId();
+    final resolved = await repository.getDeviceId();
 
-      expect(resolved, 'legacy-device-id');
-      expect(deviceIdProvider.callCount, 0);
-    },
-  );
+    expect(resolved, 'legacy-device-id');
+    expect(deviceIdProvider.callCount, 0);
+  });
 }
 
 class _FakePlatformDeviceIdProvider implements PlatformDeviceIdProvider {
@@ -190,8 +236,15 @@ class _FakePlatformDeviceIdProvider implements PlatformDeviceIdProvider {
 class _FakePreferencesStore implements PreferencesStore {
   final Map<String, bool> boolValues = {};
   final Map<String, String> stringValues = {};
+  final Map<String, bool> persistedBoolValues = {};
   bool failBoolWrites = false;
   bool failStringWrites = false;
+  bool mutateCacheBeforeFailedBoolWrite = false;
+  bool failReload = false;
+  int reloadCount = 0;
+
+  @override
+  Object? get(String key) => boolValues[key] ?? stringValues[key];
 
   @override
   bool? getBool(String key) => boolValues[key];
@@ -202,10 +255,14 @@ class _FakePreferencesStore implements PreferencesStore {
   @override
   Future<bool> setBool(String key, bool value) async {
     if (failBoolWrites) {
+      if (mutateCacheBeforeFailedBoolWrite) {
+        boolValues[key] = value;
+      }
       return false;
     }
 
     boolValues[key] = value;
+    persistedBoolValues[key] = value;
     return true;
   }
 
@@ -217,6 +274,17 @@ class _FakePreferencesStore implements PreferencesStore {
 
     stringValues[key] = value;
     return true;
+  }
+
+  @override
+  Future<void> reload() async {
+    reloadCount += 1;
+    if (failReload) {
+      throw StateError('reload failed');
+    }
+    boolValues
+      ..clear()
+      ..addAll(persistedBoolValues);
   }
 }
 

@@ -4,20 +4,26 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../domain/repository/app_lock_preferences_repository.dart';
 import '../../domain/repository/preferences_repository.dart';
 import 'platform_device_id_provider.dart';
 
 abstract interface class PreferencesStore {
+  Object? get(String key);
   bool? getBool(String key);
   String? getString(String key);
   Future<bool> setBool(String key, bool value);
   Future<bool> setString(String key, String value);
+  Future<void> reload();
 }
 
 class SharedPreferencesStore implements PreferencesStore {
   const SharedPreferencesStore(this._sharedPreferences);
 
   final SharedPreferences _sharedPreferences;
+
+  @override
+  Object? get(String key) => _sharedPreferences.get(key);
 
   @override
   bool? getBool(String key) => _sharedPreferences.getBool(key);
@@ -34,9 +40,13 @@ class SharedPreferencesStore implements PreferencesStore {
   Future<bool> setString(String key, String value) {
     return _sharedPreferences.setString(key, value);
   }
+
+  @override
+  Future<void> reload() => _sharedPreferences.reload();
 }
 
-class PreferencesRepositoryImpl implements PreferencesRepository {
+class PreferencesRepositoryImpl
+    implements PreferencesRepository, AppLockPreferencesRepository {
   PreferencesRepositoryImpl({
     SharedPreferences? sharedPreferences,
     PreferencesStore? preferencesStore,
@@ -51,6 +61,7 @@ class PreferencesRepositoryImpl implements PreferencesRepository {
        _random = random ?? Random.secure();
 
   static const hasEverRecordedKey = 'has_ever_recorded';
+  static const appLockEnabledKey = 'app_lock_enabled';
   static const deviceIdKey = 'app_device_id';
   static const deviceIdSalt = 'wrait-v1';
 
@@ -58,6 +69,47 @@ class PreferencesRepositoryImpl implements PreferencesRepository {
   final PreferencesStore _preferencesStore;
   final Random _random;
   String? _cachedDeviceId;
+  bool? _confirmedAppLockEnabled;
+
+  @override
+  Future<bool> getAppLockEnabled() async {
+    final confirmed = _confirmedAppLockEnabled;
+    if (confirmed != null) {
+      return confirmed;
+    }
+
+    final stored = _preferencesStore.get(appLockEnabledKey);
+    if (stored == null) {
+      _confirmedAppLockEnabled = false;
+      return false;
+    }
+    if (stored is! bool) {
+      throw StateError('Invalid appLockEnabled preference');
+    }
+
+    _confirmedAppLockEnabled = stored;
+    return stored;
+  }
+
+  @override
+  Future<void> setAppLockEnabled(bool value) async {
+    final previous = await getAppLockEnabled();
+    final persisted = await _preferencesStore.setBool(appLockEnabledKey, value);
+    if (!persisted) {
+      try {
+        // SharedPreferences may update its process cache before the platform
+        // write reports failure. Reload re-fetches platform-backed values so a
+        // future repository instance cannot observe that uncommitted mutation.
+        await _preferencesStore.reload();
+      } catch (_) {
+        // Keep the last confirmed value for this repository lifetime.
+      }
+      _confirmedAppLockEnabled = previous;
+      throw StateError('Failed to persist appLockEnabled');
+    }
+
+    _confirmedAppLockEnabled = value;
+  }
 
   @override
   Future<bool> getHasEverRecorded() async {

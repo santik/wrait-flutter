@@ -108,6 +108,20 @@ class AppLockController extends Notifier<AppLockState> {
     state = const AppLockState.locked();
   }
 
+  void startEnabledSession({required bool shouldLock}) {
+    _authAttemptId += 1;
+    unawaited(_authenticator.cancel());
+    state = shouldLock
+        ? const AppLockState.locked()
+        : const AppLockState.unlocked();
+  }
+
+  void disableSession() {
+    _authAttemptId += 1;
+    unawaited(_authenticator.cancel());
+    state = const AppLockState.unlocked();
+  }
+
   Future<void> onForegroundReady() async {
     if (!state.isLocked || !state.shouldPromptOnForeground) {
       return;

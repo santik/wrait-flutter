@@ -24,6 +24,19 @@ void main() {
     expect(find.text('no entries yet'), findsOneWidget);
   });
 
+  testWidgets('renders Settings directly and returns to main', (tester) async {
+    final router = buildAppRouter(initialLocation: '/settings');
+    await tester.pumpWidget(_buildTestApp(router: router));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('App lock'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('settingsBackButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+  });
+
   testWidgets('renders the entry-detail route for a non-empty id', (
     tester,
   ) async {
