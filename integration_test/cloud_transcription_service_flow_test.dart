@@ -9,8 +9,10 @@ import 'package:wrait/data/api/backend_providers.dart';
 import 'package:wrait/data/api/record_quota_state.dart';
 import 'package:wrait/data/audio/audio_recording_providers.dart';
 import 'package:wrait/data/audio/audio_recording_service.dart';
+import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
+import 'package:wrait/domain/repository/transcription_language_preferences_repository.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -34,8 +36,15 @@ void main() {
           liveRecordingPathFactoryProvider.overrideWithValue(
             () async => '${tempDirectory.path}/live-success.m4a',
           ),
-          transcribeAudioCallbackProvider.overrideWithValue((audioFile) async {
+          transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+            const _LanguagePreferencesRepository('uk'),
+          ),
+          transcribeAudioCallbackProvider.overrideWithValue((
+            audioFile, {
+            language,
+          }) async {
             expect(audioFile.path, '${tempDirectory.path}/live-success.m4a');
+            expect(language, 'uk');
             return backend.TranscriptionSuccess(
               transcript: 'raw transcript',
               detectedLanguage: 'EN_us',
@@ -100,6 +109,9 @@ void main() {
       final livePath = '${tempDirectory.path}/live-blank.m4a';
       final container = ProviderContainer(
         overrides: [
+          transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+            const _LanguagePreferencesRepository(null),
+          ),
           audioRecordingServiceProvider.overrideWithValue(
             _FakeAudioRecordingService(),
           ),
@@ -107,7 +119,7 @@ void main() {
             () async => livePath,
           ),
           transcribeAudioCallbackProvider.overrideWithValue(
-            (_) async => backend.TranscriptionSuccess(
+            (_, {language}) async => backend.TranscriptionSuccess(
               transcript: '   ',
               detectedLanguage: 'en-US',
               quota: quota,
@@ -151,6 +163,9 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+            const _LanguagePreferencesRepository(null),
+          ),
           audioRecordingServiceProvider.overrideWithValue(
             _FakeAudioRecordingService(),
           ),
@@ -158,7 +173,7 @@ void main() {
             () async => '${tempDirectory.path}/live-invalid-language.m4a',
           ),
           transcribeAudioCallbackProvider.overrideWithValue(
-            (_) async => const backend.TranscriptionSuccess(
+            (_, {language}) async => const backend.TranscriptionSuccess(
               transcript: 'raw transcript',
               detectedLanguage: 'zz-ZZ',
             ),
@@ -197,6 +212,9 @@ void main() {
       final livePath = '${tempDirectory.path}/live-failure.m4a';
       final container = ProviderContainer(
         overrides: [
+          transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+            const _LanguagePreferencesRepository(null),
+          ),
           audioRecordingServiceProvider.overrideWithValue(
             _FakeAudioRecordingService(),
           ),
@@ -204,7 +222,7 @@ void main() {
             () async => livePath,
           ),
           transcribeAudioCallbackProvider.overrideWithValue(
-            (_) async => const backend.TranscriptionFailure(
+            (_, {language}) async => const backend.TranscriptionFailure(
               reason: backend.BackendFailureReason.noInternet,
             ),
           ),
@@ -256,11 +274,14 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+            const _LanguagePreferencesRepository(null),
+          ),
           audioRecordingServiceProvider.overrideWithValue(
             _FakeAudioRecordingService(),
           ),
           transcribeAudioCallbackProvider.overrideWithValue(
-            (_) async => backend.TranscriptionSuccess(
+            (_, {language}) async => backend.TranscriptionSuccess(
               transcript: '   ',
               detectedLanguage: 'en-US',
               quota: quota,
@@ -311,11 +332,14 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+            const _LanguagePreferencesRepository(null),
+          ),
           audioRecordingServiceProvider.overrideWithValue(
             _FakeAudioRecordingService(),
           ),
           transcribeAudioCallbackProvider.overrideWithValue(
-            (_) async => backend.TranscriptionFailure(
+            (_, {language}) async => backend.TranscriptionFailure(
               reason: backend.BackendFailureReason.quotaExceeded,
               quota: quota,
             ),
@@ -362,10 +386,13 @@ void main() {
     final resultCompleter = Completer<backend.TranscriptionResult>();
     final container = ProviderContainer(
       overrides: [
+        transcriptionLanguagePreferencesRepositoryProvider.overrideWithValue(
+          const _LanguagePreferencesRepository(null),
+        ),
         audioRecordingServiceProvider.overrideWithValue(
           _FakeAudioRecordingService(),
         ),
-        transcribeAudioCallbackProvider.overrideWithValue((_) {
+        transcribeAudioCallbackProvider.overrideWithValue((_, {language}) {
           if (!startedCompleter.isCompleted) {
             startedCompleter.complete();
           }
@@ -392,6 +419,21 @@ void main() {
     );
     await expectLater(firstCall, completion(isA<TranscriptionSuccess>()));
   });
+}
+
+class _LanguagePreferencesRepository
+    implements TranscriptionLanguagePreferencesRepository {
+  const _LanguagePreferencesRepository(this.language);
+
+  final String? language;
+
+  @override
+  Future<String?> getTranscriptionLanguage() async => language;
+
+  @override
+  Future<void> setTranscriptionLanguage(String? language) async {
+    throw UnsupportedError('This integration fixture is read-only.');
+  }
 }
 
 class _FakeAudioRecordingService implements AudioRecordingService {

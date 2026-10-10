@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import 'entry_delete_confirmation.dart';
 import 'entry_list_controller.dart';
 import 'entry_list_row.dart';
 import '../../domain/model/entry.dart';
+import '../../domain/service/entry_import_service.dart';
 
 class EntryListScreen extends ConsumerStatefulWidget {
   const EntryListScreen({super.key});
@@ -31,6 +33,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     final searchQuery = ref.watch(entryListSearchQueryProvider);
     final controllerState = ref.watch(entryListControllerProvider);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final canPopRoute = Navigator.of(context).canPop();
     final hasActiveQuery = searchQuery.trim().isNotEmpty;
 
@@ -59,12 +62,12 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                     children: [
                       Semantics(
                         button: true,
-                        label: 'Back to main screen',
+                        label: l10n.entryListBackSemanticsLabel,
                         child: IconButton(
                           key: const ValueKey('entryListBackButton'),
                           onPressed: () => _navigateBack(context),
                           icon: const Icon(Icons.arrow_back_rounded),
-                          tooltip: 'Back',
+                          tooltip: l10n.entryListBack,
                         ),
                       ),
                       const SizedBox(width: WraitSpacingTokens.xs),
@@ -81,21 +84,21 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                           onSubmitted: (_) => FocusScope.of(context).unfocus(),
                           textInputAction: TextInputAction.search,
                           decoration: InputDecoration(
-                            labelText: 'Search entries',
-                            hintText: 'Search entries',
+                            labelText: l10n.entryListSearchLabel,
+                            hintText: l10n.entryListSearchLabel,
                             prefixIcon: const Icon(Icons.search_rounded),
                             suffixIcon: searchQuery.isEmpty
                                 ? null
                                 : Semantics(
                                     button: true,
-                                    label: 'Clear search',
+                                    label: l10n.entryListClearSearch,
                                     child: IconButton(
                                       key: const ValueKey(
                                         'entryListClearSearchButton',
                                       ),
                                       onPressed: _clearSearch,
                                       icon: const Icon(Icons.close_rounded),
-                                      tooltip: 'Clear search',
+                                      tooltip: l10n.entryListClearSearch,
                                     ),
                                   ),
                           ),
@@ -106,8 +109,8 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                         button: !controllerState.isImporting,
                         enabled: !controllerState.isImporting,
                         label: controllerState.isImporting
-                            ? 'Importing entries'
-                            : 'Import entries',
+                            ? l10n.entryListImportingSemanticsLabel
+                            : l10n.entryListImportSemanticsLabel,
                         liveRegion: controllerState.isImporting,
                         child: IconButton(
                           key: const ValueKey('entryListImportButton'),
@@ -116,7 +119,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                               : () => _importEntries(context),
                           icon: controllerState.isImporting
                               ? Semantics(
-                                  label: 'Importing entries',
+                                  label: l10n.entryListImportingSemanticsLabel,
                                   child: const SizedBox(
                                     width: 20,
                                     height: 20,
@@ -127,16 +130,16 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                 )
                               : const Icon(Icons.file_upload_outlined),
                           tooltip: controllerState.isImporting
-                              ? 'Importing CSV'
-                              : 'Import CSV',
+                              ? l10n.entryListImporting
+                              : l10n.entryListImportCsv,
                         ),
                       ),
                       Semantics(
                         button: !controllerState.isExporting,
                         enabled: !controllerState.isExporting,
                         label: controllerState.isExporting
-                            ? 'Exporting entries'
-                            : 'Export entries',
+                            ? l10n.entryListExportingSemanticsLabel
+                            : l10n.entryListExportSemanticsLabel,
                         liveRegion: controllerState.isExporting,
                         child: IconButton(
                           key: const ValueKey('entryListExportButton'),
@@ -145,7 +148,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                               : () => _exportEntries(context, allEntries),
                           icon: controllerState.isExporting
                               ? Semantics(
-                                  label: 'Exporting entries',
+                                  label: l10n.entryListExportingSemanticsLabel,
                                   child: const SizedBox(
                                     width: 20,
                                     height: 20,
@@ -156,8 +159,8 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                 )
                               : const Icon(Icons.file_download_outlined),
                           tooltip: controllerState.isExporting
-                              ? 'Exporting CSV'
-                              : 'Export CSV',
+                              ? l10n.entryListExporting
+                              : l10n.entryListExportCsv,
                         ),
                       ),
                     ],
@@ -196,10 +199,11 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     required List<Entry> filteredEntries,
     required bool hasActiveQuery,
   }) {
+    final l10n = AppLocalizations.of(context);
     if (allEntries.isEmpty) {
       return Center(
         child: Text(
-          'no entries yet',
+          l10n.entryListEmpty,
           key: const ValueKey('entryListEmptyState'),
           style: theme.textTheme.labelLarge?.copyWith(
             color: theme.colorScheme.secondary,
@@ -215,7 +219,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'No matching entries',
+              l10n.entryListNoResults,
               key: const ValueKey('entryListNoSearchResults'),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.secondary,
@@ -226,7 +230,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
             TextButton(
               key: const ValueKey('entryListNoResultsClearButton'),
               onPressed: _clearSearch,
-              child: const Text('Clear search'),
+              child: Text(l10n.entryListClearSearch),
             ),
           ],
         ),
@@ -276,6 +280,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
   }
 
   Future<void> _exportEntries(BuildContext context, List<Entry> entries) async {
+    final l10n = AppLocalizations.of(context);
     final result = await ref
         .read(entryListControllerProvider.notifier)
         .exportEntries(entries);
@@ -287,18 +292,19 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     if (result.didExport) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Exported ${result.fileName} to ${result.pathLabel}.'),
+          content: Text(
+            l10n.entryListExportSuccess(result.fileName!, result.pathLabel!),
+          ),
         ),
       );
       return;
     }
 
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Could not export entries.')),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.entryListExportFailed)));
   }
 
   Future<void> _importEntries(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final result = await ref
         .read(entryListControllerProvider.notifier)
         .importEntries();
@@ -308,11 +314,10 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
 
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     if (result.didImport) {
-      final recordLabel = result.importedCount == 1 ? 'record' : 'records';
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'Imported ${result.importedCount} $recordLabel from ${result.fileName}.',
+            l10n.entryListImportSuccess(result.importedCount, result.fileName!),
           ),
         ),
       );
@@ -321,7 +326,17 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text(result.failureMessage ?? 'Could not import entries.'),
+        content: Text(switch (result.failureCategory) {
+          EntryImportFailureCategory.invalidFormat =>
+            l10n.entryListImportInvalidFormat,
+          EntryImportFailureCategory.unreadableFile =>
+            l10n.entryListImportUnreadableFile,
+          EntryImportFailureCategory.fileTooLarge =>
+            l10n.entryListImportFileTooLarge,
+          EntryImportFailureCategory.storageFailure =>
+            l10n.entryListImportStorageFailure,
+          null => l10n.entryListImportFailed,
+        }),
       ),
     );
   }

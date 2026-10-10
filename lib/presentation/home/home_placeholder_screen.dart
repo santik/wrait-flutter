@@ -9,8 +9,7 @@ class HomePlaceholderScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const ShellPlaceholderScreen(
       title: 'Capture',
-      description:
-          'The root shell is ready for recording, transient status feedback, and quota messaging.',
+      description: 'The root shell is ready for recording, transient status feedback, and quota messaging.',
     );
   }
 }

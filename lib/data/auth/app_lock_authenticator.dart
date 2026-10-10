@@ -21,8 +21,11 @@ abstract interface class AppLockAuthenticator {
   Future<void> cancel();
 }
 
-typedef AppLockLogWarning =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef AppLockLogWarning = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 abstract interface class LocalAuthClient {
   Future<bool> isDeviceSupported();

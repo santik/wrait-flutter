@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/repository/app_lock_preferences_repository.dart';
 import '../../domain/repository/preferences_repository.dart';
+import '../../domain/repository/transcription_language_preferences_repository.dart';
 import 'platform_device_id_provider.dart';
 import 'preferences_repository_impl.dart';
 
@@ -23,6 +24,16 @@ final preferencesRepositoryProvider = Provider<PreferencesRepository>(
   ),
 );
 
+final transcriptionLanguagePreferencesRepositoryProvider =
+    Provider<TranscriptionLanguagePreferencesRepository>((ref) {
+      final repository = ref.watch(preferencesRepositoryProvider);
+      return switch (repository) {
+        TranscriptionLanguagePreferencesRepository languageRepository =>
+          languageRepository,
+        _ => const _AutomaticTranscriptionLanguagePreferencesRepository(),
+      };
+    });
+
 final appLockPreferencesRepositoryProvider =
     Provider<AppLockPreferencesRepository>((ref) {
       final repository = ref.watch(preferencesRepositoryProvider);
@@ -42,5 +53,20 @@ class _DisabledAppLockPreferencesRepository
   @override
   Future<void> setAppLockEnabled(bool value) async {
     throw UnsupportedError('App-lock preferences are not writable.');
+  }
+}
+
+class _AutomaticTranscriptionLanguagePreferencesRepository
+    implements TranscriptionLanguagePreferencesRepository {
+  const _AutomaticTranscriptionLanguagePreferencesRepository();
+
+  @override
+  Future<String?> getTranscriptionLanguage() async => null;
+
+  @override
+  Future<void> setTranscriptionLanguage(String? language) async {
+    throw UnsupportedError(
+      'Transcription-language preferences are not writable.',
+    );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import 'entry_delete_confirmation.dart';
 import 'entry_detail_controller.dart';
@@ -67,6 +68,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                 return _buildLoadingState();
               }
 
+              final l10n = AppLocalizations.of(context);
               final displayText = entryDetailDisplayText(entry!);
               _scheduleSyncFromEntry(
                 detailController,
@@ -84,9 +86,9 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                 locale: Localizations.localeOf(context),
               );
               final saveMessage = detailState.isSaving
-                  ? 'Saving changes...'
+                  ? l10n.entryDetailSaving
                   : detailState.saveFailed
-                  ? 'Could not save your changes.'
+                  ? l10n.entryDetailSaveFailed
                   : null;
 
               return Padding(
@@ -134,7 +136,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                     ),
                     const SizedBox(height: WraitSpacingTokens.md),
                     Text(
-                      formatEntryWordCount(entry.wordCount),
+                      formatEntryWordCount(entry.wordCount, l10n),
                       key: const ValueKey('entryDetailWordCount'),
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
@@ -160,7 +162,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                         key: const ValueKey('entryDetailScrollView'),
                         child: detailState.isEditing
                             ? Semantics(
-                                label: 'Edit entry text',
+                                label: l10n.entryDetailEditSemanticsLabel,
                                 textField: true,
                                 child: TextField(
                                   key: const ValueKey('entryDetailEditor'),
@@ -169,15 +171,15 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                                   maxLines: null,
                                   minLines: 12,
                                   textInputAction: TextInputAction.newline,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     border: InputBorder.none,
-                                    hintText: 'Edit your entry',
+                                    hintText: l10n.entryDetailEditHint,
                                   ),
                                   style: Theme.of(context).textTheme.bodyLarge,
                                 ),
                               )
                             : Semantics(
-                                hint: 'Tap to edit entry',
+                                hint: l10n.entryDetailTapToEditHint,
                                 onTap: () => _handleBodyTap(displayText),
                                 child: SelectableText(
                                   displayText,
@@ -207,11 +209,12 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   }
 
   Widget _buildErrorState() {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: WraitDesignTokens.screenPadding,
         child: Text(
-          'Could not load this entry.',
+          l10n.entryDetailLoadFailed,
           key: const ValueKey('entryDetailError'),
           textAlign: TextAlign.center,
         ),
@@ -335,7 +338,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
       return;
     }
     if (!didFinish) {
-      _showMessage('Could not save your changes.');
+      _showMessage(AppLocalizations.of(context).entryDetailSaveFailed);
       return;
     }
     _editorFocusNode.unfocus();
@@ -358,7 +361,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
       return;
     }
 
-    _showMessage('Could not share this entry.');
+    _showMessage(AppLocalizations.of(context).entryDetailShareFailed);
   }
 
   Future<void> _handleDelete(EntryDetailController detailController) async {
@@ -386,7 +389,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
       return false;
     }
     if (!didFlush) {
-      _showMessage('Could not save your changes.');
+      _showMessage(AppLocalizations.of(context).entryDetailSaveFailed);
       return false;
     }
 
@@ -419,24 +422,27 @@ class _EntryDetailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
         Semantics(
           button: true,
-          label: 'Back to entries',
+          label: l10n.entryDetailBackSemanticsLabel,
           child: IconButton(
             key: const ValueKey('entryDetailBackButton'),
             onPressed: () {
               unawaited(onBackPressed());
             },
             icon: const Icon(Icons.arrow_back_rounded),
-            tooltip: 'Back',
+            tooltip: l10n.entryDetailBack,
           ),
         ),
         const Spacer(),
         Semantics(
           button: true,
-          label: isEditing ? 'Finish editing' : 'Edit entry',
+          label: isEditing
+              ? l10n.entryDetailFinishEditingSemanticsLabel
+              : l10n.entryDetailEditEntrySemanticsLabel,
           child: IconButton(
             key: ValueKey(
               isEditing ? 'entryDetailDoneButton' : 'entryDetailEditButton',
@@ -445,31 +451,31 @@ class _EntryDetailHeader extends StatelessWidget {
               unawaited(onEditPressed());
             },
             icon: Icon(isEditing ? Icons.check_rounded : Icons.edit_outlined),
-            tooltip: isEditing ? 'Done' : 'Edit',
+            tooltip: isEditing ? l10n.entryDetailDone : l10n.entryDetailEdit,
           ),
         ),
         Semantics(
           button: true,
-          label: 'Share entry',
+          label: l10n.entryDetailShareSemanticsLabel,
           child: IconButton(
             key: const ValueKey('entryDetailShareButton'),
             onPressed: () {
               unawaited(onSharePressed());
             },
             icon: const Icon(Icons.ios_share_rounded),
-            tooltip: 'Share',
+            tooltip: l10n.entryDetailShare,
           ),
         ),
         Semantics(
           button: true,
-          label: 'Delete entry',
+          label: l10n.entryDetailDeleteSemanticsLabel,
           child: IconButton(
             key: const ValueKey('entryDetailDeleteButton'),
             onPressed: () {
               unawaited(onDeletePressed());
             },
             icon: const Icon(Icons.delete_outline_rounded),
-            tooltip: 'Delete',
+            tooltip: l10n.entryDetailDelete,
           ),
         ),
       ],

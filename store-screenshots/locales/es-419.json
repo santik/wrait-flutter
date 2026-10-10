@@ -1,0 +1,26 @@
+{
+  "lang": "es",
+  "dir": "ltr",
+  "wait": "wait",
+  "tap": "toca el botón para escribir",
+  "language": "Idioma: Español",
+  "stats": "{n} entradas - {d} días",
+  "search": "Buscar entradas",
+  "back": "Atrás",
+  "draft": "borrador",
+  "dates": [
+    "Hoy",
+    "Ayer",
+    "Lun"
+  ],
+  "entries": [
+    "Esta mañana caminé junto al río. El aire era fresco y por fin sentí la cabeza despejada.",
+    "Gran llamada con el equipo. Acordamos el plan del próximo trimestre.",
+    "Cena con mamá. Volvió a contar la historia de la casa vieja."
+  ],
+  "captions": [
+    "Solo habla. Wait escribe.",
+    "Tu diario, siempre a mano",
+    "Lee, edita y mantenlo privado"
+  ]
+}

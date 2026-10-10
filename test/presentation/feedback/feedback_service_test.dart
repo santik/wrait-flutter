@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../test_doubles/l10n_test_helper.dart';
+
 import 'package:wrait/presentation/feedback/feedback_model.dart';
 import 'package:wrait/presentation/feedback/feedback_preparation_sheet.dart';
 import 'package:wrait/presentation/feedback/feedback_service.dart';
@@ -93,6 +96,8 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) {
             pageContext = context;
@@ -186,6 +191,8 @@ void main() {
     final service = WiredashFeedbackService(isConfigured: false);
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) => Scaffold(
             body: FilledButton(
@@ -270,6 +277,8 @@ void main() {
     final service = WiredashFeedbackService(isConfigured: false);
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) => Scaffold(
             body: FilledButton(
@@ -334,6 +343,8 @@ Future<FeedbackLaunchResult> _openService(
   FeedbackLaunchResult? result;
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: testLocalizationsDelegates,
+      supportedLocales: testSupportedLocales,
       home: Builder(
         builder: (context) => Scaffold(
           body: FilledButton(

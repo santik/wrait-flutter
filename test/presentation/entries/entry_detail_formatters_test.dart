@@ -1,9 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/domain/model/entry.dart';
+import 'package:wrait/l10n/app_localizations.dart';
 import 'package:wrait/presentation/entries/entry_detail_formatters.dart';
 
+import '../../test_doubles/l10n_test_helper.dart';
+
 void main() {
+  late AppLocalizations l10n;
+
+  setUpAll(() {
+    l10n = testL10n();
+  });
   test('prefers cleaned text when it is available', () {
     final entry = _entry(cleanedText: 'clean text', rawTranscript: 'raw text');
 
@@ -62,8 +70,8 @@ void main() {
   });
 
   test('formats singular and plural word counts', () {
-    expect(formatEntryWordCount(1), '1 word');
-    expect(formatEntryWordCount(4), '4 words');
+    expect(formatEntryWordCount(1, l10n), '1 word');
+    expect(formatEntryWordCount(4, l10n), '4 words');
   });
 }
 

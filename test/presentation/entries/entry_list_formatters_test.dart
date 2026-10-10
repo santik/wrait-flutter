@@ -2,12 +2,18 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:wrait/domain/model/entry.dart';
+import 'package:wrait/l10n/app_localizations.dart';
 import 'package:wrait/presentation/entries/entry_list_formatters.dart';
 
+import '../../test_doubles/l10n_test_helper.dart';
+
 void main() {
+  late AppLocalizations l10n;
+
   setUpAll(() async {
     await initializeDateFormatting('en_US');
     await initializeDateFormatting('nl_NL');
+    l10n = testL10n();
   });
 
   test('uses the first line of cleaned text when available', () {
@@ -21,7 +27,7 @@ void main() {
       wordCount: 4,
     );
 
-    expect(entryListPreviewText(entry), 'clean line one');
+    expect(entryListPreviewText(entry, l10n), 'clean line one');
   });
 
   test('falls back to the first line of raw transcript', () {
@@ -35,7 +41,7 @@ void main() {
       wordCount: 4,
     );
 
-    expect(entryListPreviewText(entry), 'raw line one');
+    expect(entryListPreviewText(entry, l10n), 'raw line one');
   });
 
   test('returns an empty preview for audio-only drafts', () {
@@ -50,7 +56,7 @@ void main() {
       audioPath: '/tmp/audio.m4a',
     );
 
-    expect(entryListPreviewText(entry), entryListAudioDraftPreview);
+    expect(entryListPreviewText(entry, l10n), l10n.entryListAudioDraftPreview);
     expect(entryListIsAudioOnlyDraft(entry), isTrue);
   });
 
@@ -65,15 +71,15 @@ void main() {
       wordCount: 4,
     );
 
-    expect(entryListPreviewText(entry), 'raw line one');
+    expect(entryListPreviewText(entry, l10n), 'raw line one');
   });
 
   test(
     'resolves supported language display names and falls back to raw code',
     () {
-      expect(entryListLanguageLabel('fr'), 'français');
-      expect(entryListLanguageLabel('ru'), 'русский');
-      expect(entryListLanguageLabel('fr-FR'), 'français');
+      expect(entryListLanguageLabel('fr'), 'Français');
+      expect(entryListLanguageLabel('ru'), 'Русский');
+      expect(entryListLanguageLabel('fr-FR'), 'Français');
       expect(entryListLanguageLabel('zz-ZZ'), 'zz-ZZ');
     },
   );

@@ -6,39 +6,65 @@ class SupportedLanguage {
 }
 
 const supportedLanguages = <SupportedLanguage>[
-  SupportedLanguage(code: 'bg', displayName: 'български'),
-  SupportedLanguage(code: 'ca', displayName: 'català'),
-  SupportedLanguage(code: 'cs', displayName: 'čeština'),
-  SupportedLanguage(code: 'da', displayName: 'dansk'),
+  SupportedLanguage(code: 'af', displayName: 'Afrikaans'),
+  SupportedLanguage(code: 'ar', displayName: 'العربية'),
+  SupportedLanguage(code: 'as', displayName: 'অসমীয়া'),
+  SupportedLanguage(code: 'be', displayName: 'Беларуская'),
+  SupportedLanguage(code: 'bg', displayName: 'Български'),
+  SupportedLanguage(code: 'bn', displayName: 'বাংলা'),
+  SupportedLanguage(code: 'bs', displayName: 'Bosanski'),
+  SupportedLanguage(code: 'ca', displayName: 'Català'),
+  SupportedLanguage(code: 'cs', displayName: 'Čeština'),
+  SupportedLanguage(code: 'da', displayName: 'Dansk'),
   SupportedLanguage(code: 'de', displayName: 'Deutsch'),
   SupportedLanguage(code: 'de-CH', displayName: 'Deutsch (Schweiz)'),
   SupportedLanguage(code: 'el', displayName: 'Ελληνικά'),
   SupportedLanguage(code: 'en', displayName: 'English'),
   SupportedLanguage(code: 'es', displayName: 'Español'),
-  SupportedLanguage(code: 'et', displayName: 'eesti'),
-  SupportedLanguage(code: 'fi', displayName: 'suomi'),
-  SupportedLanguage(code: 'fr', displayName: 'français'),
+  SupportedLanguage(code: 'et', displayName: 'Eesti'),
+  SupportedLanguage(code: 'fa', displayName: 'فارسی'),
+  SupportedLanguage(code: 'fi', displayName: 'Suomi'),
+  SupportedLanguage(code: 'fr', displayName: 'Français'),
+  SupportedLanguage(code: 'gu', displayName: 'ગુજરાતી'),
+  SupportedLanguage(code: 'he', displayName: 'עברית'),
   SupportedLanguage(code: 'hi', displayName: 'हिन्दी'),
-  SupportedLanguage(code: 'hu', displayName: 'magyar'),
+  SupportedLanguage(code: 'hr', displayName: 'Hrvatski'),
+  SupportedLanguage(code: 'hu', displayName: 'Magyar'),
+  SupportedLanguage(code: 'hy', displayName: 'Հայերեն'),
   SupportedLanguage(code: 'id', displayName: 'Bahasa Indonesia'),
-  SupportedLanguage(code: 'it', displayName: 'italiano'),
+  SupportedLanguage(code: 'it', displayName: 'Italiano'),
   SupportedLanguage(code: 'ja', displayName: '日本語'),
+  SupportedLanguage(code: 'ka', displayName: 'ქართული'),
+  SupportedLanguage(code: 'kk', displayName: 'Қазақша'),
+  SupportedLanguage(code: 'kn', displayName: 'ಕನ್ನಡ'),
   SupportedLanguage(code: 'ko', displayName: '한국어'),
-  SupportedLanguage(code: 'lt', displayName: 'lietuvių'),
-  SupportedLanguage(code: 'lv', displayName: 'latviešu'),
+  SupportedLanguage(code: 'lt', displayName: 'Lietuvių'),
+  SupportedLanguage(code: 'lv', displayName: 'Latviešu'),
+  SupportedLanguage(code: 'mk', displayName: 'Македонски'),
+  SupportedLanguage(code: 'mn', displayName: 'Монгол'),
+  SupportedLanguage(code: 'mr', displayName: 'मराठी'),
   SupportedLanguage(code: 'ms', displayName: 'Bahasa Melayu'),
+  SupportedLanguage(code: 'ne', displayName: 'नेपाली'),
   SupportedLanguage(code: 'nl', displayName: 'Nederlands'),
   SupportedLanguage(code: 'nl-BE', displayName: 'Vlaams'),
-  SupportedLanguage(code: 'no', displayName: 'norsk'),
-  SupportedLanguage(code: 'pl', displayName: 'polski'),
-  SupportedLanguage(code: 'pt', displayName: 'português'),
-  SupportedLanguage(code: 'ro', displayName: 'română'),
-  SupportedLanguage(code: 'ru', displayName: 'русский'),
-  SupportedLanguage(code: 'sk', displayName: 'slovenčina'),
-  SupportedLanguage(code: 'sv', displayName: 'svenska'),
+  SupportedLanguage(code: 'no', displayName: 'Norsk'),
+  SupportedLanguage(code: 'pa', displayName: 'ਪੰਜਾਬੀ'),
+  SupportedLanguage(code: 'pl', displayName: 'Polski'),
+  SupportedLanguage(code: 'ps', displayName: 'پښتو'),
+  SupportedLanguage(code: 'pt', displayName: 'Português'),
+  SupportedLanguage(code: 'ro', displayName: 'Română'),
+  SupportedLanguage(code: 'ru', displayName: 'Русский'),
+  SupportedLanguage(code: 'sk', displayName: 'Slovenčina'),
+  SupportedLanguage(code: 'sl', displayName: 'Slovenščina'),
+  SupportedLanguage(code: 'sr', displayName: 'Српски'),
+  SupportedLanguage(code: 'sv', displayName: 'Svenska'),
+  SupportedLanguage(code: 'ta', displayName: 'தமிழ்'),
+  SupportedLanguage(code: 'te', displayName: 'తెలుగు'),
   SupportedLanguage(code: 'th', displayName: 'ไทย'),
+  SupportedLanguage(code: 'tl', displayName: 'Filipino'),
   SupportedLanguage(code: 'tr', displayName: 'Türkçe'),
-  SupportedLanguage(code: 'uk', displayName: 'українська'),
+  SupportedLanguage(code: 'uk', displayName: 'Українська'),
+  SupportedLanguage(code: 'ur', displayName: 'اردو'),
   SupportedLanguage(code: 'vi', displayName: 'Tiếng Việt'),
   SupportedLanguage(code: 'zh', displayName: '中文'),
 ];
@@ -64,26 +90,28 @@ final supportedLanguageCodes = supportedLanguages
     .map((language) => language.code)
     .toSet();
 
+SupportedLanguage? _findExactMatch(String normalizedCode) {
+  final lower = normalizedCode.toLowerCase();
+  for (final language in supportedLanguages) {
+    if (language.code.toLowerCase() == lower) {
+      return language;
+    }
+  }
+  return null;
+}
+
 String? supportedLanguageDisplayName(String? code) {
   final normalized = normalizeLocaleLikeLanguageCode(code);
   if (normalized == null) {
     return null;
   }
 
-  for (final supportedLanguage in supportedLanguages) {
-    if (supportedLanguage.code.toLowerCase() == normalized.toLowerCase()) {
-      return supportedLanguage.displayName;
-    }
+  final exact = _findExactMatch(normalized);
+  if (exact != null) {
+    return exact.displayName;
   }
 
-  final baseLanguage = normalized.split('-').first.toLowerCase();
-  for (final supportedLanguage in supportedLanguages) {
-    if (supportedLanguage.code.toLowerCase() == baseLanguage) {
-      return supportedLanguage.displayName;
-    }
-  }
-
-  return null;
+  return _findExactMatch(normalized.split('-').first)?.displayName;
 }
 
 String? sanitizeLanguageCode(String? code) {
@@ -133,10 +161,9 @@ String? resolveSupportedLanguageCode(String? code) {
     return null;
   }
 
-  for (final supportedLanguage in supportedLanguages) {
-    if (supportedLanguage.code.toLowerCase() == normalized.toLowerCase()) {
-      return supportedLanguage.code;
-    }
+  final exact = _findExactMatch(normalized);
+  if (exact != null) {
+    return exact.code;
   }
 
   final legacyAlias = _legacySupportedLanguageAliases[normalized.toLowerCase()];
@@ -145,9 +172,9 @@ String? resolveSupportedLanguageCode(String? code) {
   }
 
   final baseLanguage = normalized.split('-').first.toLowerCase();
-  for (final supportedLanguage in supportedLanguages) {
-    if (supportedLanguage.code.split('-').first.toLowerCase() == baseLanguage) {
-      return supportedLanguage.code;
+  for (final language in supportedLanguages) {
+    if (language.code.split('-').first.toLowerCase() == baseLanguage) {
+      return language.code;
     }
   }
 

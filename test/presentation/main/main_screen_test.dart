@@ -17,12 +17,14 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/domain/model/entry.dart';
 import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
+import 'package:wrait/domain/repository/transcription_language_preferences_repository.dart';
 import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
 import 'package:wrait/presentation/feedback/feedback_providers.dart';
 import 'package:wrait/presentation/feedback/feedback_service.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/main_screen_test_keys.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
+import 'package:wrait/presentation/settings/settings_test_keys.dart';
 import 'package:wrait/presentation/theme/design_tokens.dart';
 
 import '../../test_doubles/fake_display_awake_service.dart';
@@ -60,6 +62,7 @@ void main() {
       expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
       expect(find.byKey(mainSettingsButtonKey), findsOneWidget);
       expect(find.byKey(mainFeedbackButtonKey), findsOneWidget);
+      expect(find.byKey(mainTranscriptionLanguageKey), findsNothing);
       expect(
         tester.getSize(find.byKey(const ValueKey('statusLineSlot'))).height,
         WraitStatusLineTokens.reservedHeight,
@@ -74,6 +77,75 @@ void main() {
       );
     },
   );
+
+  testWidgets('explicit transcription language opens its focused setting', (
+    tester,
+  ) async {
+    preferencesRepository = _TestPreferencesRepository(
+      hasEverRecorded: true,
+      language: 'de-CH',
+    );
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+    );
+
+    expect(find.byKey(mainTranscriptionLanguageKey), findsOneWidget);
+    expect(find.text('Language: Deutsch (Schweiz)'), findsOneWidget);
+
+    await tester.tap(find.byKey(mainTranscriptionLanguageKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(transcriptionLanguageDropdownKey), findsOneWidget);
+    expect(
+      tester
+          .widget<Focus>(
+            find
+                .descendant(
+                  of: find.byKey(transcriptionLanguageFocusKey),
+                  matching: find.byType(Focus),
+                )
+                .first,
+          )
+          .focusNode!
+          .hasFocus,
+      isTrue,
+    );
+  });
+
+  testWidgets('active recording keeps the language visible but disabled', (
+    tester,
+  ) async {
+    preferencesRepository = _TestPreferencesRepository(
+      hasEverRecorded: true,
+      language: 'fr',
+    );
+    controller.setTestState(
+      RecordingControllerState(
+        recordingState: RecordingListening(
+          hardCapDeadlineElapsedRealtime: 120000,
+        ),
+      ),
+    );
+    await _pumpTestApp(
+      tester,
+      controller: controller,
+      entryRepository: entryRepository,
+      preferencesRepository: preferencesRepository,
+      quotaNotifier: quotaNotifier,
+      settle: false,
+    );
+    await tester.pump();
+
+    expect(find.text('Language: Français'), findsOneWidget);
+    expect(
+      tester.widget<InkWell>(find.byKey(mainTranscriptionLanguageKey)).onTap,
+      isNull,
+    );
+  });
 
   testWidgets('first-time status tap starts recording through the controller', (
     tester,
@@ -992,13 +1064,18 @@ class _TestEntryRepository implements EntryRepository {
   Future<void> deleteStaleDrafts({int daysOld = 7}) async {}
 }
 
-class _TestPreferencesRepository implements PreferencesRepository {
+class _TestPreferencesRepository
+    implements
+        PreferencesRepository,
+        TranscriptionLanguagePreferencesRepository {
   _TestPreferencesRepository({
     required this.hasEverRecorded,
+    this.language,
     this.throwsOnGetHasEverRecorded = false,
   });
 
   final bool hasEverRecorded;
+  String? language;
   final bool throwsOnGetHasEverRecorded;
 
   @override
@@ -1014,6 +1091,14 @@ class _TestPreferencesRepository implements PreferencesRepository {
 
   @override
   Future<void> setHasEverRecorded(bool value) async {}
+
+  @override
+  Future<String?> getTranscriptionLanguage() async => language;
+
+  @override
+  Future<void> setTranscriptionLanguage(String? value) async {
+    language = value;
+  }
 }
 
 Entry _entry({

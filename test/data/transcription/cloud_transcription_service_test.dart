@@ -18,6 +18,7 @@ void main() {
   late CloudTranscriptionService service;
   late Future<backend.TranscriptionResult> Function(File audioFile) transcribe;
   late int transcribeCallCount;
+  String? uploadedLanguage;
 
   setUp(() async {
     tempDirectory = await Directory.systemTemp.createTemp(
@@ -34,8 +35,9 @@ void main() {
     );
     service = CloudTranscriptionService(
       audioRecordingService: audioRecordingService,
-      transcribeAudio: (audioFile) {
+      transcribeAudio: (audioFile, {language}) {
         transcribeCallCount += 1;
+        uploadedLanguage = language;
         return transcribe(audioFile);
       },
       createLiveRecordingPath: () async => livePath,
@@ -68,6 +70,28 @@ void main() {
       ),
     );
     expect(audioRecordingService.startedPaths.single, livePath);
+  });
+
+  test('live transcription keeps the language captured at start', () async {
+    var selectedLanguage = 'uk';
+    service = CloudTranscriptionService(
+      audioRecordingService: audioRecordingService,
+      transcribeAudio: (audioFile, {language}) async {
+        uploadedLanguage = language;
+        return const backend.TranscriptionSuccess(
+          transcript: 'raw transcript',
+          detectedLanguage: 'uk',
+        );
+      },
+      createLiveRecordingPath: () async => livePath,
+      readLanguageSnapshot: () async => selectedLanguage,
+    );
+
+    await service.startLiveTranscription(onStatus: (_) {});
+    selectedLanguage = 'en';
+    await service.stopLiveTranscription(onStatus: (_) {});
+
+    expect(uploadedLanguage, 'uk');
   });
 
   test('denied microphone access surfaces a typed start failure', () async {
@@ -116,72 +140,64 @@ void main() {
     },
   );
 
-  test(
-    'cancelLiveTranscription logs cancel failures and keeps the live session recoverable',
-    () async {
-      await service.startLiveTranscription(onStatus: (_) {});
-      audioRecordingService.cancelFailure = StateError('cancel failed');
+  test('cancelLiveTranscription logs cancel failures and keeps the live session recoverable', () async {
+    await service.startLiveTranscription(onStatus: (_) {});
+    audioRecordingService.cancelFailure = StateError('cancel failed');
 
-      await expectLater(
-        service.cancelLiveTranscription(),
-        throwsA(isA<StateError>()),
+    await expectLater(
+      service.cancelLiveTranscription(),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(
+      logMessages,
+      contains('Cloud transcription failed to cancel live recording.'),
+    );
+    expect(logErrors.single, isA<StateError>());
+    expect(service.isRecording, isTrue);
+    expect(service.isTranscribing, isFalse);
+
+    final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+    expect(result, isA<TranscriptionSuccess>());
+  });
+
+  test('successful live transcription uploads and deletes the temp file without publishing quota directly', () async {
+    final quota = RecordQuotaState(
+      limit: 5,
+      count: 2,
+      remaining: 3,
+      resetAt: DateTime.utc(2026, 6, 12),
+    );
+    transcribe = (audioFile) async {
+      expect(audioFile.path, livePath);
+      return backend.TranscriptionSuccess(
+        transcript: 'raw transcript',
+        detectedLanguage: 'FR_fr',
+        quota: quota,
       );
+    };
 
-      expect(
-        logMessages,
-        contains('Cloud transcription failed to cancel live recording.'),
-      );
-      expect(logErrors.single, isA<StateError>());
-      expect(service.isRecording, isTrue);
-      expect(service.isTranscribing, isFalse);
+    final statuses = <TranscriptionStatus>[];
+    await service.startLiveTranscription(onStatus: statuses.add);
+    final result = await service.stopLiveTranscription(onStatus: statuses.add);
 
-      final result = await service.stopLiveTranscription(onStatus: (_) {});
-
-      expect(result, isA<TranscriptionSuccess>());
-    },
-  );
-
-  test(
-    'successful live transcription uploads and deletes the temp file without publishing quota directly',
-    () async {
-      final quota = RecordQuotaState(
-        limit: 5,
-        count: 2,
-        remaining: 3,
-        resetAt: DateTime.utc(2026, 6, 12),
-      );
-      transcribe = (audioFile) async {
-        expect(audioFile.path, livePath);
-        return backend.TranscriptionSuccess(
-          transcript: 'raw transcript',
-          detectedLanguage: 'FR_fr',
-          quota: quota,
-        );
-      };
-
-      final statuses = <TranscriptionStatus>[];
-      await service.startLiveTranscription(onStatus: statuses.add);
-      final result = await service.stopLiveTranscription(
-        onStatus: statuses.add,
-      );
-
-      expect(statuses, [isA<RecordingStarted>(), isA<Uploading>()]);
-      expect(
-        result,
-        isA<TranscriptionSuccess>()
-            .having((value) => value.transcript, 'transcript', 'raw transcript')
-            .having(
-              (value) => value.detectedLanguage,
-              'detectedLanguage',
-              'fr-FR',
-            )
-            .having((value) => value.quota?.remaining, 'quotaRemaining', 3),
-      );
-      expect(await File(livePath).exists(), isFalse);
-      expect(service.isRecording, isFalse);
-      expect(service.isTranscribing, isFalse);
-    },
-  );
+    expect(statuses, [isA<RecordingStarted>(), isA<Uploading>()]);
+    expect(
+      result,
+      isA<TranscriptionSuccess>()
+          .having((value) => value.transcript, 'transcript', 'raw transcript')
+          .having(
+            (value) => value.detectedLanguage,
+            'detectedLanguage',
+            'fr-FR',
+          )
+          .having((value) => value.quota?.remaining, 'quotaRemaining', 3),
+    );
+    expect(await File(livePath).exists(), isFalse);
+    expect(service.isRecording, isFalse);
+    expect(service.isTranscribing, isFalse);
+  });
 
   test(
     'live transcription succeeds without detected language when unsupported',
@@ -220,6 +236,73 @@ void main() {
       service.stopLiveTranscription(onStatus: (_) {}),
       throwsA(isA<NoActiveLiveTranscriptionFailure>()),
     );
+  });
+
+  test(
+    'stop releases the session when the recorder stopped externally',
+    () async {
+      final activity = <bool>[];
+      service = CloudTranscriptionService(
+        audioRecordingService: audioRecordingService,
+        transcribeAudio: (audioFile, {language}) => transcribe(audioFile),
+        createLiveRecordingPath: () async => livePath,
+        onActivityChanged: activity.add,
+      );
+      await service.startLiveTranscription(onStatus: (_) {});
+      audioRecordingService.isRecording = false;
+
+      await expectLater(
+        service.stopLiveTranscription(onStatus: (_) {}),
+        throwsA(isA<NoActiveLiveTranscriptionFailure>()),
+      );
+
+      expect(activity, <bool>[true, false]);
+      await service.startLiveTranscription(onStatus: (_) {});
+      expect(service.isRecording, isTrue);
+    },
+  );
+
+  test(
+    'cancel releases the session when the recorder stopped externally',
+    () async {
+      final activity = <bool>[];
+      service = CloudTranscriptionService(
+        audioRecordingService: audioRecordingService,
+        transcribeAudio: (audioFile, {language}) => transcribe(audioFile),
+        createLiveRecordingPath: () async => livePath,
+        onActivityChanged: activity.add,
+      );
+      await service.startLiveTranscription(onStatus: (_) {});
+      audioRecordingService.isRecording = false;
+
+      await service.cancelLiveTranscription();
+
+      expect(audioRecordingService.cancelCallCount, 0);
+      expect(activity, <bool>[true, false]);
+      await service.startLiveTranscription(onStatus: (_) {});
+      expect(service.isRecording, isTrue);
+    },
+  );
+
+  test('start surfaces a typed failure and releases activity when the saved '
+      'language cannot be read', () async {
+    final activity = <bool>[];
+    service = CloudTranscriptionService(
+      audioRecordingService: audioRecordingService,
+      transcribeAudio: (audioFile, {language}) => transcribe(audioFile),
+      createLiveRecordingPath: () async => livePath,
+      readLanguageSnapshot: () async => throw StateError('load failed'),
+      onActivityChanged: activity.add,
+    );
+
+    await expectLater(
+      service.startLiveTranscription(onStatus: (_) {}),
+      throwsA(isA<TranscriptionLanguageUnavailableFailure>()),
+    );
+
+    expect(audioRecordingService.startedPaths, isEmpty);
+    expect(activity, <bool>[true, false]);
+    expect(service.isRecording, isFalse);
   });
 
   test(
@@ -284,6 +367,52 @@ void main() {
   );
 
   test(
+    'each draft retry keeps the language captured at its own start',
+    () async {
+      final draftPath = '${tempDirectory.path}/draft-language.m4a';
+      await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
+      var selectedLanguage = 'fr';
+      final firstUploadStarted = Completer<void>();
+      final firstUploadResult = Completer<backend.TranscriptionResult>();
+      final uploadedLanguages = <String?>[];
+      var uploadCount = 0;
+      service = CloudTranscriptionService(
+        audioRecordingService: audioRecordingService,
+        transcribeAudio: (audioFile, {language}) {
+          uploadedLanguages.add(language);
+          uploadCount += 1;
+          if (uploadCount == 1) {
+            firstUploadStarted.complete();
+            return firstUploadResult.future;
+          }
+          return Future<backend.TranscriptionResult>.value(
+            const backend.TranscriptionSuccess(
+              transcript: 'second retry',
+              detectedLanguage: 'en',
+            ),
+          );
+        },
+        createLiveRecordingPath: () async => livePath,
+        readLanguageSnapshot: () async => selectedLanguage,
+      );
+
+      final firstRetry = service.transcribeAudioDraft(draftPath);
+      await firstUploadStarted.future;
+      selectedLanguage = 'en';
+      firstUploadResult.complete(
+        const backend.TranscriptionSuccess(
+          transcript: 'first retry',
+          detectedLanguage: 'fr',
+        ),
+      );
+      await firstRetry;
+      await service.transcribeAudioDraft(draftPath);
+
+      expect(uploadedLanguages, <String?>['fr', 'en']);
+    },
+  );
+
+  test(
     'unexpected upload exceptions return apiError and preserve live audio',
     () async {
       transcribe = (_) async => throw StateError('boom');
@@ -332,62 +461,75 @@ void main() {
     },
   );
 
-  test(
-    'blank live transcript success becomes nothingCaught, deletes live audio, and leaves quota publication to the caller',
-    () async {
-      final quota = RecordQuotaState(
-        limit: 5,
-        count: 5,
-        remaining: 0,
-        resetAt: DateTime.utc(2026, 6, 12),
-      );
-      transcribe = (_) async => backend.TranscriptionSuccess(
-        transcript: '   ',
-        detectedLanguage: 'en-US',
-        quota: quota,
-      );
+  test('blank live transcript success becomes nothingCaught, deletes live audio, and leaves quota publication to the caller', () async {
+    final quota = RecordQuotaState(
+      limit: 5,
+      count: 5,
+      remaining: 0,
+      resetAt: DateTime.utc(2026, 6, 12),
+    );
+    transcribe = (_) async => backend.TranscriptionSuccess(
+      transcript: '   ',
+      detectedLanguage: 'en-US',
+      quota: quota,
+    );
 
-      await service.startLiveTranscription(onStatus: (_) {});
-      final result = await service.stopLiveTranscription(onStatus: (_) {});
+    await service.startLiveTranscription(onStatus: (_) {});
+    final result = await service.stopLiveTranscription(onStatus: (_) {});
 
-      expect(
-        result,
-        isA<TranscriptionFailure>()
-            .having(
-              (value) => value.reason,
-              'reason',
-              TranscriptionFailureReason.nothingCaught,
-            )
-            .having((value) => value.audioDraftPath, 'audioDraftPath', isNull)
-            .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
-      );
-      expect(await File(livePath).exists(), isFalse);
-    },
-  );
+    expect(
+      result,
+      isA<TranscriptionFailure>()
+          .having(
+            (value) => value.reason,
+            'reason',
+            TranscriptionFailureReason.nothingCaught,
+          )
+          .having((value) => value.audioDraftPath, 'audioDraftPath', isNull)
+          .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
+    );
+    expect(await File(livePath).exists(), isFalse);
+  });
 
-  test(
-    'punctuation-only live transcript success becomes nothingCaught and deletes live audio',
-    () async {
-      transcribe = (_) async => const backend.TranscriptionSuccess(
-        transcript: ' ... ',
-        detectedLanguage: 'en-US',
-      );
+  test('punctuation-only live transcript success becomes nothingCaught and deletes live audio', () async {
+    transcribe = (_) async => const backend.TranscriptionSuccess(
+      transcript: ' ... ',
+      detectedLanguage: 'en-US',
+    );
 
-      await service.startLiveTranscription(onStatus: (_) {});
-      final result = await service.stopLiveTranscription(onStatus: (_) {});
+    await service.startLiveTranscription(onStatus: (_) {});
+    final result = await service.stopLiveTranscription(onStatus: (_) {});
 
-      expect(
-        result,
-        isA<TranscriptionFailure>().having(
-          (value) => value.reason,
-          'reason',
-          TranscriptionFailureReason.nothingCaught,
-        ),
-      );
-      expect(await File(livePath).exists(), isFalse);
-      expect(logMessages.single, contains('non-usable transcript'));
-    },
-  );
+    expect(
+      result,
+      isA<TranscriptionFailure>().having(
+        (value) => value.reason,
+        'reason',
+        TranscriptionFailureReason.nothingCaught,
+      ),
+    );
+    expect(await File(livePath).exists(), isFalse);
+    expect(logMessages.single, contains('non-usable transcript'));
+  });
+
+  test('non-Latin script transcript is accepted as usable content', () async {
+    transcribe = (_) async => const backend.TranscriptionSuccess(
+      transcript: 'તો વરદાન રાખી લે',
+      detectedLanguage: 'gu',
+    );
+
+    await service.startLiveTranscription(onStatus: (_) {});
+    final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+    expect(
+      result,
+      isA<TranscriptionSuccess>().having(
+        (value) => value.transcript,
+        'transcript',
+        'તો વરદાન રાખી લે',
+      ),
+    );
+  });
 
   test('rejects new work while another transcription is in progress', () async {
     final startedCompleter = Completer<void>();
@@ -426,7 +568,7 @@ void main() {
       final livePathCompleter = Completer<String>();
       service = CloudTranscriptionService(
         audioRecordingService: audioRecordingService,
-        transcribeAudio: (audioFile) {
+        transcribeAudio: (audioFile, {language}) {
           transcribeCallCount += 1;
           return transcribe(audioFile);
         },
@@ -510,63 +652,110 @@ void main() {
     },
   );
 
-  test(
-    'blank transcript success payload becomes nothingCaught without publishing quota directly',
-    () async {
-      final draftPath = '${tempDirectory.path}/draft.m4a';
-      await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
-      final quota = RecordQuotaState(
-        limit: 5,
-        count: 5,
-        remaining: 0,
-        resetAt: DateTime.utc(2026, 6, 12),
-      );
-      transcribe = (_) async => backend.TranscriptionSuccess(
-        transcript: '   ',
-        detectedLanguage: 'en-US',
-        quota: quota,
-      );
+  test('blank transcript success payload becomes nothingCaught without publishing quota directly', () async {
+    final draftPath = '${tempDirectory.path}/draft.m4a';
+    await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
+    final quota = RecordQuotaState(
+      limit: 5,
+      count: 5,
+      remaining: 0,
+      resetAt: DateTime.utc(2026, 6, 12),
+    );
+    transcribe = (_) async => backend.TranscriptionSuccess(
+      transcript: '   ',
+      detectedLanguage: 'en-US',
+      quota: quota,
+    );
 
-      final result = await service.transcribeAudioDraft(draftPath);
+    final result = await service.transcribeAudioDraft(draftPath);
 
-      expect(
-        result,
-        isA<TranscriptionFailure>()
-            .having(
-              (value) => value.reason,
-              'reason',
-              TranscriptionFailureReason.nothingCaught,
-            )
-            .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
-      );
-      expect(logMessages.single, contains('non-usable transcript'));
-    },
-  );
+    expect(
+      result,
+      isA<TranscriptionFailure>()
+          .having(
+            (value) => value.reason,
+            'reason',
+            TranscriptionFailureReason.nothingCaught,
+          )
+          .having((value) => value.quota?.remaining, 'quotaRemaining', 0),
+    );
+    expect(logMessages.single, contains('non-usable transcript'));
+  });
 
-  test(
-    'punctuation-only draft transcript success becomes nothingCaught without deleting caller-owned audio',
-    () async {
-      final draftPath = '${tempDirectory.path}/draft-punctuation.m4a';
-      await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
-      transcribe = (_) async => const backend.TranscriptionSuccess(
-        transcript: ' ... ',
-        detectedLanguage: 'en-US',
-      );
+  test('punctuation-only draft transcript success becomes nothingCaught without deleting caller-owned audio', () async {
+    final draftPath = '${tempDirectory.path}/draft-punctuation.m4a';
+    await File(draftPath).writeAsBytes(const <int>[1, 2, 3]);
+    transcribe = (_) async => const backend.TranscriptionSuccess(
+      transcript: ' ... ',
+      detectedLanguage: 'en-US',
+    );
 
-      final result = await service.transcribeAudioDraft(draftPath);
+    final result = await service.transcribeAudioDraft(draftPath);
 
-      expect(
-        result,
-        isA<TranscriptionFailure>().having(
-          (value) => value.reason,
-          'reason',
-          TranscriptionFailureReason.nothingCaught,
-        ),
-      );
-      expect(await File(draftPath).exists(), isTrue);
-      expect(logMessages.single, contains('non-usable transcript'));
-    },
-  );
+    expect(
+      result,
+      isA<TranscriptionFailure>().having(
+        (value) => value.reason,
+        'reason',
+        TranscriptionFailureReason.nothingCaught,
+      ),
+    );
+    expect(await File(draftPath).exists(), isTrue);
+    expect(logMessages.single, contains('non-usable transcript'));
+  });
+
+  test('live transcription failure carries the requested language', () async {
+    service = CloudTranscriptionService(
+      audioRecordingService: audioRecordingService,
+      transcribeAudio: (audioFile, {language}) async {
+        return const backend.TranscriptionFailure(
+          reason: backend.BackendFailureReason.speechNotRecognized,
+        );
+      },
+      createLiveRecordingPath: () async => livePath,
+      readLanguageSnapshot: () async => 'de-CH',
+      logWarning: (message, {error, stackTrace}) {
+        logMessages.add(message);
+      },
+    );
+
+    await service.startLiveTranscription(onStatus: (_) {});
+    final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+    expect(
+      result,
+      isA<TranscriptionFailure>()
+          .having(
+            (value) => value.reason,
+            'reason',
+            TranscriptionFailureReason.speechNotRecognized,
+          )
+          .having(
+            (value) => value.requestedLanguage,
+            'requestedLanguage',
+            'de-CH',
+          )
+          .having((value) => value.audioDraftPath, 'audioDraftPath', livePath),
+    );
+  });
+
+  test('automatic detection failure carries null requested language', () async {
+    transcribe = (_) async => const backend.TranscriptionFailure(
+      reason: backend.BackendFailureReason.noInternet,
+    );
+
+    await service.startLiveTranscription(onStatus: (_) {});
+    final result = await service.stopLiveTranscription(onStatus: (_) {});
+
+    expect(
+      result,
+      isA<TranscriptionFailure>().having(
+        (value) => value.requestedLanguage,
+        'requestedLanguage',
+        isNull,
+      ),
+    );
+  });
 
   test(
     'maps backend failure reasons into the narrowed service failure surface',
@@ -580,6 +769,8 @@ void main() {
             TranscriptionFailureReason.backendUnavailable,
         backend.BackendFailureReason.proxyAuthFailed:
             TranscriptionFailureReason.proxyAuthFailed,
+        backend.BackendFailureReason.speechNotRecognized:
+            TranscriptionFailureReason.speechNotRecognized,
         backend.BackendFailureReason.requestTooLarge:
             TranscriptionFailureReason.apiError,
         backend.BackendFailureReason.quotaExceeded:

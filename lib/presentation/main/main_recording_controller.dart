@@ -20,8 +20,11 @@ import '../../domain/repository/preferences_repository.dart';
 import '../../domain/usecase/cleanup_transcript_use_case.dart';
 import 'recording_state.dart';
 
-typedef RecordingControllerWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef RecordingControllerWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 class RecordingFeedbackDelays {
   const RecordingFeedbackDelays({
@@ -363,7 +366,10 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
             result.reason == TranscriptionFailureReason.nothingCaught
             ? null
             : result.audioDraftPath;
-        final preservedDraft = await _persistAudioDraftIfNeeded(audioDraftPath);
+        final preservedDraft = await _persistAudioDraftIfNeeded(
+          audioDraftPath,
+          language: result.requestedLanguage,
+        );
         _emitError(
           _mapTranscriptionFailure(result.reason),
           preservedDraft: preservedDraft,
@@ -407,7 +413,10 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     }
   }
 
-  Future<bool> _persistAudioDraftIfNeeded(String? audioDraftPath) async {
+  Future<bool> _persistAudioDraftIfNeeded(
+    String? audioDraftPath, {
+    String? language,
+  }) async {
     if (audioDraftPath == null) {
       return false;
     }
@@ -442,7 +451,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
     try {
       await _entryRepository.saveAudioDraft(
         normalizedAudioDraftPath,
-        cleanupTranscriptFallbackLanguage,
+        language ?? cleanupTranscriptFallbackLanguage,
       );
       return true;
     } catch (error, stackTrace) {
@@ -484,6 +493,8 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         RecordingError.backendUnavailable,
       TranscriptionFailureReason.proxyAuthFailed =>
         RecordingError.proxyAuthFailed,
+      TranscriptionFailureReason.speechNotRecognized =>
+        RecordingError.speechNotRecognized,
       TranscriptionFailureReason.apiError => RecordingError.apiFailed,
     };
   }
@@ -526,6 +537,7 @@ class MainRecordingController extends Notifier<RecordingControllerState> {
         RecordingError.proxyAuthFailed,
       backend.BackendFailureReason.requestTooLarge ||
       backend.BackendFailureReason.quotaExceeded ||
+      backend.BackendFailureReason.speechNotRecognized ||
       backend.BackendFailureReason.apiError => RecordingError.apiFailed,
     };
   }

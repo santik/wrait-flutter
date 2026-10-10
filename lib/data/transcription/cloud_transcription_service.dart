@@ -8,8 +8,11 @@ import '../api/backend_results.dart' as backend;
 import 'transcription_service.dart';
 
 typedef TranscribeAudioCallback = Future<backend.TranscriptionResult> Function(
-  File audioFile,
-);
+  File audioFile, {
+  String? language,
+});
+typedef TranscriptionLanguageSnapshot = Future<String?> Function();
+typedef TranscriptionActivityCallback = void Function(bool isActive);
 typedef LiveRecordingPathFactory = Future<String> Function();
 typedef TranscriptionWarningLogger = void Function(
   String message, {
@@ -22,15 +25,22 @@ class CloudTranscriptionService implements TranscriptionService {
     required this.audioRecordingService,
     required this.transcribeAudio,
     required this.createLiveRecordingPath,
+    TranscriptionLanguageSnapshot? readLanguageSnapshot,
+    this.onActivityChanged,
     TranscriptionWarningLogger? logWarning,
-  }) : _logWarning = logWarning ?? _defaultLogWarning;
+  }) : readLanguageSnapshot =
+           readLanguageSnapshot ?? _automaticLanguageSnapshot,
+       _logWarning = logWarning ?? _defaultLogWarning;
 
   final AudioRecordingService audioRecordingService;
   final TranscribeAudioCallback transcribeAudio;
   final LiveRecordingPathFactory createLiveRecordingPath;
+  final TranscriptionLanguageSnapshot readLanguageSnapshot;
+  final TranscriptionActivityCallback? onActivityChanged;
   final TranscriptionWarningLogger _logWarning;
 
   _CloudTranscriptionState _state = _CloudTranscriptionState.idle;
+  String? _liveLanguage;
 
   @override
   bool get isRecording => audioRecordingService.isRecording;
@@ -48,8 +58,10 @@ class CloudTranscriptionService implements TranscriptionService {
   }) async {
     _ensureIdle();
     _state = _CloudTranscriptionState.startingLiveRecording;
+    _publishActivity(true);
 
     try {
+      _liveLanguage = await _readLanguage();
       final outputPath = await createLiveRecordingPath();
       await audioRecordingService.startRecording(outputPath);
 
@@ -63,10 +75,10 @@ class CloudTranscriptionService implements TranscriptionService {
       _state = _CloudTranscriptionState.liveRecording;
       onStatus(RecordingStarted(deadline));
     } on RecordingPermissionDeniedFailure catch (error) {
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
       throw MicBlockedTranscriptionServiceFailure(error.accessState);
     } catch (_) {
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
       rethrow;
     }
   }
@@ -77,6 +89,11 @@ class CloudTranscriptionService implements TranscriptionService {
   }) async {
     if (_state != _CloudTranscriptionState.liveRecording ||
         !audioRecordingService.isRecording) {
+      if (_state == _CloudTranscriptionState.liveRecording) {
+        // The recorder stopped externally; release the session so activity
+        // is not left flagged and a new recording can start.
+        _finishOperation();
+      }
       throw const NoActiveLiveTranscriptionFailure();
     }
 
@@ -86,12 +103,12 @@ class CloudTranscriptionService implements TranscriptionService {
     try {
       audioPath = await audioRecordingService.stopRecording();
     } on RecordingTooShortFailure {
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
       return const TranscriptionFailure(
         reason: TranscriptionFailureReason.tooShort,
       );
     } catch (_) {
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
       rethrow;
     }
 
@@ -100,11 +117,12 @@ class CloudTranscriptionService implements TranscriptionService {
       onStatus(const Uploading());
       return await _transcribeCapturedAudio(
         audioPath: audioPath,
+        language: _liveLanguage,
         preserveAudioOnFailure: true,
         deleteAudioOnSuccess: true,
       );
     } finally {
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
     }
   }
 
@@ -112,13 +130,16 @@ class CloudTranscriptionService implements TranscriptionService {
   Future<void> cancelLiveTranscription() async {
     if (_state != _CloudTranscriptionState.liveRecording ||
         !audioRecordingService.isRecording) {
+      if (_state == _CloudTranscriptionState.liveRecording) {
+        _finishOperation();
+      }
       return;
     }
 
     _state = _CloudTranscriptionState.stoppingLiveRecording;
     try {
       await audioRecordingService.cancelRecording();
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
     } catch (error, stackTrace) {
       _logWarning(
         'Cloud transcription failed to cancel live recording.',
@@ -128,6 +149,10 @@ class CloudTranscriptionService implements TranscriptionService {
       _state = audioRecordingService.isRecording
           ? _CloudTranscriptionState.liveRecording
           : _CloudTranscriptionState.idle;
+      if (_state == _CloudTranscriptionState.idle) {
+        _liveLanguage = null;
+        _publishActivity(false);
+      }
       rethrow;
     }
   }
@@ -135,23 +160,37 @@ class CloudTranscriptionService implements TranscriptionService {
   @override
   Future<TranscriptionResult> transcribeAudioDraft(String audioPath) async {
     _ensureIdle();
-
-    final validatedAudioPath = await _validateDraftAudioPath(audioPath);
-    if (validatedAudioPath == null) {
-      return const TranscriptionFailure(
-        reason: TranscriptionFailureReason.apiError,
-      );
-    }
-
     _state = _CloudTranscriptionState.transcribing;
+    _publishActivity(true);
     try {
+      final language = await _readLanguage();
+      final validatedAudioPath = await _validateDraftAudioPath(audioPath);
+      if (validatedAudioPath == null) {
+        return const TranscriptionFailure(
+          reason: TranscriptionFailureReason.apiError,
+        );
+      }
       return await _transcribeCapturedAudio(
         audioPath: validatedAudioPath,
+        language: language,
         preserveAudioOnFailure: false,
         deleteAudioOnSuccess: false,
       );
     } finally {
-      _state = _CloudTranscriptionState.idle;
+      _finishOperation();
+    }
+  }
+
+  Future<String?> _readLanguage() async {
+    try {
+      return await readLanguageSnapshot();
+    } catch (error, stackTrace) {
+      _logWarning(
+        'Cloud transcription could not read the saved language preference.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      throw const TranscriptionLanguageUnavailableFailure();
     }
   }
 
@@ -207,11 +246,15 @@ class CloudTranscriptionService implements TranscriptionService {
 
   Future<TranscriptionResult> _transcribeCapturedAudio({
     required String audioPath,
+    required String? language,
     required bool preserveAudioOnFailure,
     required bool deleteAudioOnSuccess,
   }) async {
     try {
-      final backendResult = await transcribeAudio(File(audioPath));
+      final backendResult = await transcribeAudio(
+        File(audioPath),
+        language: language,
+      );
       return await switch (backendResult) {
         backend.TranscriptionSuccess() => _handleSuccessResult(
           backendResult,
@@ -221,6 +264,7 @@ class CloudTranscriptionService implements TranscriptionService {
         backend.TranscriptionFailure() => _handleFailureResult(
           backendResult,
           audioPath: audioPath,
+          language: language,
           preserveAudioOnFailure: preserveAudioOnFailure,
         ),
       };
@@ -274,6 +318,7 @@ class CloudTranscriptionService implements TranscriptionService {
   TranscriptionResult _handleFailureResult(
     backend.TranscriptionFailure result, {
     required String audioPath,
+    required String? language,
     required bool preserveAudioOnFailure,
   }) {
     _logWarning('Cloud transcription failed with ${result.reason.name}.');
@@ -281,6 +326,7 @@ class CloudTranscriptionService implements TranscriptionService {
     return TranscriptionFailure(
       reason: _mapFailureReason(result.reason),
       audioDraftPath: preserveAudioOnFailure ? audioPath : null,
+      requestedLanguage: language,
       quota: result.quota,
     );
   }
@@ -297,6 +343,8 @@ class CloudTranscriptionService implements TranscriptionService {
         TranscriptionFailureReason.backendUnavailable,
       backend.BackendFailureReason.proxyAuthFailed =>
         TranscriptionFailureReason.proxyAuthFailed,
+      backend.BackendFailureReason.speechNotRecognized =>
+        TranscriptionFailureReason.speechNotRecognized,
       backend.BackendFailureReason.requestTooLarge ||
       backend.BackendFailureReason.quotaExceeded ||
       backend.BackendFailureReason.apiError =>
@@ -319,6 +367,16 @@ class CloudTranscriptionService implements TranscriptionService {
     }
   }
 
+  void _finishOperation() {
+    _state = _CloudTranscriptionState.idle;
+    _liveLanguage = null;
+    _publishActivity(false);
+  }
+
+  void _publishActivity(bool isActive) {
+    onActivityChanged?.call(isActive);
+  }
+
   static void _defaultLogWarning(
     String message, {
     Object? error,
@@ -331,6 +389,8 @@ class CloudTranscriptionService implements TranscriptionService {
       stackTrace: stackTrace,
     );
   }
+
+  static Future<String?> _automaticLanguageSnapshot() async => null;
 }
 
 enum _CloudTranscriptionState {

@@ -7,6 +7,7 @@ enum BackendFailureReason {
   quotaExceeded,
   proxyAuthFailed,
   backendUnavailable,
+  speechNotRecognized,
   apiError,
 }
 

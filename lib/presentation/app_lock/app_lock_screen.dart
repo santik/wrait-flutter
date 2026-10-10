@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import 'app_lock_controller.dart';
 import 'app_lock_test_keys.dart';
 
@@ -19,6 +20,7 @@ class AppLockScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -31,20 +33,20 @@ class AppLockScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 360),
             child: Semantics(
               container: true,
-              label: 'Wrait is locked.',
-              hint: _semanticsHintFor(state),
+              label: l10n.appLockSemanticsLabel,
+              hint: _semanticsHintFor(state, l10n),
               liveRegion: true,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'wrait is locked',
+                    l10n.appLockTitle,
                     style: theme.textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _messageFor(state.status),
+                    _messageFor(state.status, l10n),
                     key: appLockMessageKey,
                     style: theme.textTheme.bodyLarge,
                     textAlign: TextAlign.center,
@@ -53,7 +55,7 @@ class AppLockScreen extends StatelessWidget {
                   FilledButton(
                     key: appLockUnlockButtonKey,
                     onPressed: state.isPromptPending ? null : onUnlock,
-                    child: const Text('Unlock'),
+                    child: Text(l10n.appLockUnlock),
                   ),
                   if (state.isPromptPending) ...[
                     const SizedBox(height: 16),
@@ -69,11 +71,11 @@ class AppLockScreen extends StatelessWidget {
                     OutlinedButton(
                       key: appLockSettingsButtonKey,
                       onPressed: onOpenSettings,
-                      child: const Text('Open settings'),
+                      child: Text(l10n.appLockOpenSettings),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Your diary will be visible until you set up device security.',
+                      l10n.appLockSettingsWarning,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -83,7 +85,7 @@ class AppLockScreen extends StatelessWidget {
                     TextButton(
                       key: appLockBypassButtonKey,
                       onPressed: onContinueWithoutLock,
-                      child: const Text('Continue without lock'),
+                      child: Text(l10n.appLockContinueWithout),
                     ),
                   ],
                 ],
@@ -95,25 +97,25 @@ class AppLockScreen extends StatelessWidget {
     );
   }
 
-  String _messageFor(AppLockStatus status) {
+  String _messageFor(AppLockStatus status, AppLocalizations l10n) {
     return switch (status) {
-      AppLockStatus.canceled => 'still locked',
-      AppLockStatus.noSecurity => 'set up device security to protect Wrait',
+      AppLockStatus.canceled => l10n.appLockStillLocked,
+      AppLockStatus.noSecurity => l10n.appLockSetUpSecurity,
       AppLockStatus.temporarilyUnavailable ||
-      AppLockStatus.unavailable => 'unlock unavailable · try again',
-      _ => 'Unlock Wrait to continue.',
+      AppLockStatus.unavailable => l10n.appLockUnavailableTryAgain,
+      _ => l10n.appLockUnlockToContinue,
     };
   }
 
-  String _semanticsHintFor(AppLockState state) {
+  String _semanticsHintFor(AppLockState state, AppLocalizations l10n) {
     if (state.canOpenSettings) {
-      return 'Double tap Unlock to try again, or open settings to configure device security.';
+      return l10n.appLockSemanticsHintSettings;
     }
 
     if (state.isPromptPending) {
-      return 'Authentication is in progress.';
+      return l10n.appLockSemanticsHintAuthInProgress;
     }
 
-    return 'Double tap Unlock to authenticate and continue.';
+    return l10n.appLockSemanticsHintUnlock;
   }
 }

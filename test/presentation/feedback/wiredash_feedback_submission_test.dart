@@ -6,6 +6,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../test_doubles/l10n_test_helper.dart';
+
 import 'package:wiredash/src/core/options/environment_detector.dart'
     show EnvironmentDetector;
 import 'package:wiredash/src/core/network/wiredash_api.dart'
@@ -52,6 +55,8 @@ void main() {
     late BuildContext pageContext;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) {
             pageContext = context;
@@ -101,6 +106,8 @@ void main() {
     late BuildContext pageContext;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) {
             pageContext = context;
@@ -139,7 +146,7 @@ void main() {
     expect(submitter.item?.metadata.custom, {
       'app_area': 'main',
       'platform': expectedPlatform,
-      'locale': 'en-US',
+      'locale': 'en',
       'feedback_category': 'Idea',
       'reply_contact': 'Signal: wrait-test',
     });
@@ -167,6 +174,8 @@ void main() {
     late BuildContext pageContext;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) {
             pageContext = context;

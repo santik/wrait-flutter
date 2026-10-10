@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +14,7 @@ import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
+import 'package:wrait/presentation/settings/settings_test_keys.dart';
 
 void main() {
   testWidgets('renders the entries route directly', (tester) async {
@@ -35,6 +36,32 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settingsBackButton')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('actionButton')), findsOneWidget);
+  });
+
+  testWidgets('focused Settings route focuses the language dropdown', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        initialLocation: '/settings?section=transcription-language',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<Focus>(
+            find
+                .descendant(
+                  of: find.byKey(transcriptionLanguageFocusKey),
+                  matching: find.byType(Focus),
+                )
+                .first,
+          )
+          .focusNode!
+          .hasFocus,
+      isTrue,
+    );
   });
 
   testWidgets('renders the entry-detail route for a non-empty id', (

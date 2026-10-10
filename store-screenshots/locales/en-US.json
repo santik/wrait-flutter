@@ -1,0 +1,26 @@
+{
+  "lang": "en",
+  "dir": "ltr",
+  "wait": "wait",
+  "tap": "tap button to write",
+  "language": "Language: English",
+  "stats": "{n} entries - {d} days",
+  "search": "Search entries",
+  "back": "Back",
+  "draft": "draft",
+  "dates": [
+    "Today",
+    "Yesterday",
+    "Mon"
+  ],
+  "entries": [
+    "Walked along the river this morning. The air was crisp and my head finally felt clear.",
+    "Great call with the team. We agreed on the plan for next quarter.",
+    "Dinner with Mom. She told the story about the old house again."
+  ],
+  "captions": [
+    "Just talk. Wait writes.",
+    "Your diary, always at hand",
+    "Read, edit, keep it private"
+  ]
+}

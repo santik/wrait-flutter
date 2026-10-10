@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 
 import '../../domain/repository/preferences_repository.dart';
+import '../../domain/model/supported_language.dart';
 import 'backend_results.dart';
 import 'generated/backend_api_generated.dart';
 import 'record_quota_state.dart';
@@ -76,13 +77,20 @@ class WraitBackendClient {
     return const RegistrationFailure(RegistrationFailureReason.transient);
   }
 
-  Future<TranscriptionResult> transcribeAudio(File audioFile) async {
+  Future<TranscriptionResult> transcribeAudio(
+    File audioFile, {
+    String? language,
+  }) async {
+    if (language != null && !supportedLanguageCodes.contains(language)) {
+      return const TranscriptionFailure(reason: BackendFailureReason.apiError);
+    }
     try {
       final deviceId = await preferencesRepository.getDeviceId();
       final response = await generatedClient.transcribeAudio(
         xDeviceId: deviceId,
         audioBytes: await audioFile.readAsBytes(),
         audioFilename: path.basename(audioFile.path),
+        language: language,
       );
 
       if (response is GeneratedApiSuccess<TranscribeResponse>) {
@@ -96,6 +104,11 @@ class WraitBackendClient {
       }
 
       final failure = response as GeneratedApiFailure<TranscribeResponse>;
+      if (failure.statusCode == 422) {
+        return const TranscriptionFailure(
+          reason: BackendFailureReason.speechNotRecognized,
+        );
+      }
       return TranscriptionFailure(
         reason: _mapHttpFailureReason(failure.statusCode),
         quota: _quotaFromFailureData(failure.data),

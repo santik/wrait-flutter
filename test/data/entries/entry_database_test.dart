@@ -168,94 +168,88 @@ void main() {
     );
   });
 
-  test(
-    'repository rejects corrupted current-shape rows with unsupported type values',
-    () async {
-      final storage = FakeSecureKeyValueStore();
-      final keyStore = DatabaseKeyStore(storage, random: Random(15));
-      final databaseFile = _databaseFile(tempDirectory);
-      final key = await keyStore.readOrCreateKey();
-      await _seedCorruptedCurrentSchemaDatabase(
-        databaseFile: databaseFile,
-        key: key,
-        rows: const <Map<String, Object?>>[
-          <String, Object?>{
-            'id': 1,
-            'raw_transcript': 'bad entry',
-            'cleaned_text': null,
-            'type': 'mystery',
-            'language': 'en-US',
-            'created_at': 1000,
-            'word_count': 2,
-            'audio_path': null,
-          },
-        ],
-      );
+  test('repository rejects corrupted current-shape rows with unsupported type values', () async {
+    final storage = FakeSecureKeyValueStore();
+    final keyStore = DatabaseKeyStore(storage, random: Random(15));
+    final databaseFile = _databaseFile(tempDirectory);
+    final key = await keyStore.readOrCreateKey();
+    await _seedCorruptedCurrentSchemaDatabase(
+      databaseFile: databaseFile,
+      key: key,
+      rows: const <Map<String, Object?>>[
+        <String, Object?>{
+          'id': 1,
+          'raw_transcript': 'bad entry',
+          'cleaned_text': null,
+          'type': 'mystery',
+          'language': 'en-US',
+          'created_at': 1000,
+          'word_count': 2,
+          'audio_path': null,
+        },
+      ],
+    );
 
-      final database = await LocalEntryDatabase.open(
-        keyStore: keyStore,
-        databaseFile: databaseFile,
-      );
-      final repository = EntryRepositoryImpl(
-        entryDao: database.entryDao,
-        clock: FakeClock(_ts(2026, 6, 8)),
-        storeDraftAudioPath: (audioPath) async => audioPath,
-        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
-      );
+    final database = await LocalEntryDatabase.open(
+      keyStore: keyStore,
+      databaseFile: databaseFile,
+    );
+    final repository = EntryRepositoryImpl(
+      entryDao: database.entryDao,
+      clock: FakeClock(_ts(2026, 6, 8)),
+      storeDraftAudioPath: (audioPath) async => audioPath,
+      resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
+    );
 
-      await expectLater(
-        repository.getEntryById(1),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('unsupported persisted type'),
-          ),
+    await expectLater(
+      repository.getEntryById(1),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('unsupported persisted type'),
         ),
-      );
-      await database.close();
-    },
-  );
+      ),
+    );
+    await database.close();
+  });
 
-  test(
-    'repository fails explicitly when a corrupted current-shape row has a null type',
-    () async {
-      final storage = FakeSecureKeyValueStore();
-      final keyStore = DatabaseKeyStore(storage, random: Random(16));
-      final databaseFile = _databaseFile(tempDirectory);
-      final key = await keyStore.readOrCreateKey();
-      await _seedCorruptedCurrentSchemaDatabase(
-        databaseFile: databaseFile,
-        key: key,
-        rows: const <Map<String, Object?>>[
-          <String, Object?>{
-            'id': 1,
-            'raw_transcript': 'bad entry',
-            'cleaned_text': null,
-            'type': null,
-            'language': 'en-US',
-            'created_at': 1000,
-            'word_count': 2,
-            'audio_path': null,
-          },
-        ],
-      );
+  test('repository fails explicitly when a corrupted current-shape row has a null type', () async {
+    final storage = FakeSecureKeyValueStore();
+    final keyStore = DatabaseKeyStore(storage, random: Random(16));
+    final databaseFile = _databaseFile(tempDirectory);
+    final key = await keyStore.readOrCreateKey();
+    await _seedCorruptedCurrentSchemaDatabase(
+      databaseFile: databaseFile,
+      key: key,
+      rows: const <Map<String, Object?>>[
+        <String, Object?>{
+          'id': 1,
+          'raw_transcript': 'bad entry',
+          'cleaned_text': null,
+          'type': null,
+          'language': 'en-US',
+          'created_at': 1000,
+          'word_count': 2,
+          'audio_path': null,
+        },
+      ],
+    );
 
-      final database = await LocalEntryDatabase.open(
-        keyStore: keyStore,
-        databaseFile: databaseFile,
-      );
-      final repository = EntryRepositoryImpl(
-        entryDao: database.entryDao,
-        clock: FakeClock(_ts(2026, 6, 8)),
-        storeDraftAudioPath: (audioPath) async => audioPath,
-        resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
-      );
+    final database = await LocalEntryDatabase.open(
+      keyStore: keyStore,
+      databaseFile: databaseFile,
+    );
+    final repository = EntryRepositoryImpl(
+      entryDao: database.entryDao,
+      clock: FakeClock(_ts(2026, 6, 8)),
+      storeDraftAudioPath: (audioPath) async => audioPath,
+      resolveDraftAudioPath: (storedAudioPath) async => storedAudioPath,
+    );
 
-      await expectLater(repository.getEntryById(1), throwsA(isA<Object>()));
-      await database.close();
-    },
-  );
+    await expectLater(repository.getEntryById(1), throwsA(isA<Object>()));
+    await database.close();
+  });
 
   test(
     'creates an encrypted database file whose plaintext transcript is absent',
@@ -463,57 +457,54 @@ void main() {
     },
   );
 
-  test(
-    'reopens a seeded database with 1000 entries within a host-side startup budget',
-    () async {
-      final storage = FakeSecureKeyValueStore();
-      final keyStore = DatabaseKeyStore(storage, random: Random(6));
-      final file = _databaseFile(tempDirectory);
-      final seedDatabase = await LocalEntryDatabase.open(
-        keyStore: keyStore,
-        databaseFile: file,
-      );
-      final createdAt = _ts(2026, 6, 8);
+  test('reopens a seeded database with 1000 entries within a host-side startup budget', () async {
+    final storage = FakeSecureKeyValueStore();
+    final keyStore = DatabaseKeyStore(storage, random: Random(6));
+    final file = _databaseFile(tempDirectory);
+    final seedDatabase = await LocalEntryDatabase.open(
+      keyStore: keyStore,
+      databaseFile: file,
+    );
+    final createdAt = _ts(2026, 6, 8);
 
-      await seedDatabase.batch((batch) {
-        batch.insertAll(
-          seedDatabase.entryRecords,
-          List<EntryRecordsCompanion>.generate(
-            1000,
-            (index) => EntryRecordsCompanion.insert(
-              rawTranscript: 'seeded entry $index',
-              type: EntryType.saved.name,
-              language: 'en-US',
-              createdAt: createdAt,
-              cleanedText: const Value.absent(),
-              wordCount: const Value(3),
-              audioPath: const Value.absent(),
-            ),
+    await seedDatabase.batch((batch) {
+      batch.insertAll(
+        seedDatabase.entryRecords,
+        List<EntryRecordsCompanion>.generate(
+          1000,
+          (index) => EntryRecordsCompanion.insert(
+            rawTranscript: 'seeded entry $index',
+            type: EntryType.saved.name,
+            language: 'en-US',
+            createdAt: createdAt,
+            cleanedText: const Value.absent(),
+            wordCount: const Value(3),
+            audioPath: const Value.absent(),
           ),
-        );
-      });
-      await seedDatabase.close();
-
-      final reopenStopwatch = Stopwatch()..start();
-      final reopenedDatabase = await LocalEntryDatabase.open(
-        keyStore: keyStore,
-        databaseFile: file,
+        ),
       );
-      reopenStopwatch.stop();
+    });
+    await seedDatabase.close();
 
-      final countRow = await reopenedDatabase
-          .customSelect('SELECT COUNT(*) AS count FROM entries;')
-          .getSingle();
-      final entryCount = countRow.data['count'] as int;
-      debugPrint(
-        'LocalEntryDatabase reopen with 1000 entries took ${reopenStopwatch.elapsedMilliseconds}ms.',
-      );
+    final reopenStopwatch = Stopwatch()..start();
+    final reopenedDatabase = await LocalEntryDatabase.open(
+      keyStore: keyStore,
+      databaseFile: file,
+    );
+    reopenStopwatch.stop();
 
-      expect(entryCount, 1000);
-      expect(reopenStopwatch.elapsed, lessThan(const Duration(seconds: 3)));
-      await reopenedDatabase.close();
-    },
-  );
+    final countRow = await reopenedDatabase
+        .customSelect('SELECT COUNT(*) AS count FROM entries;')
+        .getSingle();
+    final entryCount = countRow.data['count'] as int;
+    debugPrint(
+      'LocalEntryDatabase reopen with 1000 entries took ${reopenStopwatch.elapsedMilliseconds}ms.',
+    );
+
+    expect(entryCount, 1000);
+    expect(reopenStopwatch.elapsed, lessThan(const Duration(seconds: 3)));
+    await reopenedDatabase.close();
+  });
 }
 
 class _DatabaseHarness {

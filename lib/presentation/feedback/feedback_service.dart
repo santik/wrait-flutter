@@ -14,12 +14,11 @@ class FeedbackLaunchResult {
   final FeedbackLaunchStatus status;
 }
 
-typedef WiredashFlowLauncher =
-    Future<bool> Function({
-      required BuildContext context,
-      required FeedbackDraft draft,
-      required String appArea,
-    });
+typedef WiredashFlowLauncher = Future<bool> Function({
+  required BuildContext context,
+  required FeedbackDraft draft,
+  required String appArea,
+});
 
 abstract interface class FeedbackService {
   Future<FeedbackLaunchResult> open(

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../test_doubles/l10n_test_helper.dart';
+
 import 'package:wrait/presentation/feedback/feedback_model.dart';
 import 'package:wrait/presentation/feedback/feedback_preparation_sheet.dart';
 
@@ -11,6 +14,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
               body: FilledButton(
@@ -102,7 +107,11 @@ void main() {
 
   testWidgets('limits feedback text to 2,048 characters', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: FeedbackPreparationSheet())),
+      MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
+        home: Scaffold(body: FeedbackPreparationSheet()),
+      ),
     );
 
     final messageField = find.byKey(feedbackMessageFieldKey);
@@ -123,7 +132,11 @@ void main() {
   ) async {
     final semanticsHandle = tester.ensureSemantics();
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: FeedbackPreparationSheet())),
+      MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
+        home: Scaffold(body: FeedbackPreparationSheet()),
+      ),
     );
 
     final bugSemantics = tester.getSemantics(
@@ -148,6 +161,8 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: Builder(
           builder: (context) => Scaffold(
             body: FilledButton(

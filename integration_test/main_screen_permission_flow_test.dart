@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Locale;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,8 +21,11 @@ import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/main_screen_status.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
+import 'package:wrait/l10n/app_localizations.dart';
 
 import '../test/test_doubles/fake_monotonic_clock.dart';
+
+final _l10n = lookupAppLocalizations(const Locale('en'));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +51,7 @@ void main() {
       final status = resolveMainScreenStatus(
         controllerState: harness.state,
         hasEverRecorded: false,
+        l10n: _l10n,
       );
       expect(status.buttonLabel, 'wrait');
       expect(status.statusText, 'mic needed · tap again');
@@ -71,6 +76,7 @@ void main() {
       final status = resolveMainScreenStatus(
         controllerState: harness.state,
         hasEverRecorded: false,
+        l10n: _l10n,
       );
       expect(status.buttonLabel, 'wrait');
       expect(status.statusText, 'mic blocked · tap settings');
@@ -101,6 +107,7 @@ void main() {
       final status = resolveMainScreenStatus(
         controllerState: harness.state,
         hasEverRecorded: false,
+        l10n: _l10n,
       );
       expect(status.statusText, 'mic blocked · tap settings');
       expect(status.action, MainScreenStatusAction.openMicrophoneSettings);
@@ -135,6 +142,7 @@ void main() {
         resolveMainScreenStatus(
           controllerState: harness.state,
           hasEverRecorded: false,
+          l10n: _l10n,
         ).statusText,
         'tap button to write',
       );
@@ -239,7 +247,10 @@ Future<_Harness> _createHarness() async {
       liveRecordingPathFactoryProvider.overrideWithValue(() async {
         return path.join(tempDirectory.path, 'live-recording.m4a');
       }),
-      transcribeAudioCallbackProvider.overrideWithValue((audioFile) async {
+      transcribeAudioCallbackProvider.overrideWithValue((
+        audioFile, {
+        language,
+      }) async {
         harness.transcribeCallCount += 1;
         return const backend.TranscriptionSuccess(
           transcript: 'raw transcript',

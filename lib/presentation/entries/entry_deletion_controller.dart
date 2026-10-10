@@ -5,13 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/entries/entry_providers.dart';
 import '../../domain/repository/entry_repository.dart';
 
-typedef EntryDeletionWarningLogger =
-    void Function(
-      String message, {
-      Object? error,
-      StackTrace? stackTrace,
-      int? entryId,
-    });
+typedef EntryDeletionWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+  int? entryId,
+});
 
 final entryDeletionWarningLoggerProvider = Provider<EntryDeletionWarningLogger>(
   (ref) {

@@ -24,45 +24,80 @@ The current product scope centers on one launch path: cloud-backed recording,
 transcription, cleanup, and local entry persistence with retryable drafts when
 backend work cannot fully complete in one attempt.
 
-## Automatic language detection
+## Transcription language support
 
-The configured wrait backend can automatically detect the following languages:
+Users can explicitly select a spoken language for transcription from the
+Settings screen, or leave the default automatic detection. The selection is
+stored locally, saved immediately, and survives navigation and restart. An
+explicit choice appears on the main screen and propagates as the optional
+`language` query parameter on `POST /api/transcribe`. Automatic mode omits
+the parameter. Returned `detected_language` remains authoritative for entry
+metadata and text cleanup regardless of the selected preference.
 
-1. Bulgarian (`bg`)
-2. Catalan (`ca`)
-3. Czech (`cs`)
-4. Danish (`da`)
-5. German (`de`)
-6. German (Switzerland) (`de-CH`)
-7. Greek (`el`)
-8. English (`en`)
-9. Spanish (`es`)
-10. Estonian (`et`)
-11. Finnish (`fi`)
-12. French (`fr`)
-13. Hindi (`hi`)
-14. Hungarian (`hu`)
-15. Indonesian (`id`)
-16. Italian (`it`)
-17. Japanese (`ja`)
-18. Korean (`ko`)
-19. Lithuanian (`lt`)
-20. Latvian (`lv`)
-21. Malay (`ms`)
-22. Dutch (`nl`)
-23. Flemish (`nl-BE`)
-24. Norwegian (`no`)
-25. Polish (`pl`)
-26. Portuguese (`pt`)
-27. Romanian (`ro`)
-28. Russian (`ru`)
-29. Slovak (`sk`)
-30. Swedish (`sv`)
-31. Thai (`th`)
-32. Turkish (`tr`)
-33. Ukrainian (`uk`)
-34. Vietnamese (`vi`)
-35. Chinese (`zh`)
+The app picker supports the following 61 languages (all base languages from
+the backend transcription enum plus the `de-CH` and `nl-BE` regional variants):
+
+1. Afrikaans (`af`)
+2. Arabic (`ar`)
+3. Assamese (`as`)
+4. Belarusian (`be`)
+5. Bulgarian (`bg`)
+6. Bengali (`bn`)
+7. Bosnian (`bs`)
+8. Catalan (`ca`)
+9. Czech (`cs`)
+10. Danish (`da`)
+11. German (`de`)
+12. German — Switzerland (`de-CH`)
+13. Greek (`el`)
+14. English (`en`)
+15. Spanish (`es`)
+16. Estonian (`et`)
+17. Persian (`fa`)
+18. Finnish (`fi`)
+19. French (`fr`)
+20. Gujarati (`gu`)
+21. Hebrew (`he`)
+22. Hindi (`hi`)
+23. Croatian (`hr`)
+24. Hungarian (`hu`)
+25. Armenian (`hy`)
+26. Indonesian (`id`)
+27. Italian (`it`)
+28. Japanese (`ja`)
+29. Georgian (`ka`)
+30. Kazakh (`kk`)
+31. Kannada (`kn`)
+32. Korean (`ko`)
+33. Lithuanian (`lt`)
+34. Latvian (`lv`)
+35. Macedonian (`mk`)
+36. Mongolian (`mn`)
+37. Marathi (`mr`)
+38. Malay (`ms`)
+39. Nepali (`ne`)
+40. Dutch (`nl`)
+41. Flemish (`nl-BE`)
+42. Norwegian (`no`)
+43. Punjabi (`pa`)
+44. Polish (`pl`)
+45. Pashto (`ps`)
+46. Portuguese (`pt`)
+47. Romanian (`ro`)
+48. Russian (`ru`)
+49. Slovak (`sk`)
+50. Slovenian (`sl`)
+51. Serbian (`sr`)
+52. Swedish (`sv`)
+53. Tamil (`ta`)
+54. Telugu (`te`)
+55. Thai (`th`)
+56. Filipino (`tl`)
+57. Turkish (`tr`)
+58. Ukrainian (`uk`)
+59. Urdu (`ur`)
+60. Vietnamese (`vi`)
+61. Chinese (`zh`)
 
 ## Current implementation scope
 
@@ -166,6 +201,18 @@ upcoming feature work:
   audio-draft persistence, and `hasEverRecorded` updates
 - controller-owned three-second auto-clear behavior for Error and Deleted
   feedback, with Saved feedback intentionally left UI-owned
+- Settings screen at `/settings` with a compact transcription-language dropdown,
+  focused navigation from the main-screen language indicator, and activity
+  guards during recording/transcription
+- transcription language preference with immediate save, startup loading, and
+  automatic-detection default for missing or unsupported stored values
+- tappable explicit-language indicator on the main screen
+  (`Language: <display name>`), hidden in automatic mode, disabled during
+  active work, opening Settings at the language dropdown when tapped
+- optional `language` query parameter on `POST /api/transcribe` for explicit
+  selections; automatic mode omits the parameter
+- operation-stable language snapshots: recording start and retained-audio retry
+  each capture the preference at their start time
 - real root main screen at `/` with a voice-first circular recording button,
   under-button status line, entry stats line, and session quota line when
   quota data exists
@@ -193,7 +240,7 @@ upcoming feature work:
   action button, countdown, quota, and status UI
 - main-screen navigation from saved feedback to `/entry/:id` and from entry
   stats to `/entries`
-- active entry stats using fixed `{count} entries - {days} days` wording,
+- active entry stats using pluralized `{count} entries - {days} days` wording (ICU plural forms in en and ru),
   counting every stored entry including drafts and unique local calendar days
 - real entry-list screen at `/entries` backed by the local entry repository
 - entry-list newest-first ordering with draft rows included and visibly marked
@@ -238,8 +285,8 @@ upcoming feature work:
 - platform setup for Android and iOS
 
 Feature behavior such as network-preflight handling, richer retry UX, quota
-presentation beyond the current session state, preferences persistence beyond
-the current basic flags and identifiers, settings UI, and broader
+presentation beyond the current session state, additional preferences and
+settings beyond the current transcription-language preference, and broader
 entry-management UI still belongs to later user stories.
 
 Current platform limitation to keep in mind:
@@ -289,7 +336,8 @@ dependency/analyzer checks, and Android/iOS integration validation.
 
 Planned future stories cover:
 
-- expanded preferences and settings
+- expanded preferences and settings beyond the current transcription-language
+  preference
 - recording UI on top of the existing app-facing recording controller
 - network preflight and richer retry UX on top of the existing
   recording/transcription controller surface

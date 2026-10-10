@@ -1,36 +1,177 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/auth/app_lock_providers.dart';
 import '../../data/preferences/app_lock_preference_controller.dart';
+import '../../data/preferences/transcription_language_controller.dart';
+import '../../data/transcription/transcription_providers.dart';
+import '../../domain/model/supported_language.dart';
+import '../../l10n/app_localizations.dart';
 import '../main/main_recording_controller.dart';
 import '../theme/design_tokens.dart';
 import 'settings_test_keys.dart';
 
-class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+const _automaticLanguageValue = '__automatic__';
+
+String _toDropdownValue(String? language) =>
+    language ?? _automaticLanguageValue;
+
+String? _fromDropdownValue(String value) =>
+    value == _automaticLanguageValue ? null : value;
+
+class SettingsScreen extends ConsumerStatefulWidget {
+  const SettingsScreen({super.key, this.focusTranscriptionLanguage = false});
+
+  final bool focusTranscriptionLanguage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _languageSectionKey = GlobalKey();
+  final _languageFocusNode = FocusNode();
+  final _languageMenuController = MenuController();
+  final _languageTextController = TextEditingController();
+  bool _focusScheduled = false;
+  bool _languageTextSyncScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleLanguageFocusIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.focusTranscriptionLanguage &&
+        widget.focusTranscriptionLanguage) {
+      _focusScheduled = false;
+      _scheduleLanguageFocusIfNeeded();
+    }
+  }
+
+  @override
+  void dispose() {
+    _languageFocusNode.dispose();
+    _languageTextController.dispose();
+    super.dispose();
+  }
+
+  /// DropdownMenu writes the picked label into its text controller before
+  /// onSelected runs, and does not reset it when the save is rejected. While no
+  /// save is in flight, force the field back to the committed language.
+  void _scheduleLanguageTextSync(String expectedLabel, bool isSaving) {
+    if (isSaving ||
+        _languageTextSyncScheduled ||
+        _languageTextController.text == expectedLabel) {
+      return;
+    }
+    _languageTextSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _languageTextSyncScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      final current = ref.read(transcriptionLanguageControllerProvider);
+      if (current.isSaving) {
+        return;
+      }
+      final label = _languageLabel(current);
+      if (_languageTextController.text != label) {
+        _languageTextController.value = TextEditingValue(
+          text: label,
+          selection: TextSelection.collapsed(offset: label.length),
+        );
+      }
+    });
+  }
+
+  String _languageLabel(TranscriptionLanguageState state) {
+    if (!state.isReady) {
+      return '';
+    }
+    final language = state.language;
+    if (language == null) {
+      return AppLocalizations.of(context).settingsAutomaticDetection;
+    }
+    for (final supported in supportedLanguages) {
+      if (supported.code == language) {
+        return supported.displayName;
+      }
+    }
+    return '';
+  }
+
+  void _scheduleLanguageFocusIfNeeded() {
+    if (!widget.focusTranscriptionLanguage || _focusScheduled) {
+      return;
+    }
+    final languageState = ref.read(transcriptionLanguageControllerProvider);
+    if (!languageState.isReady) {
+      return;
+    }
+    _focusScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final sectionContext = _languageSectionKey.currentContext;
+      if (!mounted) {
+        return;
+      }
+      if (sectionContext == null) {
+        // Section not built yet; allow the next build to retry.
+        _focusScheduled = false;
+        return;
+      }
+      await Scrollable.ensureVisible(
+        sectionContext,
+        alignment: 0.1,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+      if (mounted) {
+        _languageFocusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final preference = ref.watch(appLockPreferenceControllerProvider);
     final buildAllowsLock = ref.watch(appLockBuildEnabledProvider);
+    final languagePreference = ref.watch(
+      transcriptionLanguageControllerProvider,
+    );
+    final transcriptionActive = ref.watch(transcriptionActivityProvider);
     final recordingActive = ref.watch(
       mainRecordingControllerProvider.select((state) => state.isActive),
     );
+    final activityActive = recordingActive || transcriptionActive;
     final canChange =
         buildAllowsLock &&
         preference.isReady &&
         !preference.isSaving &&
-        !recordingActive;
+        !activityActive;
+    final canChangeLanguage =
+        languagePreference.isReady &&
+        !languagePreference.isSaving &&
+        !activityActive;
+    _scheduleLanguageFocusIfNeeded();
+    _scheduleLanguageTextSync(
+      _languageLabel(languagePreference),
+      languagePreference.isSaving,
+    );
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           key: settingsBackButtonKey,
-          tooltip: 'Back',
+          tooltip: l10n.settingsBack,
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -40,21 +181,22 @@ class SettingsScreen extends ConsumerWidget {
           },
           icon: const Icon(Icons.arrow_back),
         ),
-        title: const Text('Settings'),
+        title: Text(l10n.settingsTitle),
       ),
       body: SafeArea(
         child: ListView(
           padding: WraitDesignTokens.screenPadding,
           children: [
-            Text('Privacy', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              l10n.settingsPrivacy,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: WraitSpacingTokens.sm),
             SwitchListTile.adaptive(
               key: appLockSwitchKey,
               contentPadding: EdgeInsets.zero,
-              title: const Text('App lock'),
-              subtitle: const Text(
-                "Use your device's screen lock when you open or return to Wrait.",
-              ),
+              title: Text(l10n.settingsAppLock),
+              subtitle: Text(l10n.settingsAppLockDescription),
               value: preference.isReady && preference.enabled,
               onChanged: canChange
                   ? (value) {
@@ -71,18 +213,177 @@ class SettingsScreen extends ConsumerWidget {
               const LinearProgressIndicator(key: appLockSavingKey),
             ],
             if (!buildAllowsLock)
-              const _Message(
-                text: 'App lock is unavailable in this validation build.',
-              )
-            else if (recordingActive)
-              const _Message(
-                text: 'Finish the current recording before changing app lock.',
+              _Message(
+                key: appLockPreferenceErrorKey,
+                text: l10n.settingsAppLockUnavailable,
               )
             else if (preference.issue != null)
               _PreferenceIssue(issue: preference.issue!),
+            const SizedBox(height: WraitSpacingTokens.lg),
+            KeyedSubtree(
+              key: _languageSectionKey,
+              child: const SizedBox(
+                key: transcriptionLanguageSectionKey,
+                height: 0,
+              ),
+            ),
+            Text(
+              l10n.settingsTranscriptionLanguage,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: WraitSpacingTokens.xs),
+            Text(l10n.settingsTranscriptionLanguageDescription),
+            const SizedBox(height: WraitSpacingTokens.sm),
+            if (languagePreference.status ==
+                TranscriptionLanguageStatus.loadFailure)
+              _LanguageLoadFailure()
+            else
+              Builder(
+                builder: (context) {
+                  final theme = Theme.of(context);
+                  final menuItemStyle = MenuItemButton.styleFrom(
+                    textStyle: theme.textTheme.bodyLarge,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: WraitSpacingTokens.md,
+                    ),
+                    minimumSize: const Size.fromHeight(
+                      kMinInteractiveDimension,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  );
+                  final dropdownEntries = <DropdownMenuEntry<String>>[
+                    DropdownMenuEntry<String>(
+                      value: _automaticLanguageValue,
+                      label: l10n.settingsAutomaticDetection,
+                      labelWidget: Text(
+                        l10n.settingsAutomaticDetection,
+                        key: transcriptionLanguageAutomaticKey,
+                      ),
+                      style: menuItemStyle,
+                    ),
+                    for (final language in supportedLanguages)
+                      DropdownMenuEntry<String>(
+                        value: language.code,
+                        label: language.displayName,
+                        labelWidget: Text(
+                          language.displayName,
+                          key: transcriptionLanguageOptionKey(language.code),
+                        ),
+                        style: menuItemStyle,
+                      ),
+                  ];
+
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      return KeyedSubtree(
+                        key: transcriptionLanguageFocusKey,
+                        child: Focus(
+                          focusNode: _languageFocusNode,
+                          onKeyEvent: (_, event) {
+                            if (!canChangeLanguage) {
+                              return KeyEventResult.ignored;
+                            }
+                            if (event is KeyDownEvent &&
+                                (event.logicalKey == LogicalKeyboardKey.enter ||
+                                    event.logicalKey ==
+                                        LogicalKeyboardKey.space)) {
+                              _languageMenuController.open();
+                              return KeyEventResult.handled;
+                            }
+                            return KeyEventResult.ignored;
+                          },
+                          child: DropdownMenu<String>(
+                            key: transcriptionLanguageDropdownKey,
+                            width: constraints.maxWidth,
+                            menuController: _languageMenuController,
+                            controller: _languageTextController,
+                            requestFocusOnTap: false,
+                            enabled: canChangeLanguage,
+                            initialSelection: languagePreference.isReady
+                                ? _toDropdownValue(languagePreference.language)
+                                : null,
+                            hintText: l10n.settingsLoading,
+                            label: Text(l10n.settingsTranscriptionLanguage),
+                            textStyle: theme.textTheme.bodyLarge,
+                            inputDecorationTheme:
+                                const InputDecorationThemeData(
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                            menuHeight: MediaQuery.sizeOf(context).height * 0.6,
+                            enableFilter: false,
+                            enableSearch: false,
+                            selectOnly: true,
+                            dropdownMenuEntries: dropdownEntries,
+                            onSelected: canChangeLanguage
+                                ? (value) {
+                                    if (value == null) {
+                                      return;
+                                    }
+                                    unawaited(
+                                      ref
+                                          .read(
+                                            transcriptionLanguageControllerProvider
+                                                .notifier,
+                                          )
+                                          .setLanguage(
+                                            _fromDropdownValue(value),
+                                          ),
+                                    );
+                                  }
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            if (languagePreference.isSaving) ...[
+              const SizedBox(height: WraitSpacingTokens.sm),
+              const LinearProgressIndicator(
+                key: transcriptionLanguageSavingKey,
+              ),
+            ],
+            if (languagePreference.saveFailed)
+              _Message(
+                key: transcriptionLanguageErrorKey,
+                text: l10n.settingsTranscriptionLanguageSaveFailed,
+              ),
+            if (activityActive)
+              _Message(
+                key: const ValueKey<String>('settingsActivityMessage'),
+                text: l10n.settingsActivityMessage,
+              ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LanguageLoadFailure extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Message(
+          key: transcriptionLanguageErrorKey,
+          text: l10n.settingsTranscriptionLanguageLoadFailed,
+        ),
+        TextButton(
+          key: transcriptionLanguageRetryKey,
+          onPressed: () => unawaited(
+            ref
+                .read(transcriptionLanguageControllerProvider.notifier)
+                .retryLoad(),
+          ),
+          child: Text(l10n.settingsTryAgain),
+        ),
+      ],
     );
   }
 }
@@ -94,22 +395,21 @@ class _PreferenceIssue extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final message = switch (issue) {
-      AppLockPreferenceIssue.noSecurity =>
-        'Set up a device screen lock before enabling app lock.',
+      AppLockPreferenceIssue.noSecurity => l10n.settingsAppLockNoSecurity,
       AppLockPreferenceIssue.temporarilyUnavailable =>
-        'Device authentication is temporarily unavailable. Try again.',
+        l10n.settingsAppLockTemporarilyUnavailable,
       AppLockPreferenceIssue.unavailable =>
-        'Device authentication is unavailable on this device.',
-      AppLockPreferenceIssue.saveFailed =>
-        'Could not save the app-lock setting. Try again.',
+        l10n.settingsAppLockUnavailableDevice,
+      AppLockPreferenceIssue.saveFailed => l10n.settingsAppLockSaveFailed,
       AppLockPreferenceIssue.settingsFailed =>
-        'Could not open device security settings.',
+        l10n.settingsAppLockSettingsFailed,
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Message(text: message),
+        _Message(key: appLockPreferenceErrorKey, text: message),
         if (issue == AppLockPreferenceIssue.noSecurity) ...[
           const SizedBox(height: WraitSpacingTokens.sm),
           OutlinedButton(
@@ -121,7 +421,7 @@ class _PreferenceIssue extends ConsumerWidget {
                     .openDeviceSecuritySettings(),
               );
             },
-            child: const Text('Open device settings'),
+            child: Text(l10n.settingsOpenDeviceSettings),
           ),
         ],
       ],
@@ -130,14 +430,13 @@ class _PreferenceIssue extends ConsumerWidget {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({required this.text});
+  const _Message({super.key, required this.text});
 
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      key: appLockPreferenceErrorKey,
       padding: const EdgeInsets.only(top: WraitSpacingTokens.md),
       child: Text(text),
     );

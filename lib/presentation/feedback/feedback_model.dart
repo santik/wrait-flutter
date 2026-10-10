@@ -1,11 +1,13 @@
+import '../../l10n/app_localizations.dart';
+
 enum FeedbackCategory { bug, idea, confusing, praise }
 
 extension FeedbackCategoryLabel on FeedbackCategory {
-  String get label => switch (this) {
-    FeedbackCategory.bug => 'Bug',
-    FeedbackCategory.idea => 'Idea',
-    FeedbackCategory.confusing => 'Confusing',
-    FeedbackCategory.praise => 'Praise',
+  String localizedLabel(AppLocalizations l10n) => switch (this) {
+    FeedbackCategory.bug => l10n.feedbackCategoryBug,
+    FeedbackCategory.idea => l10n.feedbackCategoryIdea,
+    FeedbackCategory.confusing => l10n.feedbackCategoryConfusing,
+    FeedbackCategory.praise => l10n.feedbackCategoryPraise,
   };
 }
 

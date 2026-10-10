@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/model/entry.dart';
+import '../../l10n/app_localizations.dart';
 
 class EntryDetailDateLabel {
   const EntryDetailDateLabel({required this.weekday, required this.date});
@@ -72,8 +73,8 @@ String formatEntryDetailShareTimestamp({
       .displayLabel;
 }
 
-String formatEntryWordCount(int wordCount) {
-  return wordCount == 1 ? '1 word' : '$wordCount words';
+String formatEntryWordCount(int wordCount, AppLocalizations l10n) {
+  return l10n.wordCount(wordCount);
 }
 
 EntryDetailDateLabel? _tryFormatEntryDetailDate(

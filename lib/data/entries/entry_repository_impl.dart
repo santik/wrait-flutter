@@ -10,8 +10,9 @@ import 'draft_audio_path_codec.dart';
 import 'local_entry_database.dart';
 
 typedef StoreDraftAudioPathCallback = Future<String> Function(String audioPath);
-typedef ResolveDraftAudioPathCallback =
-    Future<String> Function(String storedAudioPath);
+typedef ResolveDraftAudioPathCallback = Future<String> Function(
+  String storedAudioPath,
+);
 
 class EntryRepositoryImpl implements EntryRepository {
   EntryRepositoryImpl({

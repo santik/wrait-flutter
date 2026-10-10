@@ -1,8 +1,11 @@
 import 'register_device_on_launch_use_case.dart';
 
 typedef RetryPendingDraftsCallback = Future<void> Function();
-typedef AppLaunchWorkWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef AppLaunchWorkWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 class AppLaunchWorkUseCase {
   AppLaunchWorkUseCase({

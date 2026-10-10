@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../api/backend_providers.dart';
 import '../audio/audio_recording_providers.dart';
+import '../preferences/transcription_language_controller.dart';
 import 'cloud_transcription_service.dart';
 import 'transcription_service.dart';
 
@@ -42,11 +43,31 @@ final transcribeAudioCallbackProvider = Provider<TranscribeAudioCallback>((
   return ref.watch(wraitBackendClientProvider).transcribeAudio;
 });
 
+final transcriptionActivityProvider =
+    NotifierProvider<TranscriptionActivityNotifier, bool>(
+      TranscriptionActivityNotifier.new,
+    );
+
+class TranscriptionActivityNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setActive(bool value) {
+    state = value;
+  }
+}
+
 final transcriptionServiceProvider = Provider<TranscriptionService>((ref) {
   return CloudTranscriptionService(
     audioRecordingService: ref.watch(audioRecordingServiceProvider),
     transcribeAudio: ref.watch(transcribeAudioCallbackProvider),
     createLiveRecordingPath: ref.watch(liveRecordingPathFactoryProvider),
+    readLanguageSnapshot: () => ref
+        .read(transcriptionLanguageControllerProvider.notifier)
+        .snapshotLanguage(),
+    onActivityChanged: (isActive) {
+      ref.read(transcriptionActivityProvider.notifier).setActive(isActive);
+    },
     logWarning: ref.watch(transcriptionWarningLoggerProvider),
   );
 });

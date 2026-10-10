@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/entries/entry_providers.dart';
 import '../../domain/model/entry.dart';
+import '../../l10n/app_localizations.dart';
 
 class MainScreenStatsData {
   const MainScreenStatsData({
@@ -12,7 +13,10 @@ class MainScreenStatsData {
   final int entryCount;
   final int activeDays;
 
-  String get displayText => '$entryCount entries - $activeDays days';
+  String displayText(AppLocalizations l10n) => l10n.statsDisplay(
+    l10n.statsEntryCount(entryCount),
+    l10n.statsActiveDays(activeDays),
+  );
 }
 
 MainScreenStatsData buildMainScreenStats(Iterable<Entry> entries) {
@@ -33,8 +37,7 @@ final mainScreenStatsProvider = StreamProvider<MainScreenStatsData>((ref) {
 });
 
 String _localDayKey(Entry entry) {
-  final dateTime = DateTime.fromMillisecondsSinceEpoch(
-    entry.createdAt,
-  ).toLocal();
+  final dateTime = DateTime.fromMillisecondsSinceEpoch(entry.createdAt)
+      .toLocal();
   return '${dateTime.year}-${dateTime.month}-${dateTime.day}';
 }

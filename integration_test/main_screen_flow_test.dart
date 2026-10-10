@@ -43,7 +43,7 @@ void main() {
     (tester) async {
       final harness = await _createHarness(
         feedbackDelays: const RecordingFeedbackDelays(
-          savedDisplayWindow: Duration(milliseconds: 50),
+          savedDisplayWindow: Duration(seconds: 5),
         ),
       );
       addTearDown(harness.dispose);
@@ -89,11 +89,14 @@ void main() {
       harness.monotonicClock.advance(const Duration(seconds: 6));
       await tester.tap(find.byKey(mainActionButtonKey));
       await savedState.future.timeout(const Duration(seconds: 5));
-      await tester.pump();
-
+      await _pumpUntilFound(
+        tester,
+        find.text('saved, tap to read'),
+        timeout: const Duration(seconds: 5),
+      );
       expect(find.text('saved, tap to read'), findsOneWidget);
 
-      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump(const Duration(seconds: 6));
       await tester.pump();
       expect(find.text('wrait'), findsWidgets);
     },
@@ -623,9 +626,8 @@ class _FakeTranscriptionService implements TranscriptionService {
     required TranscriptionStatusCallback onStatus,
   }) async {
     isRecording = false;
-    if (nextStopResult case TranscriptionFailure(
-      reason: final reason,
-    ) when reason == TranscriptionFailureReason.tooShort) {
+    if (nextStopResult case TranscriptionFailure(reason: final reason)
+        when reason == TranscriptionFailureReason.tooShort) {
       return nextStopResult;
     }
 

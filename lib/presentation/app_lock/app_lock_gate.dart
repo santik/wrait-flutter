@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/auth/app_lock_providers.dart';
 import '../../data/preferences/app_lock_preference_controller.dart';
+import '../../l10n/app_localizations.dart';
 import 'app_lock_controller.dart';
 import 'app_lock_screen.dart';
 import 'app_lock_test_keys.dart';
@@ -237,6 +238,7 @@ class _AppLockPreferenceCover extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final failed = state.status == AppLockPreferenceStatus.loadFailure;
     return ColoredBox(
       key: appLockPreferenceCoverKey,
@@ -252,8 +254,8 @@ class _AppLockPreferenceCover extends ConsumerWidget {
                 if (!failed) const SizedBox(height: 16),
                 Text(
                   failed
-                      ? 'Wrait could not load your privacy setting.'
-                      : 'loading privacy settings',
+                      ? l10n.appLockPreferenceLoadFailed
+                      : l10n.appLockPreferenceLoading,
                   textAlign: TextAlign.center,
                 ),
                 if (failed) ...[
@@ -267,7 +269,7 @@ class _AppLockPreferenceCover extends ConsumerWidget {
                             .retryLoad(),
                       );
                     },
-                    child: const Text('Try again'),
+                    child: Text(l10n.appLockPreferenceRetry),
                   ),
                 ],
               ],

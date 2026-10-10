@@ -4,14 +4,16 @@ import '../model/entry.dart';
 import '../model/supported_language.dart';
 import '../repository/entry_repository.dart';
 
-typedef CleanupTranscriptCallback =
-    Future<backend.CleanupResult> Function({
-      required String transcript,
-      required String language,
-    });
+typedef CleanupTranscriptCallback = Future<backend.CleanupResult> Function({
+  required String transcript,
+  required String language,
+});
 typedef SetCleanupQuotaCallback = void Function(RecordQuotaState quota);
-typedef CleanupWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef CleanupWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 /// Spec-approved maximum cleanup request length. Only the request payload is
 /// bounded; the persisted raw transcript remains full-length.

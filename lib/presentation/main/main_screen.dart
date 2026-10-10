@@ -12,6 +12,10 @@ import '../../data/api/backend_providers.dart';
 import '../../data/audio/audio_recording_providers.dart';
 import '../../data/display/display_awake_service.dart';
 import '../../data/preferences/preferences_providers.dart';
+import '../../data/preferences/transcription_language_controller.dart';
+import '../../data/transcription/transcription_providers.dart';
+import '../../domain/model/supported_language.dart';
+import '../../l10n/app_localizations.dart';
 import '../app_lock/app_lock_controller.dart';
 import '../feedback/feedback_providers.dart';
 import '../feedback/feedback_service.dart';
@@ -134,10 +138,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
       _feedbackInFlight = false;
     });
 
+    final l10n = AppLocalizations.of(context);
     final message = switch (result.status) {
-      FeedbackLaunchStatus.submitted => 'feedback sent',
-      FeedbackLaunchStatus.unavailable => 'feedback is unavailable right now',
-      FeedbackLaunchStatus.failed => 'feedback could not be sent. try again',
+      FeedbackLaunchStatus.submitted => l10n.mainFeedbackSent,
+      FeedbackLaunchStatus.unavailable => l10n.mainFeedbackUnavailable,
+      FeedbackLaunchStatus.failed => l10n.mainFeedbackFailed,
       FeedbackLaunchStatus.cancelled => null,
     };
     if (message == null) {
@@ -171,15 +176,22 @@ class _MainScreenState extends ConsumerState<MainScreen>
     });
 
     final controllerState = ref.watch(mainRecordingControllerProvider);
+    final languagePreference = ref.watch(
+      transcriptionLanguageControllerProvider,
+    );
+    final transcriptionActive = ref.watch(transcriptionActivityProvider);
+    final settingsAvailable = !controllerState.isActive && !transcriptionActive;
     final quota = ref.watch(sessionRecordQuotaStateProvider);
     final stats =
         ref.watch(mainScreenStatsProvider).value ??
         const MainScreenStatsData(entryCount: 0, activeDays: 0);
+    final l10n = AppLocalizations.of(context);
     final hasEverRecorded =
         _hasRecordedThisSession || (_storedHasEverRecorded ?? false);
     final status = resolveMainScreenStatus(
       controllerState: controllerState,
       hasEverRecorded: hasEverRecorded,
+      l10n: l10n,
     );
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -235,10 +247,15 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                         ? const SizedBox.shrink()
                                         : Semantics(
                                             container: true,
-                                            label:
-                                                'Recording quota ${quota.limit} total and ${quota.remaining} left.',
+                                            label: l10n.mainQuotaSemanticsLabel(
+                                              quota.limit,
+                                              quota.remaining,
+                                            ),
                                             child: Text(
-                                              '${quota.limit} total / ${quota.remaining} left',
+                                              l10n.mainQuotaText(
+                                                quota.limit,
+                                                quota.remaining,
+                                              ),
                                               key: const ValueKey(
                                                 'quotaLineText',
                                               ),
@@ -298,6 +315,70 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                     ),
                                   ),
                                 ),
+                                if (languagePreference.isReady &&
+                                    languagePreference.language != null) ...[
+                                  const SizedBox(height: WraitSpacingTokens.sm),
+                                  Builder(
+                                    builder: (context) {
+                                      final displayName =
+                                          supportedLanguageDisplayName(
+                                            languagePreference.language,
+                                          );
+                                      return Semantics(
+                                        button: true,
+                                        enabled: settingsAvailable,
+                                        label: l10n.mainLanguageSemanticsLabel(
+                                          displayName ?? '',
+                                        ),
+                                        child: InkWell(
+                                          key: mainTranscriptionLanguageKey,
+                                          borderRadius: BorderRadius.circular(
+                                            WraitRadiusTokens.card,
+                                          ),
+                                          onTap: settingsAvailable
+                                              ? () => context.push(
+                                                  '/settings?section=transcription-language',
+                                                )
+                                              : null,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: WraitSpacingTokens.md,
+                                              vertical: WraitSpacingTokens.xs,
+                                            ),
+                                            child: Text(
+                                              l10n.mainLanguageLabel(
+                                                displayName ?? '',
+                                              ),
+                                              style: theme.textTheme.labelLarge
+                                                  ?.copyWith(
+                                                    color: settingsAvailable
+                                                        ? colorScheme.secondary
+                                                        : colorScheme.outline,
+                                                  ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ] else if (languagePreference.status ==
+                                    TranscriptionLanguageStatus
+                                        .loadFailure) ...[
+                                  const SizedBox(height: WraitSpacingTokens.sm),
+                                  TextButton(
+                                    key: mainTranscriptionLanguageRetryKey,
+                                    onPressed: () => unawaited(
+                                      ref
+                                          .read(
+                                            transcriptionLanguageControllerProvider
+                                                .notifier,
+                                          )
+                                          .retryLoad(),
+                                    ),
+                                    child: Text(l10n.mainLanguageUnavailable),
+                                  ),
+                                ],
                                 const SizedBox(
                                   height: WraitStatsLineTokens.gapAbove,
                                 ),
@@ -307,8 +388,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                   child: Center(
                                     child: Semantics(
                                       button: true,
-                                      label:
-                                          'Entry stats ${stats.displayText}. Opens the entry list.',
+                                      label: l10n.statsSemanticsLabel(
+                                        stats.displayText(l10n),
+                                      ),
                                       child: InkWell(
                                         key: const ValueKey('statsLineButton'),
                                         borderRadius: BorderRadius.circular(
@@ -321,7 +403,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                             vertical: WraitSpacingTokens.sm,
                                           ),
                                           child: Text(
-                                            stats.displayText,
+                                            stats.displayText(l10n),
                                             key: const ValueKey(
                                               'statsLineText',
                                             ),
@@ -348,13 +430,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 child: Semantics(
                   container: true,
                   button: true,
-                  label: 'Settings',
+                  label: l10n.mainSettingsSemanticsLabel,
                   child: IconButton(
                     key: mainSettingsButtonKey,
-                    tooltip: 'Settings',
-                    onPressed: controllerState.isActive
-                        ? null
-                        : () => context.push('/settings'),
+                    tooltip: l10n.mainSettingsTooltip,
+                    onPressed: settingsAvailable
+                        ? () => context.push('/settings')
+                        : null,
                     icon: const Icon(Icons.settings_outlined),
                   ),
                 ),
@@ -365,11 +447,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 child: Semantics(
                   container: true,
                   button: true,
-                  label: 'Send feedback',
+                  label: l10n.mainFeedbackSemanticsLabel,
                   onTap: _feedbackInFlight ? null : _openFeedback,
                   child: IconButton(
                     key: mainFeedbackButtonKey,
-                    tooltip: 'Send feedback',
+                    tooltip: l10n.mainFeedbackTooltip,
                     onPressed: _feedbackInFlight ? null : _openFeedback,
                     icon: const Icon(Icons.feedback_outlined),
                   ),
@@ -578,9 +660,10 @@ class _StatusLine extends StatelessWidget {
         style: theme.textTheme.bodyLarge,
       ),
     );
+    final l10n = AppLocalizations.of(context);
     final semanticsLabel =
         presentation.semanticsLabel ??
-        'Status message ${presentation.statusText}.';
+        l10n.statusDefaultSemanticsLabel(presentation.statusText);
 
     if (!presentation.isStatusTappable) {
       return Semantics(
