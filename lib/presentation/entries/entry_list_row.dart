@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/model/entry.dart';
+import '../../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import '../theme/wrait_colors.dart';
 import 'entry_list_formatters.dart';
@@ -29,10 +30,6 @@ class EntryListRow extends StatefulWidget {
 
 class _EntryListRowState extends State<EntryListRow>
     with SingleTickerProviderStateMixin {
-  static const _deleteAction = CustomSemanticsAction(
-    label: entryListDeleteActionLabel,
-  );
-
   late final AnimationController _revealController;
   Completer<void>? _revealFlowCompleter;
 
@@ -59,27 +56,38 @@ class _EntryListRowState extends State<EntryListRow>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final semanticColors = theme.extension<WraitSemanticColors>()!;
     final timestamp = formatEntryListTimestamp(
       createdAt: widget.entry.createdAt,
       locale: Localizations.localeOf(context),
     );
     final isAudioDraft = entryListIsAudioOnlyDraft(widget.entry);
-    final previewText = entryListPreviewText(widget.entry);
+    final previewText = entryListPreviewText(widget.entry, l10n);
     final languageLabel = entryListLanguageLabel(widget.entry.language);
+    final deleteAction = CustomSemanticsAction(
+      label: l10n.entryListDeleteActionLabel,
+    );
 
     return Semantics(
       button: true,
       enabled: !isAudioDraft,
-      label: 'Entry ${timestamp.displayLabel}. $languageLabel.',
+      label: l10n.entryListRowSemanticsLabel(
+        timestamp.displayLabel,
+        languageLabel,
+      ),
       hint: isAudioDraft
-          ? 'Swipe right to delete.'
-          : 'Double tap to open. Swipe right to delete.',
+          ? l10n.entryListRowSwipeHint
+          : l10n.entryListRowOpenHint,
       value: isAudioDraft
-          ? 'draft, $entryListAudioDraftStateDescription'
-          : (widget.entry.type == EntryType.draft ? 'draft' : null),
+          ? l10n.entryListRowAudioDraftValue(
+              l10n.entryListAudioDraftStateDescription,
+            )
+          : (widget.entry.type == EntryType.draft
+                ? l10n.entryListRowDraftValue
+                : null),
       customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
-        _deleteAction: () {
+        deleteAction: () {
           unawaited(_handleRevealFlow());
         },
       },
@@ -163,7 +171,7 @@ class _EntryListRowState extends State<EntryListRow>
                                       ),
                                     ),
                                     child: Text(
-                                      'draft',
+                                      l10n.entryListRowDraftBadge,
                                       style: theme.textTheme.labelSmall
                                           ?.copyWith(
                                             color: semanticColors.warning,

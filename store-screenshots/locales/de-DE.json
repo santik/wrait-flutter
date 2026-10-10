@@ -1,0 +1,26 @@
+{
+  "lang": "de",
+  "dir": "ltr",
+  "wait": "wait",
+  "tap": "Taste drücken zum Schreiben",
+  "language": "Sprache: Deutsch",
+  "stats": "{n} Einträge - {d} Tage",
+  "search": "Einträge durchsuchen",
+  "back": "Zurück",
+  "draft": "Entwurf",
+  "dates": [
+    "Heute",
+    "Gestern",
+    "Mo"
+  ],
+  "entries": [
+    "Heute Morgen am Fluss spaziert. Die Luft war klar und mein Kopf endlich frei.",
+    "Tolles Gespräch mit dem Team. Wir haben den Plan fürs nächste Quartal festgelegt.",
+    "Abendessen mit Mama. Sie hat wieder die Geschichte vom alten Haus erzählt."
+  ],
+  "captions": [
+    "Einfach sprechen. Wait schreibt.",
+    "Dein Tagebuch, immer dabei",
+    "Lesen, bearbeiten, privat halten"
+  ]
+}

@@ -3,8 +3,11 @@ import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-typedef DisplayAwakeLogWarning =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef DisplayAwakeLogWarning = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 abstract interface class DisplayAwakeService {
   Future<bool> setAwake(bool enabled);
@@ -48,10 +51,7 @@ final displayAwakeServiceProvider = Provider<DisplayAwakeService>((ref) {
 });
 
 class WakelockDisplayAwakeService implements DisplayAwakeService {
-  WakelockDisplayAwakeService({
-    required this._client,
-    this._logWarning,
-  });
+  WakelockDisplayAwakeService({required this._client, this._logWarning});
 
   final WakelockClient _client;
   final DisplayAwakeLogWarning? _logWarning;

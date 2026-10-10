@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wiredash/wiredash.dart';
 
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
-import 'domain/model/supported_language.dart';
+import 'l10n/app_localizations.dart';
 import 'presentation/app_lock/app_lock_gate.dart';
+import 'presentation/locale/app_localizations_fallback.dart';
 import 'presentation/theme/wrait_theme.dart';
 
 final appConfigProvider = Provider<AppConfig>(
@@ -31,7 +31,7 @@ class WraitApp extends ConsumerWidget {
       theme: wraitLightTheme,
       darkTheme: wraitDarkTheme,
       themeMode: ThemeMode.system,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: _buildSupportedLocales(),
       routerConfig: router,
       builder: (context, child) {
@@ -53,20 +53,12 @@ class WraitApp extends ConsumerWidget {
 List<Locale> _buildSupportedLocales() {
   final localesByTag = <String, Locale>{};
 
-  for (final locale in WidgetsBinding.instance.platformDispatcher.locales) {
+  for (final locale in AppLocalizations.supportedLocales) {
     _addLocale(localesByTag, locale);
   }
 
-  for (final supportedLanguage in supportedLanguages) {
-    final parts = supportedLanguage.code.split('-');
-    if (parts.isEmpty) {
-      continue;
-    }
-
-    _addLocale(localesByTag, Locale(parts.first));
-    if (parts.length == 2) {
-      _addLocale(localesByTag, Locale(parts.first, parts[1]));
-    }
+  for (final locale in WidgetsBinding.instance.platformDispatcher.locales) {
+    _addLocale(localesByTag, locale);
   }
 
   if (localesByTag.isEmpty) {

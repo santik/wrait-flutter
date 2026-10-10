@@ -28,6 +28,16 @@ this file as supporting implementation memory.
 - App-lock auth and device-security settings opening are single-flight and
   timeout/retry aware. Preserve those guards when touching lock flow code.
 
+## Settings Screen
+
+- Settings is routed at `/settings` from the main screen gear icon;
+  `focusTranscriptionLanguage` scrolls and focuses the language dropdown.
+- Settings changes are guarded by `activityActive` (recording or transcription
+  in progress).
+- Use one activity message for all settings sections — do not add
+  section-specific activity messages.
+- Keep Settings behind `AppLockGate`; do not add a separate settings lock.
+
 ## Capture Privacy
 
 - Android capture protection lives in
@@ -246,6 +256,15 @@ this file as supporting implementation memory.
   entry is missing or already finalized.
 - Cleanup request truncation is request-only: submit at most 10,000 characters
   while preserving the full stored `rawTranscript`.
+- `CloudTranscriptionService` receives a `readLanguageSnapshot` callback; it
+  captures one stable snapshot at operation start.
+- Explicit language selections propagate as the `language` query parameter on
+  `POST /api/transcribe` — never in the multipart body.
+- The backend client validates outgoing language codes against
+  `supportedLanguageCodes` before sending; invalid codes fail locally without a
+  network request.
+- Returned `detected_language` stays authoritative for entry metadata and
+  cleanup; the user's preference is an optional upstream hint.
 
 ## Preferences and Device ID
 
@@ -262,6 +281,15 @@ this file as supporting implementation memory.
   hex using the app-scoped salt `wrait-v1` before first persistence.
 - Preexisting stored values are intentionally returned unchanged; legacy
   migration is explicit future scope.
+- `TranscriptionLanguageController` (`transcriptionLanguageControllerProvider`)
+  owns language preference lifecycle: load, committed state, single-flight save
+  with concurrent chaining, and async snapshots.
+- `snapshotLanguage()` must return `null` when the preference is unavailable —
+  throwing blocks recording entirely.
+- Concurrent `setLanguage()` calls chain after an in-flight save rather than
+  silently returning the first save's future.
+- The stored key is `transcription_language`; automatic mode removes the key
+  rather than storing a sentinel.
 
 ## Main Screen and Entry UI
 
@@ -317,6 +345,12 @@ this file as supporting implementation memory.
   shared body text.
 - Entry-list back handling should prefer a real navigator pop when route
   history exists and only fall back to `/` when no prior route can be popped.
+- An explicit language selection shows as `Language: <display name>` on the
+  main screen; automatic mode hides the indicator.
+- The indicator navigates to `/settings?focusTranscriptionLanguage=true` when
+  idle; navigation is disabled during active work.
+- `supportedLanguageDisplayName()` is the single lookup for display labels;
+  compute it once when both Semantics and visible text need it.
 
 ## Feedback and Wiredash
 

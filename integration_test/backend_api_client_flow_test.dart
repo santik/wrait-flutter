@@ -35,7 +35,10 @@ void main() {
     );
 
     final registration = await client.register();
-    final transcription = await client.transcribeAudio(audioFile);
+    final transcription = await client.transcribeAudio(
+      audioFile,
+      language: 'nl-BE',
+    );
     final cleanup = await client.cleanupTranscript(
       transcript: 'hello there diary friend',
       language: 'en-US',
@@ -64,6 +67,7 @@ void main() {
     expect(requests, hasLength(3));
     expect(requests[0].path, '/api/register');
     expect(requests[1].path, '/api/transcribe');
+    expect(requests[1].queryParameters, <String, String>{'language': 'nl-BE'});
     expect(requests[2].path, '/api/cleanup');
 
     for (final request in requests) {
@@ -75,6 +79,7 @@ void main() {
     expect(requests[1].body, contains('name="audio"'));
     expect(requests[1].body, contains('filename="clip.m4a"'));
     expect(requests[1].body, contains('audio-body'));
+    expect(requests[1].body, isNot(contains('name="language"')));
 
     expect(requests[2].jsonBody?['transcript'], 'hello there diary friend');
     expect(requests[2].jsonBody?['language'], 'en-US');
@@ -96,6 +101,7 @@ Future<void> _serveBackend(
     final bodyText = latin1.decode(bodyBytes);
     final observed = _ObservedRequest(
       path: request.uri.path,
+      queryParameters: request.uri.queryParameters,
       deviceId: request.headers.value('X-Device-Id'),
       proxySecret: request.headers.value('X-Proxy-Secret'),
       contentType: request.headers.contentType?.mimeType,
@@ -143,6 +149,7 @@ Future<void> _serveBackend(
 class _ObservedRequest {
   const _ObservedRequest({
     required this.path,
+    required this.queryParameters,
     required this.deviceId,
     required this.proxySecret,
     required this.contentType,
@@ -151,6 +158,7 @@ class _ObservedRequest {
   });
 
   final String path;
+  final Map<String, String> queryParameters;
   final String? deviceId;
   final String? proxySecret;
   final String? contentType;

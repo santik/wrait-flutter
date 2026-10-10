@@ -7,8 +7,11 @@ import 'cleanup_transcript_use_case.dart';
 typedef ValidateDraftAudioPathCallback = Future<String?> Function(String path);
 typedef DeleteRetainedAudioCallback = Future<void> Function(String path);
 typedef SetRetryQuotaCallback = void Function(RecordQuotaState quota);
-typedef RetryPendingDraftsWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef RetryPendingDraftsWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 const launchRetryStaleDraftDays = 7;
 

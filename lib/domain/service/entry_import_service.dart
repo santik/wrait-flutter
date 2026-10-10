@@ -57,20 +57,6 @@ class EntryImportResult {
   final EntryImportFailureCategory? failureCategory;
   final Object? error;
   final StackTrace? stackTrace;
-
-  String? get failureMessage {
-    return switch (failureCategory) {
-      EntryImportFailureCategory.invalidFormat =>
-        'Selected CSV is not a valid Wrait export.',
-      EntryImportFailureCategory.unreadableFile =>
-        'Could not read the selected CSV file.',
-      EntryImportFailureCategory.fileTooLarge =>
-        'Selected CSV is too large to import.',
-      EntryImportFailureCategory.storageFailure =>
-        'Could not save imported entries.',
-      null => null,
-    };
-  }
 }
 
 class EntryImportService {

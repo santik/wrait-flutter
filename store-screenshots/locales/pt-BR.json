@@ -1,0 +1,26 @@
+{
+  "lang": "pt",
+  "dir": "ltr",
+  "wait": "wait",
+  "tap": "toque no botão para escrever",
+  "language": "Idioma: Português",
+  "stats": "{n} entradas - {d} dias",
+  "search": "Buscar entradas",
+  "back": "Voltar",
+  "draft": "rascunho",
+  "dates": [
+    "Hoje",
+    "Ontem",
+    "Seg"
+  ],
+  "entries": [
+    "Hoje de manhã caminhei ao longo do rio. O ar estava fresco e a cabeça finalmente leve.",
+    "Ótima reunião com a equipe. Combinamos o plano do próximo trimestre.",
+    "Jantar com a mãe. Ela contou de novo a história da casa antiga."
+  ],
+  "captions": [
+    "Só fale. O Wait escreve.",
+    "Seu diário, sempre à mão",
+    "Leia, edite e mantenha privado"
+  ]
+}

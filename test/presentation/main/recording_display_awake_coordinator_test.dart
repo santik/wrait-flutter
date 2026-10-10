@@ -58,18 +58,21 @@ void main() {
     expect(service.requests, isEmpty);
   });
 
-  test('starts released when initialized outside the resumed lifecycle', () async {
-    final service = FakeDisplayAwakeService();
-    RecordingDisplayAwakeCoordinator(
-      service: service,
-      recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
-      lifecycleState: AppLifecycleState.inactive,
-      appLockState: const AppLockState.unlocked(),
-    );
+  test(
+    'starts released when initialized outside the resumed lifecycle',
+    () async {
+      final service = FakeDisplayAwakeService();
+      RecordingDisplayAwakeCoordinator(
+        service: service,
+        recordingState: RecordingListening(hardCapDeadlineElapsedRealtime: 1),
+        lifecycleState: AppLifecycleState.inactive,
+        appLockState: const AppLockState.unlocked(),
+      );
 
-    await service.flush();
-    expect(service.requests, isEmpty);
-  });
+      await service.flush();
+      expect(service.requests, isEmpty);
+    },
+  );
 
   test(
     'releases on lifecycle exit and reacquires on resume if still listening',
@@ -137,28 +140,25 @@ void main() {
     expect(service.requests, <bool>[true, false]);
   });
 
-  test(
-    'coalesces rapid transitions to the final inactive state before any platform call starts',
-    () async {
-      final service = FakeDisplayAwakeService(autoComplete: false);
-      final coordinator = RecordingDisplayAwakeCoordinator(
-        service: service,
-        recordingState: const RecordingIdle(),
-        lifecycleState: AppLifecycleState.resumed,
-        appLockState: const AppLockState.unlocked(),
-      );
+  test('coalesces rapid transitions to the final inactive state before any platform call starts', () async {
+    final service = FakeDisplayAwakeService(autoComplete: false);
+    final coordinator = RecordingDisplayAwakeCoordinator(
+      service: service,
+      recordingState: const RecordingIdle(),
+      lifecycleState: AppLifecycleState.resumed,
+      appLockState: const AppLockState.unlocked(),
+    );
 
-      coordinator.updateRecordingState(
-        RecordingListening(hardCapDeadlineElapsedRealtime: 1),
-      );
-      coordinator.updateLifecycleState(AppLifecycleState.inactive);
-      coordinator.updateLifecycleState(AppLifecycleState.resumed);
-      coordinator.updateRecordingState(const RecordingUploading());
+    coordinator.updateRecordingState(
+      RecordingListening(hardCapDeadlineElapsedRealtime: 1),
+    );
+    coordinator.updateLifecycleState(AppLifecycleState.inactive);
+    coordinator.updateLifecycleState(AppLifecycleState.resumed);
+    coordinator.updateRecordingState(const RecordingUploading());
 
-      await service.flush();
-      expect(service.requests, isEmpty);
-    },
-  );
+    await service.flush();
+    expect(service.requests, isEmpty);
+  });
 
   test('dispose releases keep-awake only once', () async {
     final service = FakeDisplayAwakeService();

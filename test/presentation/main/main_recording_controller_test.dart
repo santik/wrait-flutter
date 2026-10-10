@@ -202,71 +202,62 @@ void main() {
     },
   );
 
-  test(
-    'Listening stop before five seconds publishes TooShort, increments shake once, and auto-clears',
-    () async {
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      transcriptionService.nextStopResult = const TranscriptionFailure(
-        reason: TranscriptionFailureReason.tooShort,
-      );
+  test('Listening stop before five seconds publishes TooShort, increments shake once, and auto-clears', () async {
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    transcriptionService.nextStopResult = const TranscriptionFailure(
+      reason: TranscriptionFailureReason.tooShort,
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(
-        container.read(mainRecordingControllerProvider),
-        const RecordingControllerState(
-          recordingState: RecordingErrorState(RecordingError.tooShort),
-          shakeErrorKey: 1,
-        ),
-      );
+    expect(
+      container.read(mainRecordingControllerProvider),
+      const RecordingControllerState(
+        recordingState: RecordingErrorState(RecordingError.tooShort),
+        shakeErrorKey: 1,
+      ),
+    );
 
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingIdle(),
-      );
-    },
-  );
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingIdle(),
+    );
+  });
 
-  test(
-    'valid stop publishes Uploading then Processing then Saved with entry id and detected language',
-    () async {
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
-        entryId: 42,
-        cleanedText: 'Cleaned transcript',
-      );
-      transcriptionService.nextStopResult = const TranscriptionSuccess(
-        transcript: 'raw transcript',
-        detectedLanguage: 'fr-FR',
-      );
+  test('valid stop publishes Uploading then Processing then Saved with entry id and detected language', () async {
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
+      entryId: 42,
+      cleanedText: 'Cleaned transcript',
+    );
+    transcriptionService.nextStopResult = const TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'fr-FR',
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(transcriptionService.statusHistory, contains(const Uploading()));
-      expect(cleanupUseCase.calls.single.rawTranscript, 'raw transcript');
-      expect(
-        container.read(mainRecordingControllerProvider),
-        RecordingControllerState(
-          recordingState: RecordingSaved(
-            entryId: 42,
-            detectedLanguage: 'fr-FR',
-          ),
-        ),
-      );
-      expect(preferencesRepository.hasEverRecorded, isTrue);
-      expect(container.read(mainRecordingControllerProvider).isActive, isFalse);
-    },
-  );
+    expect(transcriptionService.statusHistory, contains(const Uploading()));
+    expect(cleanupUseCase.calls.single.rawTranscript, 'raw transcript');
+    expect(
+      container.read(mainRecordingControllerProvider),
+      RecordingControllerState(
+        recordingState: RecordingSaved(entryId: 42, detectedLanguage: 'fr-FR'),
+      ),
+    );
+    expect(preferencesRepository.hasEverRecorded, isTrue);
+    expect(container.read(mainRecordingControllerProvider).isActive, isFalse);
+  });
 
   test('hard-cap timer stops recording and saves the result', () async {
     transcriptionService.nextHardCapDeadlineElapsedRealtime = 20;
@@ -591,6 +582,8 @@ void main() {
           RecordingError.backendUnavailable,
       TranscriptionFailureReason.proxyAuthFailed:
           RecordingError.proxyAuthFailed,
+      TranscriptionFailureReason.speechNotRecognized:
+          RecordingError.speechNotRecognized,
       TranscriptionFailureReason.apiError: RecordingError.apiFailed,
     };
 
@@ -616,230 +609,237 @@ void main() {
     }
   });
 
-  test(
-    'transcription failure with audioDraftPath persists an audio draft using the fallback language',
-    () async {
-      final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
-      await audioDraftFile.writeAsString('audio');
+  test('transcription failure with audioDraftPath persists an audio draft using the fallback language', () async {
+    final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
+    await audioDraftFile.writeAsString('audio');
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      transcriptionService.nextStopResult = TranscriptionFailure(
-        reason: TranscriptionFailureReason.network,
-        audioDraftPath: audioDraftFile.path,
-      );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = TranscriptionFailure(
+      reason: TranscriptionFailureReason.network,
+      audioDraftPath: audioDraftFile.path,
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(entryRepository.savedAudioDrafts, [
-        (audioDraftFile.path, cleanupTranscriptFallbackLanguage),
-      ]);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(
-          RecordingError.noInternet,
-          preservedDraft: true,
-        ),
-      );
-      expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
-    },
-  );
+    expect(entryRepository.savedAudioDrafts, [
+      (audioDraftFile.path, cleanupTranscriptFallbackLanguage),
+    ]);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(
+        RecordingError.noInternet,
+        preservedDraft: true,
+      ),
+    );
+    expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+  });
 
-  test(
-    'nothingCaught with audioDraftPath keeps no-match feedback and skips draft persistence',
-    () async {
-      final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
-      await audioDraftFile.writeAsString('audio');
+  test('transcription failure with requestedLanguage persists the draft using that language', () async {
+    final audioDraftFile = File('${tempDirectory.path}/retry-audio-lang.m4a');
+    await audioDraftFile.writeAsString('audio');
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      transcriptionService.nextStopResult = TranscriptionFailure(
-        reason: TranscriptionFailureReason.nothingCaught,
-        audioDraftPath: audioDraftFile.path,
-      );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = TranscriptionFailure(
+      reason: TranscriptionFailureReason.speechNotRecognized,
+      audioDraftPath: audioDraftFile.path,
+      requestedLanguage: 'de-CH',
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(entryRepository.savedAudioDrafts, isEmpty);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.noMatch),
-      );
-    },
-  );
+    expect(entryRepository.savedAudioDrafts, [(audioDraftFile.path, 'de-CH')]);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(
+        RecordingError.speechNotRecognized,
+        preservedDraft: true,
+      ),
+    );
+  });
 
-  test(
-    'transcription success without usable words keeps no-match feedback, skips cleanup, and publishes quota',
-    () async {
-      final quota = RecordQuotaState(
-        limit: 5,
-        count: 5,
-        remaining: 0,
-        resetAt: DateTime.utc(2026, 6, 12),
-      );
+  test('nothingCaught with audioDraftPath keeps no-match feedback and skips draft persistence', () async {
+    final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
+    await audioDraftFile.writeAsString('audio');
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      transcriptionService.nextStopResult = TranscriptionSuccess(
-        transcript: ' ... ',
-        detectedLanguage: 'en-US',
-        quota: quota,
-      );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = TranscriptionFailure(
+      reason: TranscriptionFailureReason.nothingCaught,
+      audioDraftPath: audioDraftFile.path,
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(cleanupUseCase.calls, isEmpty);
-      expect(entryRepository.savedAudioDrafts, isEmpty);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.noMatch),
-      );
-      expect(container.read(sessionRecordQuotaStateProvider), quota);
-    },
-  );
+    expect(entryRepository.savedAudioDrafts, isEmpty);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.noMatch),
+    );
+  });
 
-  test(
-    'transcription failure with audioDraftPath persistence failure keeps fallback error copy without preservedDraft',
-    () async {
-      final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
-      await audioDraftFile.writeAsString('audio');
-      entryRepository.failSaveAudioDraft = true;
+  test('transcription success without usable words keeps no-match feedback, skips cleanup, and publishes quota', () async {
+    final quota = RecordQuotaState(
+      limit: 5,
+      count: 5,
+      remaining: 0,
+      resetAt: DateTime.utc(2026, 6, 12),
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      transcriptionService.nextStopResult = TranscriptionFailure(
-        reason: TranscriptionFailureReason.network,
-        audioDraftPath: audioDraftFile.path,
-      );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = TranscriptionSuccess(
+      transcript: ' ... ',
+      detectedLanguage: 'en-US',
+      quota: quota,
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(entryRepository.savedAudioDrafts, isEmpty);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.noInternet),
-      );
-      expect(
-        logMessages,
-        contains(
-          'Failed to persist retryable audio draft after transcription failure.',
-        ),
-      );
-      expect(logErrors.last, isA<StateError>());
-    },
-  );
+    expect(cleanupUseCase.calls, isEmpty);
+    expect(entryRepository.savedAudioDrafts, isEmpty);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.noMatch),
+    );
+    expect(container.read(sessionRecordQuotaStateProvider), quota);
+  });
 
-  test(
-    'transcription failure with missing audioDraftPath keeps the original error and skips draft persistence',
-    () async {
-      final missingAudioPath = '${tempDirectory.path}/missing-audio.m4a';
+  test('transcription failure with audioDraftPath persistence failure keeps fallback error copy without preservedDraft', () async {
+    final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
+    await audioDraftFile.writeAsString('audio');
+    entryRepository.failSaveAudioDraft = true;
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      transcriptionService.nextStopResult = TranscriptionFailure(
-        reason: TranscriptionFailureReason.network,
-        audioDraftPath: '  $missingAudioPath  ',
-      );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = TranscriptionFailure(
+      reason: TranscriptionFailureReason.network,
+      audioDraftPath: audioDraftFile.path,
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(entryRepository.savedAudioDrafts, isEmpty);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.noInternet),
-      );
-      expect(
-        logMessages,
-        contains(
-          'Ignoring retryable audio draft path because it is not a readable file.',
-        ),
-      );
-    },
-  );
+    expect(entryRepository.savedAudioDrafts, isEmpty);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.noInternet),
+    );
+    expect(
+      logMessages,
+      contains(
+        'Failed to persist retryable audio draft after transcription failure.',
+      ),
+    );
+    expect(logErrors.last, isA<StateError>());
+  });
 
-  test(
-    'cleanup failure preserves the draft, publishes mapped Error, and does not set hasEverRecorded',
-    () async {
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      cleanupUseCase.nextResult = const CleanupTranscriptFailure(
-        entryId: 41,
-        reason: backend.BackendFailureReason.backendUnavailable,
-      );
-      transcriptionService.nextStopResult = const TranscriptionSuccess(
-        transcript: 'raw transcript',
-        detectedLanguage: 'en-US',
-      );
+  test('transcription failure with missing audioDraftPath keeps the original error and skips draft persistence', () async {
+    final missingAudioPath = '${tempDirectory.path}/missing-audio.m4a';
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = TranscriptionFailure(
+      reason: TranscriptionFailureReason.network,
+      audioDraftPath: '  $missingAudioPath  ',
+    );
 
-      expect(cleanupUseCase.calls.single.rawTranscript, 'raw transcript');
-      expect(preferencesRepository.hasEverRecorded, isFalse);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(
-          RecordingError.backendUnavailable,
-          preservedDraft: true,
-        ),
-      );
-      expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
-    },
-  );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-  test(
-    'cleanup receives transcription quota as a fallback when cleanup quota is absent',
-    () async {
-      final fallbackQuota = RecordQuotaState(
-        limit: 5,
-        count: 3,
-        remaining: 2,
-        resetAt: DateTime.utc(2026, 6, 12),
-      );
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      cleanupUseCase.nextResult = const CleanupTranscriptFailure(
-        entryId: 41,
-        reason: backend.BackendFailureReason.backendUnavailable,
-      );
-      transcriptionService.nextStopResult = TranscriptionSuccess(
-        transcript: 'raw transcript',
-        detectedLanguage: 'en-US',
-        quota: fallbackQuota,
-      );
+    expect(entryRepository.savedAudioDrafts, isEmpty);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.noInternet),
+    );
+    expect(
+      logMessages,
+      contains(
+        'Ignoring retryable audio draft path because it is not a readable file.',
+      ),
+    );
+  });
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+  test('cleanup failure preserves the draft, publishes mapped Error, and does not set hasEverRecorded', () async {
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    cleanupUseCase.nextResult = const CleanupTranscriptFailure(
+      entryId: 41,
+      reason: backend.BackendFailureReason.backendUnavailable,
+    );
+    transcriptionService.nextStopResult = const TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'en-US',
+    );
 
-      expect(cleanupUseCase.calls.single.fallbackQuota, fallbackQuota);
-    },
-  );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+
+    expect(cleanupUseCase.calls.single.rawTranscript, 'raw transcript');
+    expect(preferencesRepository.hasEverRecorded, isFalse);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(
+        RecordingError.backendUnavailable,
+        preservedDraft: true,
+      ),
+    );
+    expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
+  });
+
+  test('cleanup receives transcription quota as a fallback when cleanup quota is absent', () async {
+    final fallbackQuota = RecordQuotaState(
+      limit: 5,
+      count: 3,
+      remaining: 2,
+      resetAt: DateTime.utc(2026, 6, 12),
+    );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    cleanupUseCase.nextResult = const CleanupTranscriptFailure(
+      entryId: 41,
+      reason: backend.BackendFailureReason.backendUnavailable,
+    );
+    transcriptionService.nextStopResult = TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'en-US',
+      quota: fallbackQuota,
+    );
+
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+
+    expect(cleanupUseCase.calls.single.fallbackQuota, fallbackQuota);
+  });
 
   test('draft-preserved errors do not increment the shake key', () async {
     final audioDraftFile = File('${tempDirectory.path}/retry-audio.m4a');
@@ -904,97 +904,88 @@ void main() {
     expect(container.read(mainRecordingControllerProvider).shakeErrorKey, 0);
   });
 
-  test(
-    'cleanup success still publishes Saved when preference persistence logs a warning',
-    () async {
-      preferencesRepository.failSetHasEverRecorded = true;
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
-        entryId: 50,
-        cleanedText: 'cleaned',
-      );
-      transcriptionService.nextStopResult = const TranscriptionSuccess(
-        transcript: 'raw transcript',
-        detectedLanguage: 'nl-NL',
-      );
+  test('cleanup success still publishes Saved when preference persistence logs a warning', () async {
+    preferencesRepository.failSetHasEverRecorded = true;
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
+      entryId: 50,
+      cleanedText: 'cleaned',
+    );
+    transcriptionService.nextStopResult = const TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'nl-NL',
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        RecordingSaved(entryId: 50, detectedLanguage: 'nl-NL'),
-      );
-      expect(logMessages.single, contains('hasEverRecorded'));
-      expect(logErrors.single, isA<StateError>());
-    },
-  );
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      RecordingSaved(entryId: 50, detectedLanguage: 'nl-NL'),
+    );
+    expect(logMessages.single, contains('hasEverRecorded'));
+    expect(logErrors.single, isA<StateError>());
+  });
 
-  test(
-    'cleanup success with a non-positive entry id publishes ApiFailed and does not set hasEverRecorded',
-    () async {
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
-        entryId: 0,
-        cleanedText: 'cleaned',
-      );
-      transcriptionService.nextStopResult = const TranscriptionSuccess(
-        transcript: 'raw transcript',
-        detectedLanguage: 'en-US',
-      );
+  test('cleanup success with a non-positive entry id publishes ApiFailed and does not set hasEverRecorded', () async {
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    cleanupUseCase.nextResult = const CleanupTranscriptSuccess(
+      entryId: 0,
+      cleanedText: 'cleaned',
+    );
+    transcriptionService.nextStopResult = const TranscriptionSuccess(
+      transcript: 'raw transcript',
+      detectedLanguage: 'en-US',
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(preferencesRepository.hasEverRecorded, isFalse);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.apiFailed),
-      );
-      expect(
-        logMessages,
-        contains(
-          'Cleanup succeeded without a valid entry id; Saved state was not published.',
-        ),
-      );
-      expect(logErrors.last, isA<ArgumentError>());
-    },
-  );
+    expect(preferencesRepository.hasEverRecorded, isFalse);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.apiFailed),
+    );
+    expect(
+      logMessages,
+      contains(
+        'Cleanup succeeded without a valid entry id; Saved state was not published.',
+      ),
+    );
+    expect(logErrors.last, isA<ArgumentError>());
+  });
 
-  test(
-    'Deleted feedback ignores non-positive counts, publishes positive counts, and auto-clears',
-    () async {
-      container
-          .read(mainRecordingControllerProvider.notifier)
-          .onEntriesDeleted(0);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingIdle(),
-      );
+  test('Deleted feedback ignores non-positive counts, publishes positive counts, and auto-clears', () async {
+    container
+        .read(mainRecordingControllerProvider.notifier)
+        .onEntriesDeleted(0);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingIdle(),
+    );
 
-      container
-          .read(mainRecordingControllerProvider.notifier)
-          .onEntriesDeleted(3);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingDeleted(3),
-      );
+    container
+        .read(mainRecordingControllerProvider.notifier)
+        .onEntriesDeleted(3);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingDeleted(3),
+    );
 
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingIdle(),
-      );
-    },
-  );
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingIdle(),
+    );
+  });
 
   test(
     'Saved feedback does not auto-clear and clears through clearSaved',
@@ -1016,40 +1007,37 @@ void main() {
     },
   );
 
-  test(
-    'rapid repeated taps while start is in flight trigger only one start attempt',
-    () async {
-      final startCompleter = Completer<void>();
-      transcriptionService.startFutureFactory = (onStatus) async {
-        await startCompleter.future;
-        final status = RecordingStarted(120000);
-        transcriptionService.statusHistory.add(status);
-        onStatus(status);
-      };
+  test('rapid repeated taps while start is in flight trigger only one start attempt', () async {
+    final startCompleter = Completer<void>();
+    transcriptionService.startFutureFactory = (onStatus) async {
+      await startCompleter.future;
+      final status = RecordingStarted(120000);
+      transcriptionService.statusHistory.add(status);
+      onStatus(status);
+    };
 
-      final firstTap = container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      final secondTap = container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    final firstTap = container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    final secondTap = container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(transcriptionService.startCallCount, 1);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingIdle(),
-      );
+    expect(transcriptionService.startCallCount, 1);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingIdle(),
+    );
 
-      startCompleter.complete();
-      await Future.wait([firstTap, secondTap]);
+    startCompleter.complete();
+    await Future.wait([firstTap, secondTap]);
 
-      expect(transcriptionService.startCallCount, 1);
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
-      );
-    },
-  );
+    expect(transcriptionService.startCallCount, 1);
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      RecordingListening(hardCapDeadlineElapsedRealtime: 120000),
+    );
+  });
 
   test(
     'starting a new recording cancels a stale Error auto-clear timer',
@@ -1092,62 +1080,59 @@ void main() {
     },
   );
 
-  test(
-    'rapid error-to-error transitions keep the newer error until its own auto-clear fires',
-    () async {
-      container.dispose();
-      container = buildContainer(
-        feedbackDelays: const RecordingFeedbackDelays(
-          errorAndDeletedAutoClear: Duration(milliseconds: 60),
-        ),
-      );
+  test('rapid error-to-error transitions keep the newer error until its own auto-clear fires', () async {
+    container.dispose();
+    container = buildContainer(
+      feedbackDelays: const RecordingFeedbackDelays(
+        errorAndDeletedAutoClear: Duration(milliseconds: 60),
+      ),
+    );
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      transcriptionService.nextStopResult = const TranscriptionFailure(
-        reason: TranscriptionFailureReason.tooShort,
-      );
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    transcriptionService.nextStopResult = const TranscriptionFailure(
+      reason: TranscriptionFailureReason.tooShort,
+    );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.tooShort),
-      );
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.tooShort),
+    );
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+    await Future<void>.delayed(const Duration(milliseconds: 30));
 
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
-      monotonicClock.advance(const Duration(seconds: 6));
-      transcriptionService.nextStopResult = const TranscriptionFailure(
-        reason: TranscriptionFailureReason.apiError,
-      );
-      await container
-          .read(mainRecordingControllerProvider.notifier)
-          .onMainButtonTapped();
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
+    monotonicClock.advance(const Duration(seconds: 6));
+    transcriptionService.nextStopResult = const TranscriptionFailure(
+      reason: TranscriptionFailureReason.apiError,
+    );
+    await container
+        .read(mainRecordingControllerProvider.notifier)
+        .onMainButtonTapped();
 
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.apiFailed),
-      );
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.apiFailed),
+    );
 
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingErrorState(RecordingError.apiFailed),
-      );
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingErrorState(RecordingError.apiFailed),
+    );
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(
-        container.read(mainRecordingControllerProvider).recordingState,
-        const RecordingIdle(),
-      );
-    },
-  );
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(
+      container.read(mainRecordingControllerProvider).recordingState,
+      const RecordingIdle(),
+    );
+  });
 
   test(
     'starting a new recording cancels a stale Deleted auto-clear timer',
@@ -1254,9 +1239,8 @@ class _FakeTranscriptionService implements TranscriptionService {
     final pendingResult = stopFutureFactory?.call();
     final immediateResult = pendingResult == null ? nextStopResult : null;
 
-    if (immediateResult case TranscriptionFailure(
-      reason: final reason,
-    ) when reason == TranscriptionFailureReason.tooShort) {
+    if (immediateResult case TranscriptionFailure(reason: final reason)
+        when reason == TranscriptionFailureReason.tooShort) {
       return immediateResult;
     }
 

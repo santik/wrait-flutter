@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../presentation/theme/design_tokens.dart';
 import 'feedback_model.dart';
 
-const feedbackPrivacyCopy =
-    'Do not include private journal content unless you choose to type it into your message.';
 const feedbackContactFieldKey = ValueKey<String>('feedbackContactField');
 const feedbackMessageFieldKey = ValueKey<String>('feedbackMessageField');
 const feedbackPrivacyCopyKey = ValueKey<String>('feedbackPrivacyCopy');
@@ -17,10 +16,11 @@ Future<FeedbackDraft?> showFeedbackPreparationDialog(
   BuildContext context, {
   FeedbackDraft? initialDraft,
 }) {
+  final l10n = AppLocalizations.of(context);
   return showGeneralDialog<FeedbackDraft>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Dismiss feedback',
+    barrierLabel: l10n.feedbackDismissLabel,
     pageBuilder: (context, animation, secondaryAnimation) {
       final mediaQuery = MediaQuery.of(context);
       final maxHeight = (mediaQuery.size.height - mediaQuery.padding.top)
@@ -189,6 +189,7 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final category = _category;
     final canSubmit =
@@ -208,12 +209,9 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('send feedback', style: theme.textTheme.titleLarge),
+                Text(l10n.feedbackTitle, style: theme.textTheme.titleLarge),
                 const SizedBox(height: WraitSpacingTokens.sm),
-                Text(
-                  'What would you like to share?',
-                  style: theme.textTheme.bodyMedium,
-                ),
+                Text(l10n.feedbackPrompt, style: theme.textTheme.bodyMedium),
                 const SizedBox(height: WraitSpacingTokens.sm),
                 Wrap(
                   spacing: WraitSpacingTokens.sm,
@@ -221,7 +219,7 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
                   children: [
                     for (final option in FeedbackCategory.values)
                       ChoiceChip(
-                        label: Text(option.label),
+                        label: Text(option.localizedLabel(l10n)),
                         selected: category == option,
                         onSelected: (_) => setState(() => _category = option),
                       ),
@@ -234,9 +232,9 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
                   focusNode: _contactFocusNode,
                   maxLines: 1,
                   scrollPadding: EdgeInsets.zero,
-                  decoration: const InputDecoration(
-                    labelText: 'reply contact (optional)',
-                    hintText: 'any contact information',
+                  decoration: InputDecoration(
+                    labelText: l10n.feedbackContactLabel,
+                    hintText: l10n.feedbackContactHint,
                   ),
                 ),
                 const SizedBox(height: WraitSpacingTokens.sm),
@@ -249,14 +247,14 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
                   maxLines: 10,
                   maxLength: 2048,
                   scrollPadding: EdgeInsets.zero,
-                  decoration: const InputDecoration(
-                    labelText: 'feedback',
-                    hintText: 'what would you like to share?',
+                  decoration: InputDecoration(
+                    labelText: l10n.feedbackMessageLabel,
+                    hintText: l10n.feedbackMessageHint,
                   ),
                 ),
                 const SizedBox(height: WraitSpacingTokens.md),
                 Text(
-                  feedbackPrivacyCopy,
+                  l10n.feedbackPrivacyCopy,
                   key: feedbackPrivacyCopyKey,
                   style: theme.textTheme.bodySmall,
                 ),
@@ -266,7 +264,7 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('cancel'),
+                      child: Text(l10n.feedbackCancel),
                     ),
                     const SizedBox(width: WraitSpacingTokens.sm),
                     FilledButton(
@@ -282,7 +280,7 @@ class _FeedbackPreparationSheetState extends State<FeedbackPreparationSheet> {
                               );
                             }
                           : null,
-                      child: const Text('submit'),
+                      child: Text(l10n.feedbackSubmit),
                     ),
                   ],
                 ),

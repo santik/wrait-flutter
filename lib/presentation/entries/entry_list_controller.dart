@@ -43,8 +43,11 @@ class EntryListSearchQuery extends Notifier<String> {
   }
 }
 
-typedef EntryListWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef EntryListWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 final entryListWarningLoggerProvider = Provider<EntryListWarningLogger>((ref) {
   return (message, {error, stackTrace}) {

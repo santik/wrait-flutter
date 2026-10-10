@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'recording_state.dart';
 
 enum MainScreenStatusAction {
@@ -29,44 +30,45 @@ class MainScreenStatusPresentation {
 MainScreenStatusPresentation resolveMainScreenStatus({
   required RecordingControllerState controllerState,
   required bool hasEverRecorded,
+  required AppLocalizations l10n,
 }) {
   final recordingState = controllerState.recordingState;
   final buttonLabel = switch (recordingState) {
-    RecordingListening() => 'stop',
-    _ => 'wrait',
+    RecordingListening() => l10n.mainButtonStop,
+    _ => l10n.mainButtonWrait,
   };
 
   return switch (recordingState) {
     RecordingIdle() when !hasEverRecorded => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'tap button to write',
+      statusText: l10n.statusTapToWrite,
       action: MainScreenStatusAction.startRecording,
     ),
     RecordingIdle() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'wrait',
+      statusText: l10n.statusWrait,
     ),
     RecordingListening() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'listening...',
+      statusText: l10n.statusListening,
     ),
     RecordingUploading() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'processing...',
+      statusText: l10n.statusProcessing,
     ),
     RecordingProcessing() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'cleaning up...',
+      statusText: l10n.statusCleaningUp,
     ),
     RecordingSaved(entryId: final entryId) => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'saved, tap to read',
+      statusText: l10n.statusSavedTapToRead,
       action: MainScreenStatusAction.openSavedEntry,
       savedEntryId: entryId,
     ),
     RecordingDeleted() => MainScreenStatusPresentation(
       buttonLabel: buttonLabel,
-      statusText: 'deleted',
+      statusText: l10n.statusDeleted,
     ),
     RecordingErrorState(
       error: RecordingError.noInternet,
@@ -74,7 +76,7 @@ MainScreenStatusPresentation resolveMainScreenStatus({
     ) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'no connection · saved as draft',
+        statusText: l10n.statusNoConnectionDraft,
       ),
     RecordingErrorState(
       error: RecordingError.backendUnavailable,
@@ -82,7 +84,7 @@ MainScreenStatusPresentation resolveMainScreenStatus({
     ) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'service unavailable · saved as draft',
+        statusText: l10n.statusServiceUnavailableDraft,
       ),
     RecordingErrorState(
       error: RecordingError.proxyAuthFailed,
@@ -90,7 +92,15 @@ MainScreenStatusPresentation resolveMainScreenStatus({
     ) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'server config error · saved as draft',
+        statusText: l10n.statusServerConfigErrorDraft,
+      ),
+    RecordingErrorState(
+      error: RecordingError.speechNotRecognized,
+      preservedDraft: true,
+    ) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: l10n.statusSpeechNotRecognizedDraft,
       ),
     RecordingErrorState(
       error: RecordingError.apiFailed,
@@ -98,53 +108,58 @@ MainScreenStatusPresentation resolveMainScreenStatus({
     ) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'saved as draft · will retry',
+        statusText: l10n.statusApiFailedDraft,
       ),
     RecordingErrorState(error: RecordingError.tooShort) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'too short · keep talking',
+        statusText: l10n.statusTooShort,
       ),
     RecordingErrorState(error: RecordingError.noMatch) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'nothing caught · too quiet?',
+        statusText: l10n.statusNothingCaught,
       ),
     RecordingErrorState(error: RecordingError.microphoneDenied) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'mic needed · tap again',
+        statusText: l10n.statusMicNeeded,
         action: MainScreenStatusAction.startRecording,
-        semanticsLabel: 'Microphone access is required to start recording.',
-        semanticsHint: 'Double tap to request microphone access again.',
+        semanticsLabel: l10n.statusMicNeededSemanticsLabel,
+        semanticsHint: l10n.statusMicNeededSemanticsHint,
       ),
     RecordingErrorState(error: RecordingError.microphoneBlocked) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'mic blocked · tap settings',
+        statusText: l10n.statusMicBlocked,
         action: MainScreenStatusAction.openMicrophoneSettings,
-        semanticsLabel: 'Microphone access is blocked for Wrait.',
-        semanticsHint: 'Double tap to open app settings.',
+        semanticsLabel: l10n.statusMicBlockedSemanticsLabel,
+        semanticsHint: l10n.statusMicBlockedSemanticsHint,
       ),
     RecordingErrorState(error: RecordingError.noInternet) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'no connection',
+        statusText: l10n.statusNoConnection,
       ),
     RecordingErrorState(error: RecordingError.backendUnavailable) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'service unavailable',
+        statusText: l10n.statusServiceUnavailable,
       ),
     RecordingErrorState(error: RecordingError.proxyAuthFailed) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'server config error',
+        statusText: l10n.statusServerConfigError,
+      ),
+    RecordingErrorState(error: RecordingError.speechNotRecognized) =>
+      MainScreenStatusPresentation(
+        buttonLabel: buttonLabel,
+        statusText: l10n.statusSpeechNotRecognized,
       ),
     RecordingErrorState(error: RecordingError.apiFailed) =>
       MainScreenStatusPresentation(
         buttonLabel: buttonLabel,
-        statusText: 'something went wrong',
+        statusText: l10n.statusSomethingWentWrong,
       ),
   };
 }

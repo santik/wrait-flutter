@@ -15,7 +15,7 @@ Map<String, Object> buildFeedbackMetadata({
     'app_area': appArea,
     'platform': _platformName(platform),
     'locale': locale.toLanguageTag(),
-    'feedback_category': draft.category.label,
+    'feedback_category': _categoryValue(draft.category),
   };
 
   if (draft.replyContact.trim().isNotEmpty) {
@@ -50,6 +50,11 @@ CustomizableWiredashMetaData applyFeedbackMetadata({
   metadata.custom = safeMetadata;
   return metadata;
 }
+
+// Stable, non-localized value. Capitalized to match the historical English
+// labels ('Bug', 'Idea', ...) so existing Wiredash dashboard filters keep working.
+String _categoryValue(FeedbackCategory category) =>
+    category.name[0].toUpperCase() + category.name.substring(1);
 
 String _platformName(TargetPlatform platform) => switch (platform) {
   TargetPlatform.android => 'android',

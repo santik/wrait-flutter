@@ -10,8 +10,11 @@ import 'entry_deletion_controller.dart';
 import 'entry_detail_formatters.dart';
 import 'entry_share_service.dart';
 
-typedef EntryDetailWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef EntryDetailWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 final entryDetailWarningLoggerProvider = Provider<EntryDetailWarningLogger>((
   ref,

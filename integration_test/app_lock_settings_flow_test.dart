@@ -14,6 +14,7 @@ import 'package:wrait/presentation/app_lock/app_lock_gate.dart';
 import 'package:wrait/presentation/app_lock/app_lock_test_keys.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
+import 'package:wrait/presentation/locale/app_localizations_fallback.dart';
 import 'package:wrait/presentation/settings/settings_screen.dart';
 import 'package:wrait/presentation/settings/settings_test_keys.dart';
 
@@ -50,8 +51,7 @@ void main() {
       expect(authenticator.authenticateCalls, 0);
       expect(preferences.getBool('app_lock_enabled'), isTrue);
 
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      _simulateForegroundExitAndResume(tester);
       await tester.pumpAndSettle();
 
       expect(authenticator.authenticateCalls, 1);
@@ -67,8 +67,7 @@ void main() {
       expect(preferences.getBool('app_lock_enabled'), isFalse);
       expect(authenticator.authenticateCalls, 2);
 
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      _simulateForegroundExitAndResume(tester);
       await tester.pumpAndSettle();
       expect(find.byKey(appLockOverlayKey), findsNothing);
       expect(authenticator.authenticateCalls, 2);
@@ -115,8 +114,7 @@ void main() {
     await tester.pump();
     expect(find.byKey(appLockSavingKey), findsOneWidget);
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    _simulateForegroundExitAndResume(tester);
     availability.complete(AppLockAvailability.available);
     await tester.pumpAndSettle();
 
@@ -216,6 +214,8 @@ void main() {
         ],
         child: MaterialApp.router(
           routerConfig: router,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: const [Locale('en')],
           builder: (context, child) => AppLockGate(child: child!),
         ),
       ),
@@ -226,6 +226,15 @@ void main() {
     expect(find.byKey(appLockOverlayKey), findsOneWidget);
     expect(authenticator.authenticateCalls, 1);
   });
+}
+
+void _simulateForegroundExitAndResume(WidgetTester tester) {
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
 }
 
 Widget _app({
@@ -243,6 +252,8 @@ Widget _app({
       mainRecordingControllerProvider.overrideWith(_IdleController.new),
     ],
     child: MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
+      supportedLocales: const [Locale('en')],
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: textScaler),
         child: child!,

@@ -3,12 +3,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/domain/model/entry.dart';
-import 'package:wrait/presentation/entries/entry_list_formatters.dart';
 import 'package:wrait/presentation/entries/entry_list_row.dart';
 import 'package:wrait/presentation/theme/wrait_theme.dart';
+
+import '../../test_doubles/l10n_test_helper.dart';
 
 void main() {
   testWidgets('renders timestamp, preview, language, and draft marker', (
@@ -71,7 +71,7 @@ void main() {
     await tester.pump();
 
     expect(tapped, isFalse);
-    expect(find.text(entryListAudioDraftPreview), findsOneWidget);
+    expect(find.text(testL10n().entryListAudioDraftPreview), findsOneWidget);
     final semanticsData = tester
         .getSemantics(find.byKey(const ValueKey('entryRow-1')))
         .getSemanticsData();
@@ -84,12 +84,12 @@ void main() {
 
     expect(semanticsData.label, contains('English'));
     expect(semanticsData.hint, 'Swipe right to delete.');
-    expect(semanticsData.value, 'draft, $entryListAudioDraftStateDescription');
+    expect(semanticsData.value, 'draft, ${testL10n().entryListAudioDraftStateDescription}');
     expect(semanticsData.flagsCollection.isButton, isTrue);
     expect(semanticsData.flagsCollection.isEnabled, ui.Tristate.isFalse);
     expect(
       customActions,
-      contains(const CustomSemanticsAction(label: entryListDeleteActionLabel)),
+      contains(CustomSemanticsAction(label: testL10n().entryListDeleteActionLabel)),
     );
 
     semanticsHandle.dispose();
@@ -227,7 +227,7 @@ void main() {
 
     tester.semantics.customAction(
       find.semantics.byLabel(semanticsLabel),
-      const CustomSemanticsAction(label: entryListDeleteActionLabel),
+      CustomSemanticsAction(label: testL10n().entryListDeleteActionLabel),
     );
     await tester.pumpAndSettle();
 
@@ -273,8 +273,8 @@ Widget _buildTestApp(Widget child) {
   return MaterialApp(
     locale: const Locale('en', 'US'),
     theme: wraitLightTheme,
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    supportedLocales: const [Locale('en', 'US'), Locale('nl', 'NL')],
+    localizationsDelegates: testLocalizationsDelegates,
+    supportedLocales: testSupportedLocales,
     home: Scaffold(body: Center(child: child)),
   );
 }

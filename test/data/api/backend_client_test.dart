@@ -157,6 +157,38 @@ void main() {
       );
     });
 
+    test('transcription forwards an exact supported language code', () async {
+      generatedClient.transcribeResponses.add(
+        const GeneratedApiSuccess<TranscribeResponse>(
+          statusCode: 200,
+          data: TranscribeResponse(
+            transcript: 'hello',
+            detectedLanguage: 'de-CH',
+          ),
+        ),
+      );
+
+      await backendClient.transcribeAudio(
+        await _createTempAudioFile('language'),
+        language: 'de-CH',
+      );
+
+      expect(generatedClient.lastTranscriptionLanguage, 'de-CH');
+    });
+
+    test(
+      'transcription rejects unsupported language before the request',
+      () async {
+        final result = await backendClient.transcribeAudio(
+          await _createTempAudioFile('invalid-language'),
+          language: 'multi',
+        );
+
+        expect(result, isA<TranscriptionFailure>());
+        expect(generatedClient.transcribeCallCount, 0);
+      },
+    );
+
     test('cleanup maps 401 to proxy auth failure', () async {
       generatedClient.cleanupResponses.add(
         const GeneratedApiFailure<CleanupResponse>(
@@ -390,6 +422,35 @@ void main() {
       );
     });
 
+    test(
+      'transcription maps 422 to speech not recognized without quota',
+      () async {
+        generatedClient.transcribeResponses.add(
+          const GeneratedApiFailure<TranscribeResponse>(
+            statusCode: 422,
+            data: <String, dynamic>{
+              'error': 'Speech could not be recognized',
+              'reason': 'speech_not_recognized',
+            },
+          ),
+        );
+
+        final result = await backendClient.transcribeAudio(
+          await _createTempAudioFile('422'),
+        );
+
+        expect(
+          result,
+          isA<TranscriptionFailure>().having(
+            (value) => value.reason,
+            'reason',
+            BackendFailureReason.speechNotRecognized,
+          ),
+        );
+        expect((result as TranscriptionFailure).quota, isNull);
+      },
+    );
+
     test('429 maps to quota exceeded and surfaces valid quota', () async {
       generatedClient.transcribeResponses.add(
         const GeneratedApiFailure<TranscribeResponse>(
@@ -421,35 +482,32 @@ void main() {
       expect((result as TranscriptionFailure).quota?.remaining, 0);
     });
 
-    test(
-      'blank transcript is preserved as a success payload for caller classification',
-      () async {
-        generatedClient.transcribeResponses.add(
-          const GeneratedApiSuccess<TranscribeResponse>(
-            statusCode: 200,
-            data: TranscribeResponse(
-              transcript: '   ',
-              detectedLanguage: 'en-US',
-            ),
+    test('blank transcript is preserved as a success payload for caller classification', () async {
+      generatedClient.transcribeResponses.add(
+        const GeneratedApiSuccess<TranscribeResponse>(
+          statusCode: 200,
+          data: TranscribeResponse(
+            transcript: '   ',
+            detectedLanguage: 'en-US',
           ),
-        );
+        ),
+      );
 
-        final result = await backendClient.transcribeAudio(
-          await _createTempAudioFile('blank-transcript'),
-        );
+      final result = await backendClient.transcribeAudio(
+        await _createTempAudioFile('blank-transcript'),
+      );
 
-        expect(
-          result,
-          isA<TranscriptionSuccess>()
-              .having((value) => value.transcript, 'transcript', '')
-              .having(
-                (value) => value.detectedLanguage,
-                'detectedLanguage',
-                'en-US',
-              ),
-        );
-      },
-    );
+      expect(
+        result,
+        isA<TranscriptionSuccess>()
+            .having((value) => value.transcript, 'transcript', '')
+            .having(
+              (value) => value.detectedLanguage,
+              'detectedLanguage',
+              'en-US',
+            ),
+      );
+    });
 
     test('blank detected language is allowed as nullable success', () async {
       generatedClient.transcribeResponses.add(
@@ -562,6 +620,8 @@ class _FakeGeneratedBackendApiClient implements GeneratedBackendApiClient {
   final List<Object> cleanupResponses = <Object>[];
 
   int registerCallCount = 0;
+  int transcribeCallCount = 0;
+  String? lastTranscriptionLanguage;
 
   @override
   Future<GeneratedApiResponse<CleanupResponse>> cleanupTranscript({
@@ -584,7 +644,10 @@ class _FakeGeneratedBackendApiClient implements GeneratedBackendApiClient {
     required String xDeviceId,
     required List<int> audioBytes,
     required String audioFilename,
+    String? language,
   }) async {
+    transcribeCallCount += 1;
+    lastTranscriptionLanguage = language;
     return _takeNext<GeneratedApiResponse<TranscribeResponse>>(
       transcribeResponses,
     );

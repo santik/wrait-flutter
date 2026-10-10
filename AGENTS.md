@@ -87,6 +87,19 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   `android.permission.USE_BIOMETRIC`, and keeping the AppCompat-compatible
   launch/normal theme parents required by `local_auth_android`.
 
+### Settings screen behavior
+
+- Settings is routed at `/settings` with an optional `focusTranscriptionLanguage`
+  parameter for focused dropdown navigation from the main-screen language
+  indicator.
+- The main screen gear icon is the Settings entry point.
+- Settings changes are disabled during active recording/transcription via
+  `activityActive`.
+- Settings stays behind the existing root `AppLockGate`; do not add a separate
+  settings-specific lock.
+- The activity message covers all settings sections: use one shared message
+  rather than section-specific activity messages.
+
 ### Capture privacy behavior
 
 - Android screenshot, screen-recording, and recent-app protection now lives in
@@ -286,6 +299,12 @@ Full process: see [`docs/spec-driven-workflow.md`](docs/spec-driven-workflow.md)
   generated backend package in `tool/openapi-generator/output/backend_api`
   with at least `flutter pub get` and `flutter analyze` so resolver or
   generated-client compatibility drift is caught explicitly.
+- `integration_test/transcription_language_settings_flow_test.dart` covers
+  dropdown interaction, regional selection, focused navigation from the main
+  indicator, and automatic reset.
+- Settings-related widget tests should override
+  `transcriptionLanguageControllerProvider` with known state to avoid async
+  loading in focused tests.
 - Current Android emulator validation has a known split for recording flows:
   `integration_test/main_recording_controller_flow_test.dart` passes on
   `emulator-5554`, while

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' show Locale;
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,7 @@ import 'package:wrait/data/preferences/preferences_providers.dart';
 import 'package:wrait/data/transcription/transcription_providers.dart';
 import 'package:wrait/data/transcription/transcription_service.dart';
 import 'package:wrait/domain/model/entry.dart';
+import 'package:wrait/l10n/app_localizations.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/main_screen_status.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
@@ -24,6 +26,8 @@ import 'package:wrait/presentation/main/recording_state.dart';
 import '../test/test_doubles/fake_monotonic_clock.dart';
 import '../test/test_doubles/fake_secure_storage.dart';
 import 'support/managed_audio_files.dart';
+
+final _l10n = lookupAppLocalizations(const Locale('en'));
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -124,6 +128,7 @@ void main() {
             mainRecordingControllerProvider,
           ),
           hasEverRecorded: false,
+          l10n: _l10n,
         ).statusText,
         'no connection · saved as draft',
       );
@@ -170,6 +175,7 @@ void main() {
             mainRecordingControllerProvider,
           ),
           hasEverRecorded: false,
+          l10n: _l10n,
         ).statusText,
         'nothing caught · too quiet?',
       );
@@ -258,6 +264,7 @@ void main() {
             mainRecordingControllerProvider,
           ),
           hasEverRecorded: false,
+          l10n: _l10n,
         ).statusText,
         'service unavailable · saved as draft',
       );
@@ -308,6 +315,7 @@ void main() {
             mainRecordingControllerProvider,
           ),
           hasEverRecorded: false,
+          l10n: _l10n,
         ).statusText,
         'server config error · saved as draft',
       );
@@ -352,6 +360,7 @@ void main() {
             mainRecordingControllerProvider,
           ),
           hasEverRecorded: false,
+          l10n: _l10n,
         ).statusText,
         'saved as draft · will retry',
       );

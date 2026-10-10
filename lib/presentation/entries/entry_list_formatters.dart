@@ -3,10 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/model/entry.dart';
 import '../../domain/model/supported_language.dart';
-
-const entryListAudioDraftPreview = 'pending · will retry';
-const entryListAudioDraftStateDescription = 'Audio draft, not yet transcribed';
-const entryListDeleteActionLabel = 'Delete entry';
+import '../../l10n/app_localizations.dart';
 
 class EntryListTimestampLabel {
   const EntryListTimestampLabel({
@@ -34,7 +31,7 @@ EntryListTimestampLabel formatEntryListTimestamp({
       _tryFormatEntryListTimestamp(dateTime, null)!;
 }
 
-String entryListPreviewText(Entry entry) {
+String entryListPreviewText(Entry entry, AppLocalizations l10n) {
   final preferredText = entry.cleanedText;
   if (preferredText != null && preferredText.trim().isNotEmpty) {
     return _firstNonBlankLine(preferredText);
@@ -45,7 +42,7 @@ String entryListPreviewText(Entry entry) {
   }
 
   if (entryListIsAudioOnlyDraft(entry)) {
-    return entryListAudioDraftPreview;
+    return l10n.entryListAudioDraftPreview;
   }
 
   return '';

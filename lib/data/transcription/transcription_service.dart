@@ -57,6 +57,7 @@ enum TranscriptionFailureReason {
   timeout,
   backendUnavailable,
   proxyAuthFailed,
+  speechNotRecognized,
   apiError,
 }
 
@@ -87,7 +88,8 @@ bool hasUsableTranscriptContent(String transcript) {
 }
 
 final _usableTranscriptCharacterPattern = RegExp(
-  r'[0-9A-Za-zÀ-ɏА-Яа-яЁёЇїІіЄєҐґ]',
+  r'[\p{L}\p{N}]',
+  unicode: true,
 );
 
 /// Failed transcription result mapped to the app-facing failure surface.
@@ -95,11 +97,13 @@ final class TranscriptionFailure extends TranscriptionResult {
   const TranscriptionFailure({
     required this.reason,
     this.audioDraftPath,
+    this.requestedLanguage,
     this.quota,
   });
 
   final TranscriptionFailureReason reason;
   final String? audioDraftPath;
+  final String? requestedLanguage;
   final RecordQuotaState? quota;
 }
 
@@ -123,6 +127,12 @@ final class NoActiveLiveTranscriptionFailure
     extends TranscriptionServiceFailure {
   const NoActiveLiveTranscriptionFailure()
     : super('No live cloud transcription recording is active.');
+}
+
+final class TranscriptionLanguageUnavailableFailure
+    extends TranscriptionServiceFailure {
+  const TranscriptionLanguageUnavailableFailure()
+    : super('The saved transcription language could not be loaded.');
 }
 
 final class MicBlockedTranscriptionServiceFailure

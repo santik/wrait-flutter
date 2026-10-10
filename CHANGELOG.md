@@ -2,6 +2,19 @@
 
 All notable changes to wrait are documented here.
 
+## [1.0.3] - 2026-09-30
+
+### Added
+
+- Added a setting to choose whether Wrait uses the device lock when opening
+  the app.
+
+### Changed
+
+- Entry text can now be tapped to start editing immediately.
+- Updated Flutter and project dependencies for improved compatibility and
+  maintenance.
+
 ## [1.0.0] - 2026-07-13
 
 Initial public Flutter client release preparation.

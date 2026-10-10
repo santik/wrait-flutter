@@ -22,9 +22,10 @@ import 'package:wrait/domain/repository/entry_repository.dart';
 import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/domain/service/entry_export_service.dart';
 import 'package:wrait/domain/service/entry_import_service.dart';
-import 'package:wrait/presentation/entries/entry_list_formatters.dart';
 import 'package:wrait/presentation/main/main_recording_controller.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
+
+import '../../test_doubles/l10n_test_helper.dart';
 
 void main() {
   late _TestEntryRepository entryRepository;
@@ -267,7 +268,7 @@ void main() {
 
     await _pumpEntryListApp(tester, entryRepository: entryRepository);
 
-    expect(find.text(entryListAudioDraftPreview), findsOneWidget);
+    expect(find.text(testL10n().entryListAudioDraftPreview), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('entryCard-9')));
     await tester.pumpAndSettle();
@@ -346,7 +347,7 @@ void main() {
 
     expect(
       customActions,
-      contains(const CustomSemanticsAction(label: entryListDeleteActionLabel)),
+      contains(CustomSemanticsAction(label: testL10n().entryListDeleteActionLabel)),
     );
 
     semanticsHandle.dispose();

@@ -13,6 +13,8 @@ import 'package:wrait/domain/repository/preferences_repository.dart';
 import 'package:wrait/presentation/app_lock/app_lock_gate.dart';
 import 'package:wrait/presentation/app_lock/app_lock_test_keys.dart';
 
+import '../../test_doubles/l10n_test_helper.dart';
+
 void main() {
   testWidgets('loading preference never paints or exposes protected content', (
     tester,
@@ -26,6 +28,8 @@ void main() {
           preferencesRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
           home: AppLockGate(
             child: Semantics(
               label: 'protected content',
@@ -51,8 +55,12 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appLockEnabledProvider.overrideWithValue(false)],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );
@@ -82,6 +90,8 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
           home: AppLockGate(
             child: Scaffold(
               body: Center(
@@ -126,8 +136,12 @@ void main() {
             _TestSettingsOpener(),
           ),
         ],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );
@@ -147,8 +161,12 @@ void main() {
         overrides: [
           preferencesRepositoryProvider.overrideWithValue(repository),
         ],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );
@@ -181,8 +199,12 @@ void main() {
             _TestSettingsOpener(),
           ),
         ],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );
@@ -215,8 +237,12 @@ void main() {
             _TestSettingsOpener(),
           ),
         ],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );
@@ -256,6 +282,8 @@ void main() {
             appLockAuthenticatorProvider.overrideWithValue(authenticator),
           ],
           child: MaterialApp(
+            localizationsDelegates: testLocalizationsDelegates,
+            supportedLocales: testSupportedLocales,
             home: StatefulBuilder(
               builder: (context, setState) {
                 rebuildParent = setState;
@@ -300,8 +328,12 @@ void main() {
             settingsOpener,
           ),
         ],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );
@@ -343,8 +375,12 @@ void main() {
             _TestSettingsOpener(),
           ),
         ],
-        child: const MaterialApp(
-          home: AppLockGate(child: Scaffold(body: Text('secret content'))),
+        child: MaterialApp(
+          localizationsDelegates: testLocalizationsDelegates,
+          supportedLocales: testSupportedLocales,
+          home: const AppLockGate(
+            child: Scaffold(body: Text('secret content')),
+          ),
         ),
       ),
     );

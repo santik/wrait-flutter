@@ -24,6 +24,39 @@ void main() {
     await expectLater(repository.getHasEverRecorded(), completion(isFalse));
   });
 
+  test(
+    'transcription language defaults to automatic and persists exact codes',
+    () async {
+      expect(await repository.getTranscriptionLanguage(), isNull);
+
+      await repository.setTranscriptionLanguage('de-CH');
+      expect(await repository.getTranscriptionLanguage(), 'de-CH');
+
+      await repository.setTranscriptionLanguage(null);
+      expect(await repository.getTranscriptionLanguage(), isNull);
+    },
+  );
+
+  test('invalid stored transcription language resolves to automatic', () async {
+    preferencesStore.stringValues[PreferencesRepositoryImpl
+            .transcriptionLanguageKey] =
+        'en-US';
+
+    expect(await repository.getTranscriptionLanguage(), isNull);
+  });
+
+  test('rejects unsupported transcription language without writing', () async {
+    await expectLater(
+      repository.setTranscriptionLanguage('multi'),
+      throwsArgumentError,
+    );
+    expect(
+      preferencesStore.stringValues[PreferencesRepositoryImpl
+          .transcriptionLanguageKey],
+      isNull,
+    );
+  });
+
   test('app lock defaults to false when unset', () async {
     await expectLater(repository.getAppLockEnabled(), completion(isFalse));
   });
@@ -239,6 +272,7 @@ class _FakePreferencesStore implements PreferencesStore {
   final Map<String, bool> persistedBoolValues = {};
   bool failBoolWrites = false;
   bool failStringWrites = false;
+  bool failRemoves = false;
   bool mutateCacheBeforeFailedBoolWrite = false;
   bool failReload = false;
   int reloadCount = 0;
@@ -273,6 +307,16 @@ class _FakePreferencesStore implements PreferencesStore {
     }
 
     stringValues[key] = value;
+    return true;
+  }
+
+  @override
+  Future<bool> remove(String key) async {
+    if (failRemoves) {
+      return false;
+    }
+    boolValues.remove(key);
+    stringValues.remove(key);
     return true;
   }
 

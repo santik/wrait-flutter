@@ -3,12 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wrait/presentation/app_lock/app_lock_controller.dart';
 import 'package:wrait/presentation/app_lock/app_lock_screen.dart';
 
+import '../../test_doubles/l10n_test_helper.dart';
+
 void main() {
   testWidgets('locked screen shows Wrait copy and no Flutter logo', (
     tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: AppLockScreen(
           state: const AppLockState.locked(),
           onUnlock: () {},
@@ -28,6 +32,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: testLocalizationsDelegates,
+        supportedLocales: testSupportedLocales,
         home: AppLockScreen(
           state: const AppLockState.locked(status: AppLockStatus.noSecurity),
           onUnlock: () {},

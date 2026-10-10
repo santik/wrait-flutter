@@ -3,8 +3,11 @@ import '../../data/api/record_quota_state.dart';
 
 typedef RegisterDeviceCallback = Future<RegistrationResult> Function();
 typedef SetRecordQuotaCallback = void Function(RecordQuotaState quota);
-typedef RegistrationWarningLogger =
-    void Function(String message, {Object? error, StackTrace? stackTrace});
+typedef RegistrationWarningLogger = void Function(
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 enum LaunchDeviceRegistrationResult { success, failure }
 

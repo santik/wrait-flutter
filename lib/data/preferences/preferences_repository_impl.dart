@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/repository/app_lock_preferences_repository.dart';
 import '../../domain/repository/preferences_repository.dart';
+import '../../domain/repository/transcription_language_preferences_repository.dart';
+import '../../domain/model/supported_language.dart';
 import 'platform_device_id_provider.dart';
 
 abstract interface class PreferencesStore {
@@ -14,6 +16,7 @@ abstract interface class PreferencesStore {
   String? getString(String key);
   Future<bool> setBool(String key, bool value);
   Future<bool> setString(String key, String value);
+  Future<bool> remove(String key);
   Future<void> reload();
 }
 
@@ -42,11 +45,17 @@ class SharedPreferencesStore implements PreferencesStore {
   }
 
   @override
+  Future<bool> remove(String key) => _sharedPreferences.remove(key);
+
+  @override
   Future<void> reload() => _sharedPreferences.reload();
 }
 
 class PreferencesRepositoryImpl
-    implements PreferencesRepository, AppLockPreferencesRepository {
+    implements
+        PreferencesRepository,
+        AppLockPreferencesRepository,
+        TranscriptionLanguagePreferencesRepository {
   PreferencesRepositoryImpl({
     SharedPreferences? sharedPreferences,
     PreferencesStore? preferencesStore,
@@ -63,6 +72,7 @@ class PreferencesRepositoryImpl
   static const hasEverRecordedKey = 'has_ever_recorded';
   static const appLockEnabledKey = 'app_lock_enabled';
   static const deviceIdKey = 'app_device_id';
+  static const transcriptionLanguageKey = 'transcription_language';
   static const deviceIdSalt = 'wrait-v1';
 
   final PlatformDeviceIdProvider deviceIdProvider;
@@ -70,6 +80,33 @@ class PreferencesRepositoryImpl
   final Random _random;
   String? _cachedDeviceId;
   bool? _confirmedAppLockEnabled;
+
+  @override
+  Future<String?> getTranscriptionLanguage() async {
+    final stored = _preferencesStore.get(transcriptionLanguageKey);
+    if (stored is! String || !supportedLanguageCodes.contains(stored)) {
+      return null;
+    }
+    return stored;
+  }
+
+  @override
+  Future<void> setTranscriptionLanguage(String? language) async {
+    if (language != null && !supportedLanguageCodes.contains(language)) {
+      throw ArgumentError.value(
+        language,
+        'language',
+        'must be an exact supported transcription language code',
+      );
+    }
+
+    final persisted = language == null
+        ? await _preferencesStore.remove(transcriptionLanguageKey)
+        : await _preferencesStore.setString(transcriptionLanguageKey, language);
+    if (!persisted) {
+      throw StateError('Failed to persist transcriptionLanguage');
+    }
+  }
 
   @override
   Future<bool> getAppLockEnabled() async {

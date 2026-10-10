@@ -1,12 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wrait/l10n/app_localizations.dart';
 import 'package:wrait/presentation/main/main_screen_status.dart';
 import 'package:wrait/presentation/main/recording_state.dart';
 
+import '../../test_doubles/l10n_test_helper.dart';
+
 void main() {
+  late AppLocalizations l10n;
+
+  setUpAll(() {
+    l10n = testL10n();
+  });
+
   test('returns the first-time idle presentation', () {
     final presentation = resolveMainScreenStatus(
       controllerState: const RecordingControllerState(),
       hasEverRecorded: false,
+      l10n: l10n,
     );
 
     expect(presentation.buttonLabel, 'wrait');
@@ -18,6 +28,7 @@ void main() {
     final presentation = resolveMainScreenStatus(
       controllerState: const RecordingControllerState(),
       hasEverRecorded: true,
+      l10n: l10n,
     );
 
     expect(presentation.buttonLabel, 'wrait');
@@ -33,6 +44,7 @@ void main() {
         ),
       ),
       hasEverRecorded: true,
+      l10n: l10n,
     );
 
     expect(presentation.buttonLabel, 'stop');
@@ -45,6 +57,7 @@ void main() {
         recordingState: RecordingSaved(entryId: 14, detectedLanguage: 'en-US'),
       ),
       hasEverRecorded: true,
+      l10n: l10n,
     );
 
     expect(presentation.buttonLabel, 'wrait');
@@ -67,6 +80,10 @@ void main() {
         RecordingError.proxyAuthFailed,
         preservedDraft: true,
       ): 'server config error · saved as draft',
+      const RecordingErrorState(
+        RecordingError.speechNotRecognized,
+        preservedDraft: true,
+      ): 'not recognized · saved as draft',
       const RecordingErrorState(RecordingError.apiFailed, preservedDraft: true):
           'saved as draft · will retry',
     };
@@ -75,6 +92,7 @@ void main() {
       final presentation = resolveMainScreenStatus(
         controllerState: RecordingControllerState(recordingState: entry.key),
         hasEverRecorded: true,
+        l10n: l10n,
       );
 
       expect(presentation.statusText, entry.value);
@@ -96,6 +114,8 @@ void main() {
           'service unavailable',
       const RecordingErrorState(RecordingError.proxyAuthFailed):
           'server config error',
+      const RecordingErrorState(RecordingError.speechNotRecognized):
+          'not recognized',
       const RecordingErrorState(RecordingError.apiFailed):
           'something went wrong',
       const RecordingDeleted(2): 'deleted',
@@ -107,6 +127,7 @@ void main() {
       final presentation = resolveMainScreenStatus(
         controllerState: RecordingControllerState(recordingState: entry.key),
         hasEverRecorded: true,
+        l10n: l10n,
       );
       expect(presentation.statusText, entry.value);
     }
@@ -118,37 +139,37 @@ void main() {
         recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
       ),
       hasEverRecorded: true,
+      l10n: l10n,
     );
 
     expect(presentation.action, MainScreenStatusAction.openMicrophoneSettings);
   });
 
-  test(
-    'returns permission-specific accessibility copy for denied and blocked states',
-    () {
-      final denied = resolveMainScreenStatus(
-        controllerState: const RecordingControllerState(
-          recordingState: RecordingErrorState(RecordingError.microphoneDenied),
-        ),
-        hasEverRecorded: true,
-      );
-      final blocked = resolveMainScreenStatus(
-        controllerState: const RecordingControllerState(
-          recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
-        ),
-        hasEverRecorded: true,
-      );
+  test('returns permission-specific accessibility copy for denied and blocked states', () {
+    final denied = resolveMainScreenStatus(
+      controllerState: const RecordingControllerState(
+        recordingState: RecordingErrorState(RecordingError.microphoneDenied),
+      ),
+      hasEverRecorded: true,
+      l10n: l10n,
+    );
+    final blocked = resolveMainScreenStatus(
+      controllerState: const RecordingControllerState(
+        recordingState: RecordingErrorState(RecordingError.microphoneBlocked),
+      ),
+      hasEverRecorded: true,
+      l10n: l10n,
+    );
 
-      expect(
-        denied.semanticsLabel,
-        'Microphone access is required to start recording.',
-      );
-      expect(
-        denied.semanticsHint,
-        'Double tap to request microphone access again.',
-      );
-      expect(blocked.semanticsLabel, 'Microphone access is blocked for Wrait.');
-      expect(blocked.semanticsHint, 'Double tap to open app settings.');
-    },
-  );
+    expect(
+      denied.semanticsLabel,
+      'Microphone access is required to start recording.',
+    );
+    expect(
+      denied.semanticsHint,
+      'Double tap to request microphone access again.',
+    );
+    expect(blocked.semanticsLabel, 'Microphone access is blocked for Wrait.');
+    expect(blocked.semanticsHint, 'Double tap to open app settings.');
+  });
 }

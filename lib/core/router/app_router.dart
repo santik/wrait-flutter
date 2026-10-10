@@ -13,7 +13,10 @@ GoRouter buildAppRouter({String? initialLocation}) {
       GoRoute(path: '/', builder: (context, state) => const MainScreen()),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        builder: (context, state) => SettingsScreen(
+          focusTranscriptionLanguage:
+              state.uri.queryParameters['section'] == 'transcription-language',
+        ),
       ),
       GoRoute(
         path: '/entries',

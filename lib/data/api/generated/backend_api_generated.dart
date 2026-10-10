@@ -32,6 +32,7 @@ abstract interface class GeneratedBackendApiClient {
     required String xDeviceId,
     required List<int> audioBytes,
     required String audioFilename,
+    String? language,
   });
 
   Future<GeneratedApiResponse<CleanupResponse>> cleanupTranscript({
@@ -80,9 +81,13 @@ class DioGeneratedBackendApiClient implements GeneratedBackendApiClient {
     required String xDeviceId,
     required List<int> audioBytes,
     required String audioFilename,
+    String? language,
   }) async {
     final response = await _dio.request<dynamic>(
       '/api/transcribe',
+      queryParameters: language == null
+          ? null
+          : <String, dynamic>{'language': language},
       data: FormData.fromMap(<String, dynamic>{
         'audio': MultipartFile.fromBytes(audioBytes, filename: audioFilename),
       }),

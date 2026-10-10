@@ -12,12 +12,11 @@ import 'package:wiredash/wiredash.dart';
 import 'feedback_metadata.dart';
 import 'feedback_model.dart';
 
-typedef FeedbackSubmissionOverride =
-    Future<bool> Function({
-      required BuildContext context,
-      required FeedbackDraft draft,
-      required String appArea,
-    });
+typedef FeedbackSubmissionOverride = Future<bool> Function({
+  required BuildContext context,
+  required FeedbackDraft draft,
+  required String appArea,
+});
 
 class WiredashFeedbackSubmission {
   const WiredashFeedbackSubmission({

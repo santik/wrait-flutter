@@ -49,18 +49,15 @@ void main() {
     },
   );
 
-  test(
-    'preserves the previous in-memory quota when success exposes no usable quota',
-    () async {
-      registerDevice = () async => const RegistrationSuccess();
+  test('preserves the previous in-memory quota when success exposes no usable quota', () async {
+    registerDevice = () async => const RegistrationSuccess();
 
-      final result = await useCase();
+    final result = await useCase();
 
-      expect(result, LaunchDeviceRegistrationResult.success);
-      expect(currentQuota?.remaining, 4);
-      expect(logMessages, isEmpty);
-    },
-  );
+    expect(result, LaunchDeviceRegistrationResult.success);
+    expect(currentQuota?.remaining, 4);
+    expect(logMessages, isEmpty);
+  });
 
   test(
     'logs and swallows registration failures without clearing quota',

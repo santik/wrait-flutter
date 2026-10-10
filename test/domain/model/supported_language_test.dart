@@ -18,49 +18,90 @@ void main() {
 
   group('resolveSupportedLanguageCode', () {
     test('contains all automatically detected languages with native names', () {
-      expect(supportedLanguages, hasLength(35));
+      expect(supportedLanguages, hasLength(61));
       expect(
         supportedLanguages
             .map((language) => '${language.code}:${language.displayName}')
             .toList(),
         [
-          'bg:български',
-          'ca:català',
-          'cs:čeština',
-          'da:dansk',
+          'af:Afrikaans',
+          'ar:العربية',
+          'as:অসমীয়া',
+          'be:Беларуская',
+          'bg:Български',
+          'bn:বাংলা',
+          'bs:Bosanski',
+          'ca:Català',
+          'cs:Čeština',
+          'da:Dansk',
           'de:Deutsch',
           'de-CH:Deutsch (Schweiz)',
           'el:Ελληνικά',
           'en:English',
           'es:Español',
-          'et:eesti',
-          'fi:suomi',
-          'fr:français',
+          'et:Eesti',
+          'fa:فارسی',
+          'fi:Suomi',
+          'fr:Français',
+          'gu:ગુજરાતી',
+          'he:עברית',
           'hi:हिन्दी',
-          'hu:magyar',
+          'hr:Hrvatski',
+          'hu:Magyar',
+          'hy:Հայերեն',
           'id:Bahasa Indonesia',
-          'it:italiano',
+          'it:Italiano',
           'ja:日本語',
+          'ka:ქართული',
+          'kk:Қазақша',
+          'kn:ಕನ್ನಡ',
           'ko:한국어',
-          'lt:lietuvių',
-          'lv:latviešu',
+          'lt:Lietuvių',
+          'lv:Latviešu',
+          'mk:Македонски',
+          'mn:Монгол',
+          'mr:मराठी',
           'ms:Bahasa Melayu',
+          'ne:नेपाली',
           'nl:Nederlands',
           'nl-BE:Vlaams',
-          'no:norsk',
-          'pl:polski',
-          'pt:português',
-          'ro:română',
-          'ru:русский',
-          'sk:slovenčina',
-          'sv:svenska',
+          'no:Norsk',
+          'pa:ਪੰਜਾਬੀ',
+          'pl:Polski',
+          'ps:پښتو',
+          'pt:Português',
+          'ro:Română',
+          'ru:Русский',
+          'sk:Slovenčina',
+          'sl:Slovenščina',
+          'sr:Српски',
+          'sv:Svenska',
+          'ta:தமிழ்',
+          'te:తెలుగు',
           'th:ไทย',
+          'tl:Filipino',
           'tr:Türkçe',
-          'uk:українська',
+          'uk:Українська',
+          'ur:اردو',
           'vi:Tiếng Việt',
           'zh:中文',
         ],
       );
+    });
+
+    test('starts every cased display label with an uppercase character', () {
+      for (final language in supportedLanguages) {
+        final firstCharacter = language.displayName.substring(0, 1);
+        final hasCase =
+            firstCharacter.toLowerCase() != firstCharacter.toUpperCase();
+        if (hasCase) {
+          expect(
+            firstCharacter,
+            firstCharacter.toUpperCase(),
+            reason: language.code,
+          );
+        }
+      }
     });
 
     test('returns canonical code for exact supported value', () {
